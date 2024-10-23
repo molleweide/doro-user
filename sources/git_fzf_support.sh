@@ -20,6 +20,21 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+# NOTE: This script loads keybinds that map to fzf git selector FZF_GIT_SELECTOR_ACTIONS (*).
+# The first char is used for the binding for each (*)
+FZF_GIT_SELECTOR_ACTIONS=(
+  branches
+  each_ref
+  files
+  hashes
+  lreflogs
+  remotes
+  stashes
+  tags
+  worktrees
+)
+
+
 # NOTE:
 # list all zsh binds with: bindkey -L
 # -------
@@ -114,6 +129,8 @@ __fzf_git_pager() {
 #
 # Allows the fzf git functions to perform and use specific git logic.
 # This could maybe go into dorothy commands?
+#
+# NOTE: new name -> `fzf-git-support-helpers`
 
 # Calling script with ONE arg
 if [[ $# -eq 1 ]]; then
@@ -255,6 +272,9 @@ __fzf_git_script=$(readlink -f "$__fzf_git_script" 2> /dev/null || \
 
 # =======================================================
 # Git types
+
+# TODO: try
+# --cycle
 
 _fzf_git_files() {
   __fzf_ensure_git_repo || return
@@ -415,9 +435,9 @@ if [[ -n "${BASH_VERSION:-}" ]]; then
   }
 elif [[ -n "${ZSH_VERSION:-}" ]]; then
   __fzf_git_join_lines() {
-    local item
-    while read item; do
-      echo -n "${(q)item} "
+    local line
+    while read line; do
+      echo -n "${(q)line} "
     done
   }
 
@@ -535,18 +555,5 @@ elif [[ -n "${ZSH_VERSION:-}" ]]; then
   set +e
 fi
 
-# TODO: put key binds in array as well so that I can configure binds easilly.
-actions=(
-  files
-  branches
-  tags
-  remotes
-  hashes
-  stashes
-  lreflogs
-  each_ref
-  worktrees
-)
-
-__fzf_git_init "${actions[@]}"
+__fzf_git_init "${FZF_GIT_SELECTOR_ACTIONS[@]}"
 fi
