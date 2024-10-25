@@ -4,33 +4,25 @@
 # >>> __keybind_actions should also be moved into a dorothy command
 
 # NOTE: This script loads keybinds that map to fzf git selector FZF_GIT_SELECTOR_ACTIONS (*).
-# The first char is used for the binding for each (*)
-FZF_GIT_SELECTOR_ACTIONS=(
-  branches
-  each_ref
-  files
-  hashes
-  lreflogs
-  remotes
-  stashes
-  tags
-  worktrees
-)
 
 # TODO: It feels like the core also should be moved into a dorothy command so
 # that you can use reuse this easilly.
 
-# TODO: we could use
+DEBUG_FZF="yes"
 
+__print_lines(){
+        printf "%s\n" "$1"
+      }
+
+__debug_lines(){
+      if (( "$DEBUG_FZF" == "yes" )); then
+        __print_lines "[sources/load_binds]: $1"
+      fi
+}
 
 # NOTE: Should these binds be callable if one is not runnig a git command?
 # Eg. should it work to run C-gC-e if the prompt is empty, ie. just triggering
 # the fzf helper standalone.
-
-# BUG: Find why I need to use `set -e` in zsh (and bash?)
-
-# shellcheck disable=SC2039
-[[ $0 = - ]] && return
 
 # echo-style --h1="add git fzf support"
 
@@ -64,21 +56,22 @@ FZF_GIT_SELECTOR_ACTIONS=(
 
 if [[ -n "${BASH_VERSION:-}" ]]; then
   __fzf_git_init() {
-    bind -m emacs-standard '"\er":  redraw-current-line'
-    bind -m emacs-standard '"\C-z": vi-editing-mode'
-    bind -m vi-command     '"\C-z": emacs-editing-mode'
-    bind -m vi-insert      '"\C-z": emacs-editing-mode'
-
-    local o c
-    for o in "$@"; do
-      c=${o:0:1}
-      bind -m emacs-standard '"\C-g\C-'$c'": " \C-u \C-a\C-k`_fzf_git_'$o'`\e\C-e\C-y\C-a\C-y\ey\C-h\C-e\er \C-h"'
-      bind -m vi-command     '"\C-g\C-'$c'": "\C-z\C-g\C-'$c'\C-z"'
-      bind -m vi-insert      '"\C-g\C-'$c'": "\C-z\C-g\C-'$c'\C-z"'
-      bind -m emacs-standard '"\C-g'$c'":    " \C-u \C-a\C-k`_fzf_git_'$o'`\e\C-e\C-y\C-a\C-y\ey\C-h\C-e\er \C-h"'
-      bind -m vi-command     '"\C-g'$c'":    "\C-z\C-g'$c'\C-z"'
-      bind -m vi-insert      '"\C-g'$c'":    "\C-z\C-g'$c'\C-z"'
-    done
+    __debug_lines "bash not supported yet"
+    # bind -m emacs-standard '"\er":  redraw-current-line'
+    # bind -m emacs-standard '"\C-z": vi-editing-mode'
+    # bind -m vi-command     '"\C-z": emacs-editing-mode'
+    # bind -m vi-insert      '"\C-z": emacs-editing-mode'
+    #
+    # local o c
+    # for o in "$@"; do
+    #   c=${o:0:1}
+    #   bind -m emacs-standard '"\C-g\C-'$c'": " \C-u \C-a\C-k`_fzf_git_'$o'`\e\C-e\C-y\C-a\C-y\ey\C-h\C-e\er \C-h"'
+    #   bind -m vi-command     '"\C-g\C-'$c'": "\C-z\C-g\C-'$c'\C-z"'
+    #   bind -m vi-insert      '"\C-g\C-'$c'": "\C-z\C-g\C-'$c'\C-z"'
+    #   bind -m emacs-standard '"\C-g'$c'":    " \C-u \C-a\C-k`_fzf_git_'$o'`\e\C-e\C-y\C-a\C-y\ey\C-h\C-e\er \C-h"'
+    #   bind -m vi-command     '"\C-g'$c'":    "\C-z\C-g'$c'\C-z"'
+    #   bind -m vi-insert      '"\C-g'$c'":    "\C-z\C-g'$c'\C-z"'
+    # done
   }
 elif [[ -n "${FISH_VERSION:-}" ]]; then
 
@@ -91,22 +84,22 @@ elif [[ -n "${FISH_VERSION:-}" ]]; then
     #
     # I need to just read through this doc so that we can add this shit
     # for fish and then have that stuff made for ben later.
-    __debug_lines "[fzf git support]: fish shell is not supported yet."
+    __debug_lines "fish shell is not supported yet."
 
-    # bind \cd 'exit'
-    local o c
-    for o in "$@"; do
-      # local fish_bind_func_handle="fzf-git-$o-widget"
-      local fish_bind_func_handle="_fzf_git_$o"
-      c=${o:0:1}
-      bind "\cg\c$c" "$fish_bind_func_handle"
-      # bind -m emacs-standard '"\C-g\C-'$c'": " \C-u \C-a\C-k`_fzf_git_'$o'`\e\C-e\C-y\C-a\C-y\ey\C-h\C-e\er \C-h"'
-      # bind -m vi-command     '"\C-g\C-'$c'": "\C-z\C-g\C-'$c'\C-z"'
-      # bind -m vi-insert      '"\C-g\C-'$c'": "\C-z\C-g\C-'$c'\C-z"'
-      # bind -m emacs-standard '"\C-g'$c'":    " \C-u \C-a\C-k`_fzf_git_'$o'`\e\C-e\C-y\C-a\C-y\ey\C-h\C-e\er \C-h"'
-      # bind -m vi-command     '"\C-g'$c'":    "\C-z\C-g'$c'\C-z"'
-      # bind -m vi-insert      '"\C-g'$c'":    "\C-z\C-g'$c'\C-z"'
-    done
+    # # bind \cd 'exit'
+    # local o c
+    # for o in "$@"; do
+    #   # local fish_bind_func_handle="fzf-git-$o-widget"
+    #   local fish_bind_func_handle="_fzf_git_$o"
+    #   c=${o:0:1}
+    #   bind "\cg\c$c" "$fish_bind_func_handle"
+    #   # bind -m emacs-standard '"\C-g\C-'$c'": " \C-u \C-a\C-k`_fzf_git_'$o'`\e\C-e\C-y\C-a\C-y\ey\C-h\C-e\er \C-h"'
+    #   # bind -m vi-command     '"\C-g\C-'$c'": "\C-z\C-g\C-'$c'\C-z"'
+    #   # bind -m vi-insert      '"\C-g\C-'$c'": "\C-z\C-g\C-'$c'\C-z"'
+    #   # bind -m emacs-standard '"\C-g'$c'":    " \C-u \C-a\C-k`_fzf_git_'$o'`\e\C-e\C-y\C-a\C-y\ey\C-h\C-e\er \C-h"'
+    #   # bind -m vi-command     '"\C-g'$c'":    "\C-z\C-g'$c'\C-z"'
+    #   # bind -m vi-insert      '"\C-g'$c'":    "\C-z\C-g'$c'\C-z"'
+    # done
   }
 elif [[ -n "${ZSH_VERSION:-}" ]]; then
   __fzf_git_join_lines() {
@@ -121,7 +114,6 @@ elif [[ -n "${ZSH_VERSION:-}" ]]; then
 
   __fzf_git_init() {
 
-
     # local available_funcs=$(declare -f)
     # __print_lines "${available_funcs[@]}"
 
@@ -130,7 +122,11 @@ elif [[ -n "${ZSH_VERSION:-}" ]]; then
 
       # why do we have to generate custom functions???
       local zsh_bind_func_handle="fzf-git-$o-widget"
-      local fzf_action="_fzf_git_$o"
+
+      local key="${o:0:1}"
+      local fzf_helper_arg_name="${o:2}"
+
+      local fzf_action="fzf-helper $fzf_helper_arg_name"
 
       # >> `:Man zshzle`
       #
@@ -200,11 +196,10 @@ elif [[ -n "${ZSH_VERSION:-}" ]]; then
         zle reset-prompt; \
         LBUFFER+=\$result \
       }"
-      __debug_lines "$eval_str__zsh_create_func_handle"
+      __debug_lines "[$o -> $key | $fzf_helper_arg_name]"
 
       # make the func handlers available in the shell.
       eval "$eval_str__zsh_create_func_handle"
-
 
       # >> Mark the func handlers as zsh-widgets
       # This seems to be required in order to enable the use of LBUFFER, inside of
@@ -229,5 +224,18 @@ elif [[ -n "${ZSH_VERSION:-}" ]]; then
   }
   set +e
 fi
+
+# The first char is used for the binding for each (*)
+FZF_GIT_SELECTOR_ACTIONS=(
+  b_branches
+  e_each_ref
+  f_files
+  h_hashes
+  l_reflogs
+  r_remotes
+  s_stashes
+  t_tags
+  w_worktrees
+)
 
 __fzf_git_init "${FZF_GIT_SELECTOR_ACTIONS[@]}"
