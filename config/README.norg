@@ -1,0 +1,20 @@
+@document.meta
+title: README
+description:
+authors: hjalmarjakobsson
+categories:
+created: 2024-10-24T02:51:19-0500
+updated: 2024-10-24T02:52:58-0500
+version: 1.1.1
+@end
+
+
+~ I need to add all of my aliases to `FISH` so that I can
+  jump between shells and know that all of my binds are still there.
+~ Try the elvish shell and see how it feels.
+
+* try multiple shells.
+  the core is bash, but now since i want the best user interaction, i want
+  to add a layer of interactive stuff, and so then it makes sense to use
+  a newer custom shell for this shit. but if you only runt this on the server
+  or whatever, then bash is enough.
