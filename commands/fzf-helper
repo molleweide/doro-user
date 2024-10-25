@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# FIX: fzf picker does not close properly when opening the selection in browser.
+
 # TODO: Rename this to `fuzzy-picker`?
 
 # TODO: if no args, then cal a standard general purpose picker with
@@ -19,6 +21,8 @@ function fzf_helper() (
   source "$DOROTHY/sources/bash.bash"
 
   DEBUG_FZF="yes"
+
+  local LOG_FILE="$DOROTHY/user/fzf_log.txt"
 
   __print_lines() {
     printf "%s\n" "$1"
@@ -56,9 +60,11 @@ function fzf_helper() (
     return 1
   }
 
-  # __fzf_git_script=${BASH_SOURCE[0]:-${(%):-%x}}
-  # __fzf_git_script=$(readlink -f "$__fzf_git_script" 2> /dev/null || \
-  #   /usr/bin/ruby --disable-gems -e 'puts File.expand_path(ARGV.first)' "$__fzf_git_script" 2> /dev/null)
+  # FZF_HELPER_PATH=${BASH_SOURCE[0]:-${(%):-%x}}
+  # FZF_HELPER_PATH=$(readlink -f "$FZF_HELPER_PATH" 2> /dev/null || \
+  #   /usr/bin/ruby --disable-gems -e 'puts File.expand_path(ARGV.first)' "$FZF_HELPER_PATH" 2> /dev/null)
+  # echo "FZF_HELPER_PATH = $FZF_HELPER_PATH"
+  local FZF_HELPER_PATH="$DOROTHY/user/commands/fzf-helper"
 
   # Expects optionally one and only one arg $1
   get_git_color() {
@@ -162,7 +168,9 @@ function fzf_helper() (
   open_in_browser() {
     # Calling script with multiple args.
 
-    __debug_lines "open in browser"
+    # echo "???"
+
+    # __debug_lines "open in browser"
 
     # this is only when the scripting is initiating on shell load.
     # maybe should unset the vars instead.
@@ -208,6 +216,7 @@ function fzf_helper() (
     *) xdg-open "$url$path" ;;
     esac
 
+    # exit 0
     close_picker
   }
 
@@ -234,7 +243,7 @@ function fzf_helper() (
         --color hl:underline,hl+:underline \
         --no-hscroll \
         --bind 'ctrl-/:change-preview-window(down,70%|hidden|)' \
-        --bind "ctrl-o:execute-silent:bash fzf-helper --open-in-browser branch {}" \
+        --bind "ctrl-o:execute-silent:bash $($FZF_HELPER_PATH) --open-in-browser branch {}" \
         --bind "alt-a:change-border-label(🌳 All branches)+reload:bash fzf-helper --get-data all-branches" \
         --preview "$str_preview_cmd" \
         "$@" | sed 's/^..//' | cut -d' ' -f1
@@ -256,7 +265,7 @@ function fzf_helper() (
       picker_cmd -m --ansi --nth 2..,.. \
         --border-label '📁 Files' \
         --header $'CTRL-O (open in browser) ╱ ALT-E (open in editor)\n\n' \
-        --bind "ctrl-o:execute-silent:bash  file {-1}" \
+        --bind "ctrl-o:execute:fzf-helper --open-in-browser file {-1}" \
         --bind "alt-e:execute:${EDITOR:-vim} {-1} > /dev/tty" \
         --query "$query" \
         --preview "git diff --no-ext-diff --color=$(get_git_color .) -- {-1} | $(get_git_pager); $(get_cat_command) {-1}" "$@" |
@@ -273,17 +282,16 @@ function fzf_helper() (
         --preview "git show --color=$(get_git_color .) {} | $(get_git_pager)" "$@"
   }
 
-  # FIX: not working
   picker__hashes() {
     is_git_repo || return
     fzf-helper --get-data hashes |
       picker_cmd --ansi --no-sort --bind 'ctrl-s:toggle-sort' \
         --border-label '🍡 Hashes' \
         --header-lines 3 \
+        --color hl:underline,hl+:underline \
         --bind "ctrl-o:execute-silent:bash fzf-helper --open-in-browser commit {}" \
         --bind "ctrl-d:execute:grep -o '[a-f0-9]\{7,\}' <<< {} | head -n 1 | xargs git diff --color=$(get_git_color) > /dev/tty" \
         --bind "alt-a:change-border-label(🍇 All hashes)+reload:bash fzf-helper --get-data all-hashes" \
-        --color hl:underline,hl+:underline \
         --preview "grep -o '[a-f0-9]\{7,\}' <<< {} | head -n 1 | xargs git show --color=$(get_git_color .) | $(get_git_pager)" "$@" |
       awk 'match($0, /[a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9]*/) { print substr($0, RSTART, RLENGTH) }'
   }
@@ -300,7 +308,6 @@ function fzf_helper() (
       cut -d$'\t' -f1
   }
 
-  # FIX: not working
   picker__stashes() {
     is_git_repo || return
     git stash list | picker_cmd \
@@ -356,11 +363,6 @@ function fzf_helper() (
   # Arguments
   #
 
-  # NOTE: if $# == 1, then i know that it will be calling a func,
-  # an if 2 then requesting information.
-  # I have to see how I can handle this better and maybe reuse some
-  # dorothy commands for #2.
-
   # process our own arguments, delegate everything else to stdinargs
   local item action=''
   while test "$#" -ne 0; do
@@ -384,6 +386,7 @@ function fzf_helper() (
     # BIND CALLBACK ACTIONS
     # There are called by the base pickers internally
     --open-in-browser | '-o')
+      # echo "--open: $*"
       open_in_browser "$@"
       ;;
     --get-data | '-d')
@@ -399,9 +402,7 @@ function fzf_helper() (
     help 'No action was provided.'
   fi
 
-  # =====================================
-  # Action
-
+  # Run picker
   if test "$(type -t "picker__$action")" = 'function'; then
     "picker__$action"
     return
