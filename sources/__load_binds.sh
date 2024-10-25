@@ -121,12 +121,13 @@ elif [[ -n "${ZSH_VERSION:-}" ]]; then
     for o in "$@"; do
 
       # why do we have to generate custom functions???
-      local zsh_bind_func_handle="fzf-git-$o-widget"
 
       local key="${o:0:1}"
-      local fzf_helper_arg_name="${o:2}"
+      local picker_name="${o:2}"
 
-      local fzf_action="fzf-helper $fzf_helper_arg_name"
+      local zsh_bind_func_handle="fzf-git-$picker_name-widget"
+
+      local fzf_action="fzf-helper $picker_name"
 
       # >> `:Man zshzle`
       #
@@ -191,12 +192,17 @@ elif [[ -n "${ZSH_VERSION:-}" ]]; then
       # 1. run the fzf git func
       # 2. capture results
       # 3. put the results to the left of cursor with `zle`
+
+              # TODO: use dorothy command to properly escape the string.
+
+        # echo \"\$result\" >/dev/tty; \
       local eval_str__zsh_create_func_handle="\
-        $zsh_bind_func_handle() { local result=\$($fzf_action | __fzf_git_join_lines); \
+        $zsh_bind_func_handle() { \
+        local result=\$($fzf_action | __fzf_git_join_lines); \
         zle reset-prompt; \
         LBUFFER+=\$result \
       }"
-      __debug_lines "[$o -> $key | $fzf_helper_arg_name]"
+      __debug_lines "[input = $o -> key = $key | picker name = $picker_name]"
 
       # make the func handlers available in the shell.
       eval "$eval_str__zsh_create_func_handle"
@@ -217,8 +223,8 @@ elif [[ -n "${ZSH_VERSION:-}" ]]; then
       # I think that it is poorly documented how this syntax works in
       # the docs.
       for m in emacs vicmd viins; do
-        eval "bindkey -M $m '^g^${o[1]}' $zsh_bind_func_handle"
-        eval "bindkey -M $m '^g${o[1]}' $zsh_bind_func_handle"
+        eval "bindkey -M $m '^g^$key' $zsh_bind_func_handle"
+        eval "bindkey -M $m '^g$key' $zsh_bind_func_handle"
       done
     done
   }
