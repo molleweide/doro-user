@@ -1,0 +1,22 @@
+pane	0	1	1	:##*	1	:/Users/hjalmarjakobsson	1	zsh	:
+pane	4	1	1	:##*	1	:/Users/hjalmarjakobsson	1	zsh	:
+pane	5	1	1	:##*	1	:/Users/hjalmarjakobsson	1	zsh	:
+pane	6	1	1	:##*	1	:/Users/hjalmarjakobsson	1	zsh	:
+pane	7	1	1	:##*	1	:/Users/hjalmarjakobsson	1	zsh	:
+pane	8	1	1	:*	1	:/Users/hjalmarjakobsson	1	zsh	:
+pane	doro	1	1	:##*Z	1	:/Users/hjalmarjakobsson/.config/dorothy	1	zsh	:
+pane	doro	1	1	:##*Z	2	:/Users/hjalmarjakobsson	0	zsh	:
+pane	main	1	1	:##*	1	:/Users/hjalmarjakobsson	1	zsh	:
+pane	rpp	1	0	:-	1	:/Users/hjalmarjakobsson/reaper/packages/reaper-keys	1	zsh	:
+pane	rpp	2	1	:*	1	:/Users/hjalmarjakobsson/neorg	1	nvim	:/Users/hjalmarjakobsson/.local/share/bob/nvim-bin/nvim
+window	0	1	:zsh	1	:##*	ae5e,213x50,0,0,1	:
+window	4	1	:zsh	1	:##*	ae5f,213x50,0,0,2	:
+window	5	1	:zsh	1	:##*	ae60,213x50,0,0,3	:
+window	6	1	:zsh	1	:##*	ae61,213x50,0,0,4	:
+window	7	1	:zsh	1	:##*	ae62,213x50,0,0,5	:
+window	8	1	:zsh	1	:*	5760,213x50,0,0,11	:
+window	doro	1	:doro	1	:##*Z	2236,213x50,0,0{76x50,0,0,6,136x50,77,0,7}	off
+window	main	1	:zsh	1	:##*	ae65,213x50,0,0,8	:
+window	rpp	1	:rk	0	:-	ae66,213x50,0,0,9	off
+window	rpp	2	:reaper	1	:*	5765,213x50,0,0,16	off
+state	rpp	8

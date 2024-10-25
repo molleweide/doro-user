@@ -236,8 +236,8 @@ FZF_GIT_SELECTOR_ACTIONS=(
   b_branches
   e_each_ref
   f_files
-  h_hashes
-  l_reflogs
+  q_hashes
+  g_reflogs
   r_remotes
   s_stashes
   t_tags
