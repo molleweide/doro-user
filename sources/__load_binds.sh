@@ -199,6 +199,7 @@ elif [[ -n "${ZSH_VERSION:-}" ]]; then
       local eval_str__zsh_create_func_handle="\
         $zsh_bind_func_handle() { \
         local result=\$($fzf_action | __fzf_git_join_lines); \
+        echo \"\${result[@]}\"; \
         zle reset-prompt; \
         LBUFFER+=\$result \
       }"

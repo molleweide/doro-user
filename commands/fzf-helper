@@ -10,12 +10,39 @@
 # TODO: SYSTEM PICKER > SPOTLIGHT / ROFI / DMENU
 # - [ ]: migrate my existing spotling into this file.
 # - [ ]: create a custom rc file for the custom file browser window.
+# TEST: Revise the `/commands/launcher` script and see how it can be used to
+# make system binds.
+# And how can we manage OS keybindings -> applescript?? to set OS bindings?
+# TEST: >>> Revise calling scripts from kmonad.
 
 # TODO: Support other fuzzy matchers
 # ! Use setup utils to install absent commands.
 # fzf [x] already exists in dorothy.
 # [ ] skim
 # [ ] nucleo
+
+# NOTE: Macos: set keyboard shortcuts programmatically
+# https://stackoverflow.com/questions/823705/programatically-get-set-mac-osx-default-system-keyboard-shortcut
+# https://apple.stackexchange.com/questions/115675/set-services-keyboard-shortcut-via-script-osx
+# https://superuser.com/questions/1139859/os-x-create-keyboard-shortcut-programmatically
+# https://apple.stackexchange.com/questions/438762/how-can-i-run-a-script-to-add-keyboard-shortcuts-on-macos
+# https://apple.stackexchange.com/questions/334683/how-to-script-a-global-keyboard-shortcut-in-macos
+# https://unix.stackexchange.com/questions/367632/how-to-programmatically-set-keyboard-shortcut-on-mac
+# https://www.reddit.com/r/shortcuts/comments/ooo4wp/tip_programmatically_creating_shortcuts_on_macos/
+
+# TODO: Dynamically put together keybinds-legend, that is shown on above the
+# search list.
+# --header $'CTRL-O (open in browser) ╱ ALT-E (open in editor)\n\n' \
+
+# Mankier: FZF = https://www.mankier.com/1/fzf#Key/Event_Bindings-Command_Execution
+
+# More FZF examples / code:
+# https://github.com/junegunn/fzf/wiki
+# https://junegunn.github.io/fzf/getting-started/
+# https://github.com/junegunn/fzf/wiki/Related-projects
+# https://github.com/junegunn/fzf/wiki/examples#dotfiles-management
+# https://thevaluable.dev/practical-guide-fzf-example/
+# https://github.com/horseinthesky/dotfiles/blob/master/files/zsh/fzf-git-functions.zsh
 
 function fzf_helper() (
   source "$DOROTHY/sources/bash.bash"
@@ -40,6 +67,12 @@ function fzf_helper() (
   # - [ ] target a specific path
   # - [ ] just pick files in general.
 
+  # SOURCES__FZF_HACK=${BASH_SOURCE[0]:-${(%):-%x}}
+  local SOURCES__FZF_HACK="$DOROTHY/user/sources/__fzf_action_callbacks.sh"
+  SOURCES__FZF_HACK=$(readlink -f "$SOURCES__FZF_HACK" 2> /dev/null || \
+    /usr/bin/ruby --disable-gems -e 'puts File.expand_path(ARGV.first)' "$SOURCES__FZF_HACK" 2> /dev/null)
+  # echo "SOURCES__FZF_HACK = $SOURCES__FZF_HACK"
+
   # ===========================================================================
   # Helpers
 
@@ -59,12 +92,6 @@ function fzf_helper() (
     [[ -n $TMUX ]] && tmux display-message "Not in a git repository"
     return 1
   }
-
-  # FZF_HELPER_PATH=${BASH_SOURCE[0]:-${(%):-%x}}
-  # FZF_HELPER_PATH=$(readlink -f "$FZF_HELPER_PATH" 2> /dev/null || \
-  #   /usr/bin/ruby --disable-gems -e 'puts File.expand_path(ARGV.first)' "$FZF_HELPER_PATH" 2> /dev/null)
-  # echo "FZF_HELPER_PATH = $FZF_HELPER_PATH"
-  local FZF_HELPER_PATH="$DOROTHY/user/commands/fzf-helper"
 
   # Expects optionally one and only one arg $1
   get_git_color() {
@@ -164,6 +191,15 @@ function fzf_helper() (
     esac
   }
 
+# BUG: for some reason FZF is not closing properly. BUT, when using the original
+# posix script being called by `execute-silent: bash /path/to/script.sh` then,
+# it closes correctly.
+# TEST:
+# 1) Move this to a posix script and see if this works?
+# 2) If (1) works, then move all the functionality to a dorothy command, and
+# call this command via the posix script as a middle man, and see if FZF closes
+# properly.
+#
   # Move this to other dorothy helpers?
   open_in_browser() {
     # Calling script with multiple args.
@@ -211,6 +247,8 @@ function fzf_helper() (
       url=${remote_url%.git}
     fi
 
+    exit 0
+
     case "$(uname -s)" in
     Darwin) open "$url$path" ;;
     *) xdg-open "$url$path" ;;
@@ -227,6 +265,36 @@ function fzf_helper() (
   # TODO: try
   # --cycle
 
+  # NOTE: COMMAND EXECUTION (FZF Man page)
+  # --
+  # With execute(...) action, you can execute arbitrary commands without leaving
+  # fzf. For example, you can turn fzf into a simple file browser by binding enter
+  # key to less command like follows.
+  # --
+  #    fzf --bind "enter:execute(less {})"
+  # --
+  # You can use the same placeholder expressions as in --preview.
+  # --
+  # fzf switches to the alternate screen when executing a command. However, if the
+  # command is expected to complete quickly, and you are not interested in its
+  # output, you might want to use execute-silent instead, which silently executes
+  # the command without the switching. Note that fzf will not be responsive until
+  # the command is complete. For asynchronous execution, start your command as a
+  # background process (i.e. appending &).
+  # --
+  # On *nix systems, fzf runs the command with $SHELL -c if SHELL is set, otherwise
+  # with sh -c, so in this case make sure that the command is POSIX-compliant.
+  # --
+  # become(...) action is similar to execute(...), but it replaces the current fzf
+  # process with the specified command using execve(2) system call.
+  # --
+  #    fzf --bind "enter:become(vim {})"
+
+  # TODO: Refactor options into their own arrays, so that you can eg. reuse the
+  # C-o: open in browser bind without having to redefine it every time.
+  # >>> Also, allow for dynamically providing which key should be used, eg. `o`
+  # for opening in browser.
+
   picker__branches() {
     is_git_repo || return
     local str_preview_cmd
@@ -234,6 +302,7 @@ function fzf_helper() (
     str_preview_cmd="git log --oneline --graph --date=short --color=$(get_git_color .) \
             --pretty='format:%C(auto)%cd %h%d %s' \$(sed s/^..// <<< {} | cut -d' ' -f1) --"
 
+        # --bind 'ctrl-o:execute-silent: return 0; fzf-helper --open-in-browser branch {}' \
     fzf-helper --get-data branches |
       picker_cmd --ansi \
         --border-label '🌲 Branches' \
@@ -243,8 +312,8 @@ function fzf_helper() (
         --color hl:underline,hl+:underline \
         --no-hscroll \
         --bind 'ctrl-/:change-preview-window(down,70%|hidden|)' \
-        --bind "ctrl-o:execute-silent:bash $($FZF_HELPER_PATH) --open-in-browser branch {}" \
-        --bind "alt-a:change-border-label(🌳 All branches)+reload:bash fzf-helper --get-data all-branches" \
+        --bind "ctrl-o:execute-silent:bash $SOURCES__FZF_HACK branch {}" \
+        --bind 'alt-a:change-border-label(🌳 All branches)+reload:bash fzf-helper --get-data all-branches' \
         --preview "$str_preview_cmd" \
         "$@" | sed 's/^..//' | cut -d' ' -f1
   }
@@ -265,7 +334,7 @@ function fzf_helper() (
       picker_cmd -m --ansi --nth 2..,.. \
         --border-label '📁 Files' \
         --header $'CTRL-O (open in browser) ╱ ALT-E (open in editor)\n\n' \
-        --bind "ctrl-o:execute:fzf-helper --open-in-browser file {-1}" \
+        --bind "ctrl-o:execute-silent:bash $SOURCES__FZF_HACK file {-1}" \
         --bind "alt-e:execute:${EDITOR:-vim} {-1} > /dev/tty" \
         --query "$query" \
         --preview "git diff --no-ext-diff --color=$(get_git_color .) -- {-1} | $(get_git_pager); $(get_cat_command) {-1}" "$@" |
@@ -278,7 +347,7 @@ function fzf_helper() (
       picker_cmd --preview-window right,70% \
         --border-label '📛 Tags' \
         --header $'CTRL-O (open in browser)\n\n' \
-        --bind "ctrl-o:execute-silent:bash fzf-helper --open-in-browser tag {}" \
+        --bind "ctrl-o:execute-silent:fzf-helper --open-in-browser tag {}" \
         --preview "git show --color=$(get_git_color .) {} | $(get_git_pager)" "$@"
   }
 
@@ -289,7 +358,7 @@ function fzf_helper() (
         --border-label '🍡 Hashes' \
         --header-lines 3 \
         --color hl:underline,hl+:underline \
-        --bind "ctrl-o:execute-silent:bash fzf-helper --open-in-browser commit {}" \
+        --bind "ctrl-o:execute-silent:fzf-helper --open-in-browser commit {}" \
         --bind "ctrl-d:execute:grep -o '[a-f0-9]\{7,\}' <<< {} | head -n 1 | xargs git diff --color=$(get_git_color) > /dev/tty" \
         --bind "alt-a:change-border-label(🍇 All hashes)+reload:bash fzf-helper --get-data all-hashes" \
         --preview "grep -o '[a-f0-9]\{7,\}' <<< {} | head -n 1 | xargs git show --color=$(get_git_color .) | $(get_git_pager)" "$@" |

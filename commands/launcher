@@ -13,7 +13,14 @@ mkfifo "$fifo"
 
 # selection=$(open -n -a "/Applications/Alacritty.app" --args -t "$TITLE" -e "$launcher_filter") # "$TITLE" # only works if last line writes to tmp file?!
 
-(open -n -a "/Applications/Alacritty.app" --args -t "$TITLE" -e "find /Applications -maxdepth 1 -name \"*.app\" | fzf > \"$tmpfile\"; echo \$? > \"$fifo\"" &)
+(
+  open \
+    -n \
+    -a "/Applications/Alacritty.app" \
+    --args \
+    -t "$TITLE" \
+    -e "find /Applications -maxdepth 1 -name \"*.app\" | fzf > \"$tmpfile\"; echo \$? > \"$fifo\"" &
+)
 
 wait
 
@@ -24,12 +31,10 @@ rm "$fifo"
 
 echo "Alacritty closed with exit code: $exitcode"
 
-
 # search_locations="/System/Library/CoreServices /System/Applications /Applications /System/Applications/Utilities"
 # cmd="find /Applications -maxdepth 1 -name \"*.app\" | /usr/local/bin/fzf > \"$temp_file\""
 # (open -n -a "/Applications/Alacritty.app" --args -t "$TITLE" \
 #     -e "find /Applications -maxdepth 1 -name \"*.app\" | /usr/local/bin/fzf > \"$temp_file\"")
-
 
 # alacritty_pid=$!
 
@@ -40,7 +45,6 @@ echo "Alacritty closed with exit code: $exitcode"
 # selection=$(cat "$fifo")
 # exec {COPROC[0]}>&-
 # rm "$fifo"
-
 
 # selection=$(cat "$fifo")
 
