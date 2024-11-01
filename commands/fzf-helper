@@ -51,13 +51,11 @@ function fzf_helper() (
 
   local LOG_FILE="$DOROTHY/user/fzf_log.txt"
 
-  __print_lines() {
-    printf "%s\n" "$1"
-  }
+  local CURRENT_PICKER=''
 
   __debug_lines() {
     if (("$DEBUG_FZF" == "yes")); then
-      __print_lines "[fzf-helper]: $1"
+      __print_lines "[fzf-helper (current = $CURRENT_PICKER)]: $1"
     fi
   }
 
@@ -69,8 +67,8 @@ function fzf_helper() (
 
   # SOURCES__FZF_HACK=${BASH_SOURCE[0]:-${(%):-%x}}
   local SOURCES__FZF_HACK="$DOROTHY/user/sources/__fzf_action_callbacks.sh"
-  SOURCES__FZF_HACK=$(readlink -f "$SOURCES__FZF_HACK" 2> /dev/null || \
-    /usr/bin/ruby --disable-gems -e 'puts File.expand_path(ARGV.first)' "$SOURCES__FZF_HACK" 2> /dev/null)
+  SOURCES__FZF_HACK=$(readlink -f "$SOURCES__FZF_HACK" 2>/dev/null ||
+    /usr/bin/ruby --disable-gems -e 'puts File.expand_path(ARGV.first)' "$SOURCES__FZF_HACK" 2>/dev/null)
   # echo "SOURCES__FZF_HACK = $SOURCES__FZF_HACK"
 
   # ===========================================================================
@@ -191,15 +189,15 @@ function fzf_helper() (
     esac
   }
 
-# BUG: for some reason FZF is not closing properly. BUT, when using the original
-# posix script being called by `execute-silent: bash /path/to/script.sh` then,
-# it closes correctly.
-# TEST:
-# 1) Move this to a posix script and see if this works?
-# 2) If (1) works, then move all the functionality to a dorothy command, and
-# call this command via the posix script as a middle man, and see if FZF closes
-# properly.
-#
+  # BUG: for some reason FZF is not closing properly. BUT, when using the original
+  # posix script being called by `execute-silent: bash /path/to/script.sh` then,
+  # it closes correctly.
+  # TEST:
+  # 1) Move this to a posix script and see if this works?
+  # 2) If (1) works, then move all the functionality to a dorothy command, and
+  # call this command via the posix script as a middle man, and see if FZF closes
+  # properly.
+  #
   # Move this to other dorothy helpers?
   open_in_browser() {
     # Calling script with multiple args.
@@ -302,7 +300,7 @@ function fzf_helper() (
     str_preview_cmd="git log --oneline --graph --date=short --color=$(get_git_color .) \
             --pretty='format:%C(auto)%cd %h%d %s' \$(sed s/^..// <<< {} | cut -d' ' -f1) --"
 
-        # --bind 'ctrl-o:execute-silent: return 0; fzf-helper --open-in-browser branch {}' \
+    # --bind 'ctrl-o:execute-silent: return 0; fzf-helper --open-in-browser branch {}' \
     fzf-helper --get-data branches |
       picker_cmd --ansi \
         --border-label '🌲 Branches' \
@@ -429,16 +427,51 @@ function fzf_helper() (
   }
 
   # ===========================================================================
+  # Default Pickers
+  #
+
+  # --header "$(get_fzf_heading "You have to select an ACTION")"
+  # "${fzf_base_opts[@]}"
+  picker__default() {
+    __print_lines "${pipe_inputs[@]}" | picker_cmd \
+      --border-label '🌴 [Dorothy]: Choose' \
+      --header $'CTRL-X (remove worktree)\n\n' \
+      --cycle
+  }
+
+  # ===========================================================================
+  # Test Pickers
+  #
+
+
+  picker__choose_test() {
+    choose "CHOOSE: Select desired dishes from our menu." --linger --required --confirm --multi \
+      --label \
+      --label=first \
+      --visual='${LABEL@U} = ${VALUE-}' --default-fuzzy=burger \
+      --return='Selected: ${VALUE-}' \
+      --plugin=fzf \
+      -- main burger main kebab soda coke soda fanta alkohol LeWine alkohol Carlsberg33c desert cake desert icecream
+
+    # because fzf-helper is called recursively, we need to exit immediately
+    # here in our test
+    exit 0
+  }
+
+  # ===========================================================================
   # Arguments
   #
 
   # process our own arguments, delegate everything else to stdinargs
-  local item action=''
+  local item action='' pipe_inputs=()
   while test "$#" -ne 0; do
     item="$1"
     shift
     case "$item" in
     '--help' | '-h') help ;;
+    # ====================================
+    # TEST PICKERS
+    'choose_test') action=$item ;;
     # ====================================
     # BASE PICKERS
     # These can be used standalone or from binding.
@@ -462,13 +495,30 @@ function fzf_helper() (
       get_git_data "$@"
       return
       ;;
+      # ====================================
+      # using stdin -> but i use the --pipe namespace because i dont want to
+      # overwrite --stdin since i dont know how it works with stdinargs.
+    '--pipe')
+      source "$DOROTHY/sources/stdinargs.bash"
+      function on_input {
+        pipe_inputs+=("$1")
+      }
+      # echo "inside --pipe"
+      stdinargs "$@"
+      shift $#
+      break
+      ;;
     *) help "An unrecognised argument was provided: $item" ;;
     esac
   done
 
   # Check
   if [[ -z "$action" ]]; then
-    help 'No action was provided.'
+    if test "${#pipe_inputs[@]}" -gt 0; then
+      action="default"
+    else
+      help 'No action was provided.'
+    fi
   fi
 
   # Run picker

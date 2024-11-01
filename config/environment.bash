@@ -104,7 +104,7 @@ if test "$shell" = 'zsh'; then
     mkdir -p "$XDG_STATE_HOME/zsh"
     touch "$HISTFILE"
 fi
-HOMEBREW_RUBY_VERSION='default'
+HOMEBREW_RUBY_VERSION=default
 
 [[ -f "$HOME/locatedb" ]] && export LOCATE_PATH="$HOME/locatedb"
 

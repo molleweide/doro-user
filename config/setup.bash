@@ -43,79 +43,77 @@ GO_INSTALL=(
 # neofetch
 # zsh-completions
 HOMEBREW_FORMULAS=(
-  'ack'
-  'asdf'
-  'blueutil'
-  'cabal-install'
-  'calcurse'
-  'cmacrae/formulae/spacebar'
-  'code-minimap'
-  'cointop'
-  'dbus'
-  'diff-so-fancy'
-  'direnv'
-  'fasd'
-  'fff'
-  'figlet'
-  'findutils'
-  'fswatch'
-  'gcc'
-  'ghc'
-  'git-extras'
-  'gnu-tar'
-  'gnuplot'
-  'gpg-tui'
-  'heroku/brew/heroku'
-  'himalaya'
-  'hub'
-  'imagemagick'
-  'irssi'
-  'isync'
-  'koekeishiya/formulae/skhd'
-  'koekeishiya/formulae/yabai'
-  'lazygit'
-  'lf'
-  'libxml2'
-  'libzip'
-  'lua'
-  'luarocks'
-  'mongocli'
-  'most'
-  'mps-youtube'
-  'msmtp'
-  'ncurses'
-  'neofetch'
-  'neomutt'
-  'ninja'
-  'nnn'
-  'pandoc'
-  'pass'
-  'pass-otp'
-  'paul-nameless/repo/tg'
-  'pinentry-mac'
-  'podman'
-  'postgresql'
-  'ranger'
-  'readline'
-  'reattach-to-user-namespace'
-  'redis'
-  'sc-im'
-  'signal-cli'
-  'sl'
-  'sox'
-  'spotify-tui'
-  'stripe/stripe-cli/stripe'
-  'subversion'
-  'terminal-notifier'
-  'the_silver_searcher'
-  'tmux'
-  'tmuxinator'
-  'universal-ctags'
-  'urlview'
-  'watch'
-  'watchman'
-  'wp-cli'
-  'zstd'
+	ack
+	asdf
+	blueutil
+	cabal-install
+	calcurse
+	cmacrae/formulae/spacebar
+	code-minimap
+	cointop
+	dbus
+	diff-so-fancy
+	direnv
+	fasd
+	fff
+	figlet
+	findutils
+	fswatch
+	gcc
+	ghc
+	git-extras
+	gnu-tar
+	gnuplot
+	gpg-tui
+	heroku/brew/heroku
+	himalaya
+	hub
+	imagemagick
+	irssi
+	isync
+	koekeishiya/formulae/skhd
+	koekeishiya/formulae/yabai
+	lazygit
+	lf
+	libxml2
+	libzip
+	lua
+	luarocks
+	mongocli
+	most
+	mps-youtube
+	msmtp
+	ncurses
+	neofetch
+	neomutt
+	ninja
+	nnn
+	pandoc
+	pass
+	pass-otp
+	paul-nameless/repo/tg
+	pinentry-mac
+	podman
+	postgresql
+	ranger
+	readline
+	reattach-to-user-namespace
+	redis
+	sc-im
+	signal-cli
+	sl
+	sox
+	spotify-tui
+	stripe/stripe-cli/stripe
+	subversion
+	terminal-notifier
+	the_silver_searcher
+	tmux
+	universal-ctags
+	urlview
+	watchman
+	wp-cli
+	zstd
 )
 HOMEBREW_SLOW_FORMULAS=(
   gpg
@@ -208,6 +206,8 @@ HOMEBREW_CASKS=(
   'xquartz'
 )
 
+# TODO: remove unused ruby packages
+
 # 'git-up' # This is an objective-C proj, dunno why it was located under GEM?
 # I also believe that I have stopped using `sass` completely..
 GEM_INSTALL=(
@@ -219,7 +219,6 @@ GEM_INSTALL=(
   'hirb'
   'pry'
   'sass'
-  'tmuxinator'
   'twurl'
   'yard'
   'zeus'
@@ -261,56 +260,57 @@ CARGO_INSTALL=(
 )
 
 SETUP_UTILS=(
-  '1password'
-  'alacritty'
-  'aria2'
-  'bandwhich'
-  'bash'
-  'bat'
-  'bottom'
-  'brave'
-  'curl'
-  'delta'
-  'deno'
-  'devel'
-  'docker'
-  'dust'
-  'eza'
-  'fd'
-  'fish'
-  'fzf'
-  'gh'
-  'ghcup'
-  'git'
-  'glab'
-  'gocryptfs'
-  'grex'
-  'hammerspoon'
-  'httpie'
-  'hyperfine'
-  'jq'
-  'mas'
-  'micro'
-  'neovim'
-  'obs'
-  'prettier'
-  'procs'
-  'ripgrep'
-  'rmesg'
-  'screen'
-  'sd'
-  'shellcheck'
-  'signal'
-  'strongbox'
-  'syncthing'
-  'tealdeer'
-  'tokei'
-  'tree'
-  'unziptar'
-  'vim'
-  'vscode'
-  'wget'
-  'zoxide'
+	1password
+	alacritty
+	aria2
+	bandwhich
+	bash
+	bat
+	bottom
+	brave
+	curl
+	delta
+	deno
+	devel
+	docker
+	dust
+	eza
+	fd
+	fish
+	fzf
+	gh
+	ghcup
+	git
+	glab
+	gocryptfs
+	grex
+	hammerspoon
+	httpie
+	hyperfine
+	jq
+	mas
+	micro
+	neovim
+	obs
+	prettier
+	procs
+	ps
+	ripgrep
+	rmesg
+	screen
+	sd
+	shellcheck
+	signal
+	strongbox
+	syncthing
+	tealdeer
+	tokei
+	tree
+	unziptar
+	vim
+	vscode
+	wget
+	zoxide
 )
 
 # heroku plugins:install heroku-repo
