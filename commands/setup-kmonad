@@ -28,7 +28,7 @@
 
 function kmonad_run_new() (
 	source "$DOROTHY/sources/bash.bash"
-	require_array 'mapfile'
+	 __require_array 'mapfile'
 
 	# Paths
 	KMONAD_CONFIG_DIR="$XDG_CONFIG_HOME/kmonad"
@@ -447,8 +447,7 @@ function kmonad_run_new() (
 			return 1
 		fi
 
-		print_line "$kmo_executable"
-		print_line "$layout_file"
+		__print_lines_or_line "$kmo_executable" "$layout_file"
 	}
 
 	# =================================
@@ -485,7 +484,7 @@ function kmonad_run_new() (
 		eval_capture --statusvar=status --stdoutvar=fodder -- get_necessary_parts
 
 		if test "$status" -ne 0; then
-			echo-error "Failed to put together command for dry/run"
+			echo-error "dry run: Failed to put together command for dry/run"
 			return 22 # ??
 		else
 			mapfile -t cmd <<<"$fodder"
@@ -498,12 +497,11 @@ function kmonad_run_new() (
 		echo-style --bold="Running kmonad now..."
 		eval_capture --statusvar=status --stdoutvar=fodder -- get_necessary_parts
 
-		if test $status -ne 0; then
-			echo-error "Failed to put together command for dry/run"
+		if test "$status" -ne 0; then
+			echo-error "Run: Failed to put together command for dry/run"
 		else
 			echo "Run command is commented out in [run]"
 			# sudo "${parts[@]}" --allow-cmd
-
 			mapfile -t cmd <<<"$fodder"
 			eval-helper --wrap --no-quiet -- sudo "${cmd[@]}" --allow-cmd
 			# if is-mac; then
