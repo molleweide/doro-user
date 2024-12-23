@@ -286,3 +286,13 @@ github.com/max397574/care.nvim
 git@github.com:neovim/neovim.git
 git@github.com:vsedov/PoloVim.git
 git@github.com:junegunn/fzf-git.sh.git
+git@github.com:Marskey/telescope-sg.git
+git@github.com:vigoux/architext.nvim.git
+git@github.com:nvim-telescope/telescope.nvim.git
+git@github.com:stevearc/overseer.nvim.git
+git@github.com:rest-nvim/rest.nvim.git
+git@github.com:Makaze/watch.nvim.git
+git@github.com:TaDaa/vimade.git
+git@github.com:rcarriga/nvim-dap-ui.git
+git@github.com:dmtrKovalenko/macos-assembly-http-server.git
+git@github.com:imagineincode/x-dev.git

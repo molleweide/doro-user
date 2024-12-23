@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# NOTE: Consult these docs for a more in depth understanding concepts:
+# https://www.gnu.org/software/libc/manual/html_node/index.html#SEC_Contents
+
 # TODO: use `eval-helper --wrap --no-quiet --`
 
 # NOTE: file descriptors
@@ -16,23 +19,26 @@
 function bash_playground() (
   source "$DOROTHY/sources/bash.bash"
 
-  # ============================================
-  # vars
+  # ===========================================================================
+  # VARS
 
   # Try to keep this as close to man page chapters as possible?
   local BASH_MAN_PAGE_CHAPTERS=(
     "SHELL GRAMMAR"
     "PARAMETERS"
+    "JOB CONTROL"
   )
 
-  # ============================================
-  # helpers
+  # ===========================================================================
+  # HELPERS
+  # Put stuff here that aids in the demoing of all chapter examples below.
   #
 
-  # ============================================
-  # Act / Chapters
-
+  # ===========================================================================
+  # ACT / CHAPTERS
   #
+
+  # ===================================
   # CHAPTER 1 SHELL GRAMMAR
   #
   chapter__shell_grammar() {
@@ -79,6 +85,14 @@ function bash_playground() (
     # job control is not active.
 
     echo-style --h2="COMPOUND COMMANDS"
+
+    # https://stackoverflow.com/questions/29261297/parenthesis-in-bash-subshell-vs-grouping
+    # https://stackoverflow.com/questions/46092962/what-is-the-right-way-to-do-command-grouping-in-bash
+    # https://unix.stackexchange.com/questions/127334/bash-subshell-creation-with-curly-braces
+    # https://stackoverflow.com/questions/21246552/bash-command-groups-why-do-curly-braces-require-a-semicolon?rq=3
+    # https://unix.stackexchange.com/questions/421020/what-is-the-exact-difference-between-a-subshell-and-a-child-process
+    # https://unix.stackexchange.com/questions/138463/do-parentheses-really-put-the-command-in-a-subshell?noredirect=1&lq=1
+    # https://unix.stackexchange.com/questions/524506/how-can-i-detect-if-im-in-a-subshell?noredirect=1&lq=1
 
     # NOTE: list / parentheses.
     # (list)
@@ -177,7 +191,7 @@ function bash_playground() (
     # echo "e = $e"
   }
 
-  #
+  # ===================================
   # CHAPTER 2 QUOTING
   #
   chapter__quoting() {
@@ -263,6 +277,15 @@ function bash_playground() (
   chapter__parameters() {
     echo-style --h1="PARAMETERS"
     echo-style --h2="PARAMETERS -> SHELL VARIABLES"
+
+    # `$0` – The name of the script being executed.
+    # `$1-$9` – The first nine command-line arguments.
+    # `$#` – The number of command-line arguments.
+    # `$*` – All command-line arguments as a single string.
+    # `$@` – All command-line arguments as an array.
+    # `$?` – The exit status of the last executed command.
+    # `$$` – The process ID of the current shell.
+    # `$!` – The process ID of the last background command.
 
     # there are a shit tone of shell variables
 
@@ -895,6 +918,9 @@ function bash_playground() (
     echo-style --h1="FUNCTIONS"
   }
 
+  #
+  #
+  #
   chapter__arithmetic_evaluation() {
     echo-style --h1="ARITHMETIC EVALUATION"
   }
@@ -909,6 +935,10 @@ function bash_playground() (
 
     # look at `debug-terminal-stdin` for some good examples of how to debug
     # the environment with conditionals.
+
+    # https://stackoverflow.com/questions/2188199/how-to-use-double-or-single-brackets-parentheses-curly-braces
+
+    # NOTE: what is the difference btw = and ==
 
     # ----
 
@@ -951,10 +981,8 @@ function bash_playground() (
     #        True if file exists and its ``sticky'' bit is set.
     # -p file
     #        True if file exists and is a named pipe (FIFO).
-    # -r file
-    #        True if file exists and is readable.
-    # -s file
-    #        True if file exists and has a size greater than zero.
+    # -r file     True if file exists and is readable.
+    # -s file     True if file exists and has a size greater than zero.
     # -t fd  True if file descriptor fd is open and refers to a terminal.
     # -u file
     #        True if file exists and its set-user-id bit is set.
@@ -1015,18 +1043,408 @@ function bash_playground() (
     #        expressions (see ARITHMETIC EVALUATION above).
   }
 
-  # echo-style --h1="SIMPLE COMMAND EXPANSION"
-  # echo-style --h1="COMMAND EXECUTION"
-  # echo-style --h1="COMMAND EXECUTION ENVIRONMENT"
-  # echo-style --h1="ENVIRONMENT"
-  # echo-style --h1="EXIT STATUS"
-  # echo-style --h1="SIGNALS"
-  # echo-style --h1="JOB CONTROL"
-  # echo-style --h1="PROMPTING"
-  # echo-style --h1="READLINE"
-  # echo-style --h1="HISTORY"
-  # echo-style --h1="HISTORY EXPANSION"
-  # echo-style --h1="HISTORY EXPANSION"
+  #
+  #
+  #
+  chapter__simple_command_expansion() {
+    echo-style --h1="SIMPLE COMMAND EXPANSION"
+    # When a simple command is executed, the shell performs the following expansions, assignments, and
+    # redirections, from left to right, in the following order.
+    #
+    # 1.     The words that the parser has marked as variable assignments (those preceding the command
+    #        name) and redirections are saved for later processing.
+    #
+    # 2.     The words that are not variable assignments or redirections are expanded.  If any words
+    #        remain after expansion, the first word is taken to be the name of the command and the
+    #        remaining words are the arguments.
+    #
+    # 3.     Redirections are performed as described above under REDIRECTION.
+    #
+    # 4.     The text after the = in each variable assignment undergoes tilde expansion, parameter
+    #        expansion, command substitution, arithmetic expansion, and quote removal before being
+    #        assigned to the variable.
+    #
+    # If no command name results, the variable assignments affect the current shell environment.  In
+    # the case of such a command (one that consists only of assignment statements and redirections),
+    # assignment statements are performed before redirections.  Otherwise, the variables are added to
+    # the environment of the executed command and do not affect the current shell environment.  If any
+    # of the assignments attempts to assign a value to a readonly variable, an error occurs, and the
+    # command exits with a non-zero status.
+    #
+    # If no command name results, redirections are performed, but do not affect the current shell
+    # environment.  A redirection error causes the command to exit with a non-zero status.
+    #
+    # If there is a command name left after expansion, execution proceeds as described below.
+    # Otherwise, the command exits.  If one of the expansions contained a command substitution, the
+    # exit status of the command is the exit status of the last command substitution performed.  If
+    # there were no command substitutions, the command exits with a status of zero.
+
+  }
+
+  #
+  #
+  #
+  chapter__command_execution() {
+    echo-style --h1="COMMAND EXECUTION"
+    # After a command has been split into words, if it results in a simple command and an optional list
+    # of arguments, the following actions are taken.
+    #
+    # If the command name contains no slashes, the shell attempts to locate it.  If there exists a
+    # shell function by that name, that function is invoked as described above in FUNCTIONS.  If the
+    # name does not match a function, the shell searches for it in the list of shell builtins.  If a
+    # match is found, that builtin is invoked.
+    #
+    # If the name is neither a shell function nor a builtin, and contains no slashes, bash searches
+    # each element of the PATH for a directory containing an executable file by that name.  Bash uses a
+    # hash table to remember the full pathnames of executable files (see hash under SHELL BUILTIN
+    # COMMANDS below).  A full search of the directories in PATH is performed only if the command is
+    # not found in the hash table.  If the search is unsuccessful, the shell searches for a defined
+    # shell function named command_not_found_handle.  If that function exists, it is invoked in a
+    # separate execution environment with the original command and the original command's arguments as
+    # its arguments, and the function's exit status becomes the exit status of that subshell.  If that
+    # function is not defined, the shell prints an error message and returns an exit status of 127.
+    #
+    # If the search is successful, or if the command name contains one or more slashes, the shell
+    # executes the named program in a separate execution environment.  Argument 0 is set to the name
+    # given, and the remaining arguments to the command are set to the arguments given, if any.
+    #
+    # If this execution fails because the file is not in executable format, and the file is not a
+    # directory, it is assumed to be a shell script, a file containing shell commands, and the shell
+    # creates a new instance of itself to execute it.  This subshell reinitializes itself, so that the
+    # effect is as if a new shell had been invoked to handle the script, with the exception that the
+    # locations of commands remembered by the parent (see hash below under SHELL BUILTIN COMMANDS) are
+    # retained by the child.
+    #
+    # If the program is a file beginning with #!, the remainder of the first line specifies an
+    # interpreter for the program.  The shell executes the specified interpreter on operating systems
+    # that do not handle this executable format themselves.  The arguments to the interpreter consist
+    # of a single optional argument following the interpreter name on the first line of the program,
+    # followed by the name of the program, followed by the command arguments, if any.
+  }
+
+  #
+  #
+  #
+  chapter__command_execution() {
+    echo-style --h1="COMMAND EXECUTION ENVIRONMENT"
+    # The shell has an execution environment, which consists of the following:
+    #
+    # •      open files inherited by the shell at invocation, as modified by redirections supplied to
+    #        the exec builtin
+    #
+    # •      the current working directory as set by cd, pushd, or popd, or inherited by the shell at
+    #        invocation
+    #
+    # •      the file creation mode mask as set by umask or inherited from the shell's parent
+    #
+    # •      current traps set by trap
+    #
+    # •      shell parameters that are set by variable assignment or with set or inherited from the
+    #        shell's parent in the environment
+    #
+    # •      shell functions defined during execution or inherited from the shell's parent in the
+    #        environment
+    #
+    # •      options enabled at invocation (either by default or with command-line arguments) or by set
+    #
+    # •      options enabled by shopt
+    #
+    # •      shell aliases defined with alias
+    #
+    # •      various process IDs, including those of background jobs, the value of $$, and the value of
+    #        PPID
+    #
+    # When a simple command other than a builtin or shell function is to be executed, it is invoked in
+    # a separate execution environment that consists of the following.  Unless otherwise noted, the
+    # values are inherited from the shell.
+    #
+    #
+    # •      the shell's open files, plus any modifications and additions specified by redirections to
+    #        the command
+    #
+    # •      the current working directory
+    #
+    # •      the file creation mode mask
+    #
+    # •      shell variables and functions marked for export, along with variables exported for the
+    #        command, passed in the environment
+    #
+    # •      traps caught by the shell are reset to the values inherited from the shell's parent, and
+    #        traps ignored by the shell are ignored
+    #
+    # A command invoked in this separate environment cannot affect the shell's execution environment.
+    #
+    # A subshell is a copy of the shell process.
+  }
+
+  #
+  #
+  #
+  chapter__environment() {
+    echo-style --h1="ENVIRONMENT"
+    # When a program is invoked it is given an array of strings called the environment.  This is a list
+    # of name-value pairs, of the form name=value.
+    #
+    # The shell provides several ways to manipulate the environment.  On invocation, the shell scans
+    # its own environment and creates a parameter for each name found, automatically marking it for
+    # export to child processes.  Executed commands inherit the environment.  The export and declare -x
+    # commands allow parameters and functions to be added to and deleted from the environment.  If the
+    # value of a parameter in the environment is modified, the new value becomes part of the
+    # environment, replacing the old.  The environment inherited by any executed command consists of
+    # the shell's initial environment, whose values may be modified in the shell, less any pairs
+    # removed by the unset command, plus any additions via the export and declare -x commands.
+    #
+    # The environment for any simple command or function may be augmented temporarily by prefixing it
+    # with parameter assignments, as described above in PARAMETERS.  These assignment statements affect
+    # only the environment seen by that command.
+    #
+    # If the -k option is set (see the set builtin command below), then all parameter assignments are
+    # placed in the environment for a command, not just those that precede the command name.
+    #
+    # When bash invokes an external command, the variable _ is set to the full filename of the command
+    # and passed to that command in its environment.
+  }
+
+  #
+  #
+  #
+  chapter__exit_status() {
+    echo-style --h1="EXIT STATUS"
+    # The exit status of an executed command is the value returned by the waitpid system call or
+    # equivalent function.  Exit statuses fall between 0 and 255, though, as explained below, the shell
+    # may use values above 125 specially.  Exit statuses from shell builtins and compound commands are
+    # also limited to this range.  Under certain circumstances, the shell will use special values to
+    # indicate specific failure modes.
+    #
+    # For the shell's purposes, a command which exits with a zero exit status has succeeded.  An exit
+    # status of zero indicates success.  A non-zero exit status indicates failure.  When a command
+    # terminates on a fatal signal N, bash uses the value of 128+N as the exit status.
+    #
+    # If a command is not found, the child process created to execute it returns a status of 127.  If a
+    # command is found but is not executable, the return status is 126.
+    #
+    # If a command fails because of an error during expansion or redirection, the exit status is
+    # greater than zero.
+    #
+    # Shell builtin commands return a status of 0 (true) if successful, and non-zero (false) if an
+    # error occurs while they execute.  All builtins return an exit status of 2 to indicate incorrect
+    # usage, generally invalid options or missing arguments.
+    #
+    # The exit status of the last command is available in the special parameter $?.
+    #
+    # Bash itself returns the exit status of the last command executed, unless a syntax error occurs,
+    # in which case it exits with a non-zero value.  See also the exit builtin command below.
+  }
+
+  #
+  #
+  #
+  chapter__signals() {
+    echo-style --h1="SIGNALS"
+    # When bash is interactive, in the absence of any traps, it ignores SIGTERM (so that kill 0 does
+    # not kill an interactive shell), and SIGINT is caught and handled (so that the wait builtin is
+    # interruptible).  In all cases, bash ignores SIGQUIT.  If job control is in effect, bash ignores
+    # SIGTTIN, SIGTTOU, and SIGTSTP.
+    #
+    # Non-builtin commands run by bash have signal handlers set to the values inherited by the shell
+    # from its parent.  When job control is not in effect, asynchronous commands ignore SIGINT and
+    # SIGQUIT in addition to these inherited handlers.  Commands run as a result of command
+    # substitution ignore the keyboard-generated job control signals SIGTTIN, SIGTTOU, and SIGTSTP.
+    #
+    # The shell exits by default upon receipt of a SIGHUP.  Before exiting, an interactive shell
+    # resends the SIGHUP to all jobs, running or stopped.  Stopped jobs are sent SIGCONT to ensure that
+    # they receive the SIGHUP.  To prevent the shell from sending the signal to a particular job, it
+    # should be removed from the jobs table with the disown builtin (see SHELL BUILTIN COMMANDS below)
+    # or marked to not receive SIGHUP using disown -h.
+    #
+    # If the huponexit shell option has been set with shopt, bash sends a SIGHUP to all jobs when an
+    # interactive login shell exits.
+    #
+    # If bash is waiting for a command to complete and receives a signal for which a trap has been set,
+    # the trap will not be executed until the command completes.  When bash is waiting for an
+    # asynchronous command via the wait builtin, the reception of a signal for which a trap has been
+    # set will cause the wait builtin to return immediately with an exit status greater than 128,
+    # immediately after which the trap is executed.
+    #
+    # When job control is not enabled, and bash is waiting for a foreground command to complete, the
+    # shell receives keyboard-generated signals such as SIGINT (usually generated by ^C) that users
+    # commonly intend to send to that command.  This happens because the shell and the command are in
+    # the same process group as the terminal, and ^C sends SIGINT to all processes in that process
+    # group.
+    #
+    # When bash is running without job control enabled and receives SIGINT while waiting for a
+    # foreground command, it waits until that foreground command terminates and then decides what to do
+    # about the SIGINT:
+    #
+    # 1.     If the command terminates due to the SIGINT, bash concludes that the user meant to end the
+    #        entire script, and acts on the SIGINT (e.g., by running a SIGINT trap or exiting itself);
+    #
+    # 2.     If the command does not terminate due to SIGINT, the program handled the SIGINT itself and
+    #        did not treat it as a fatal signal.  In that case, bash does not treat SIGINT as a fatal
+    #        signal, either, instead assuming that the SIGINT was used as part of the program's normal
+    #        operation (e.g., emacs uses it to abort editing commands) or deliberately discarded.
+    #        However, bash will run any trap set on SIGINT, as it does with any other trapped signal it
+    #        receives while it is waiting for the foreground command to complete, for compatibility.
+  }
+
+  #
+  #
+  #
+  chapter__job_control() {
+    echo-style --h1="PROCESSES & JOB CONTROL"
+
+    lsof -p $$ # list open files for the this current running process.
+
+    # Job control refers to the ability to selectively stop (suspend) the execution of processes and
+    # continue (resume) their execution at a later point.  A user typically employs this facility via
+    # an interactive interface supplied jointly by the operating system kernel's terminal driver and
+    # bash.
+    #
+    # The shell associates a job with each pipeline.  It keeps a table of currently executing jobs,
+    # which may be listed with the jobs command.  When bash starts a job asynchronously (in the
+    # background), it prints a line that looks like:
+    #
+    #        [1] 25647
+    #
+    # indicating that this job is job number 1 and that the process ID of the last process in the
+    # pipeline associated with this job is 25647.  All of the processes in a single pipeline are
+    # members of the same job.  Bash uses the job abstraction as the basis for job control.
+    #
+    # To facilitate the implementation of the user interface to job control, the operating system
+    # maintains the notion of a current terminal process group ID.  Members of this process group
+    # (processes whose process group ID is equal to the current terminal process group ID) receive
+    # keyboard-generated signals such as SIGINT.  These processes are said to be in the foreground.
+    # Background processes are those whose process group ID differs from the terminal's; such processes
+    # are immune to keyboard-generated signals.  Only foreground processes are allowed to read from or,
+    # if the user so specifies with stty tostop, write to the terminal.  Background processes which
+    # attempt to read from (write to when stty tostop is in effect) the terminal are sent a SIGTTIN
+    # (SIGTTOU) signal by the kernel's terminal driver, which, unless caught, suspends the process.
+    #
+    # If the operating system on which bash is running supports job control, bash contains facilities
+    # to use it.  Typing the suspend character (typically ^Z, Control-Z) while a process is running
+    # causes that process to be stopped and returns control to bash.  Typing the delayed suspend
+    # character (typically ^Y, Control-Y) causes the process to be stopped when it attempts to read
+    # input from the terminal, and control to be returned to bash.  The user may then manipulate the
+    # state of this job, using the bg command to continue it in the background, the fg command to
+    # continue it in the foreground, or the kill command to kill it.  A ^Z takes effect immediately,
+    # and has the additional side effect of causing pending output and typeahead to be discarded.
+    #
+    # There are a number of ways to refer to a job in the shell.  The character % introduces a job
+    # specification (jobspec).  Job number n may be referred to as %n.  A job may also be referred to
+    # using a prefix of the name used to start it, or using a substring that appears in its command
+    # line.  For example, %ce refers to a stopped job whose command name begins with ce.  If a prefix
+    # matches more than one job, bash reports an error.  Using %?ce, on the other hand, refers to any
+    # job containing the string ce in its command line.  If the substring matches more than one job,
+    # bash reports an error.  The symbols %% and %+ refer to the shell's notion of the current job,
+    # which is the last job stopped while it was in the foreground or started in the background.  The
+    # previous job may be referenced using %-.  If there is only a single job, %+ and %- can both be
+    # used to refer to that job.  In output pertaining to jobs (e.g., the output of the jobs command),
+    # the current job is always flagged with a +, and the previous job with a -.  A single % (with no
+    # accompanying job specification) also refers to the current job.
+
+  }
+
+  chapter__prompting() {
+    echo-style --h1="PROMPTING"
+    # When executing interactively, bash displays the primary prompt PS1 when it is ready to read a
+    # command, and the secondary prompt PS2 when it needs more input to complete a command.  Bash
+    # displays PS0 after it reads a command but before executing it.  Bash displays PS4 as described
+    # above before tracing each command when the -x option is enabled.  Bash allows these prompt
+    # strings to be customized by inserting a number of backslash-escaped special characters that are
+    # decoded as follows:
+    #        \a     an ASCII bell character (07)
+    #        \d     the date in "Weekday Month Date" format (e.g., "Tue May 26")
+    #        \D{format}
+    #               the format is passed to strftime(3) and the result is inserted into the prompt
+    #               string; an empty format results in a locale-specific time representation.  The
+    #               braces are required
+    #        \e     an ASCII escape character (033)
+    #        \h     the hostname up to the first `.'
+    #        \H     the hostname
+    #        \j     the number of jobs currently managed by the shell
+    #        \l     the basename of the shell's terminal device name
+    #        \n     newline
+    #        \r     carriage return
+    #        \s     the name of the shell, the basename of $0 (the portion following the final slash)
+    #        \t     the current time in 24-hour HH:MM:SS format
+    #        \T     the current time in 12-hour HH:MM:SS format
+    #        \@     the current time in 12-hour am/pm format
+    #        \A     the current time in 24-hour HH:MM format
+    #        \u     the username of the current user
+    #        \v     the version of bash (e.g., 2.00)
+    #        \V     the release of bash, version + patch level (e.g., 2.00.0)
+    #        \w     the value of the PWD shell variable ($PWD), with $HOME abbreviated with a tilde
+    #               (uses the value of the PROMPT_DIRTRIM variable)
+    #        \W     the basename of $PWD, with $HOME abbreviated with a tilde
+    #        \!     the history number of this command
+    #        \#     the command number of this command
+    #        \$     if the effective UID is 0, a #, otherwise a $
+    #        \nnn   the character corresponding to the octal number nnn
+    #        \\     a backslash
+    #        \[     begin a sequence of non-printing characters, which could be used to embed a
+    #               terminal control sequence into the prompt
+    #        \]     end a sequence of non-printing characters
+    #
+    # The command number and the history number are usually different: the history number of a command
+    # is its position in the history list, which may include commands restored from the history file
+    # (see HISTORY below), while the command number is the position in the sequence of commands
+    # executed during the current shell session.  After the string is decoded, it is expanded via
+    # parameter expansion, command substitution, arithmetic expansion, and quote removal, subject to
+    # the value of the promptvars shell option (see the description of the shopt command under SHELL
+    # BUILTIN COMMANDS below).  This can have unwanted side effects if escaped portions of the string
+    # appear within command substitution or contain characters special to word expansion.
+
+  }
+
+  chapter__readline() {
+    echo-style --h1="READLINE"
+  }
+
+  chapter__history() {
+    echo-style --h1="HISTORY"
+    # When the -o history option to the set builtin is enabled, the shell provides access to the
+    # command history, the list of commands previously typed.  The value of the HISTSIZE variable is
+    # used as the number of commands to save in a history list.  The text of the last HISTSIZE commands
+    # (default 500) is saved.  The shell stores each command in the history list prior to parameter and
+    # variable expansion (see EXPANSION above) but after history expansion is performed, subject to the
+    # values of the shell variables HISTIGNORE and HISTCONTROL.
+    #
+    # On startup, the history is initialized from the file named by the variable HISTFILE (default
+    # ~/.bash_history).  The file named by the value of HISTFILE is truncated, if necessary, to contain
+    # no more than the number of lines specified by the value of HISTFILESIZE.  If HISTFILESIZE is
+    # unset, or set to null, a non-numeric value, or a numeric value less than zero, the history file
+    # is not truncated.  When the history file is read, lines beginning with the history comment
+    # character followed immediately by a digit are interpreted as timestamps for the following history
+    # line.  These timestamps are optionally displayed depending on the value of the HISTTIMEFORMAT
+    # variable.  When a shell with history enabled exits, the last $HISTSIZE lines are copied from the
+    # history list to $HISTFILE.  If the histappend shell option is enabled (see the description of
+    # shopt under SHELL BUILTIN COMMANDS below), the lines are appended to the history file, otherwise
+    # the history file is overwritten.  If HISTFILE is unset, or if the history file is unwritable, the
+    # history is not saved.  If the HISTTIMEFORMAT variable is set, time stamps are written to the
+    # history file, marked with the history comment character, so they may be preserved across shell
+    # sessions.  This uses the history comment character to distinguish timestamps from other history
+    # lines.  After saving the history, the history file is truncated to contain no more than
+    # HISTFILESIZE lines.  If HISTFILESIZE is unset, or set to null, a non-numeric value, or a numeric
+    # value less than zero, the history file is not truncated.
+    #
+    # The builtin command fc (see SHELL BUILTIN COMMANDS below) may be used to list or edit and re-
+    # execute a portion of the history list.  The history builtin may be used to display or modify the
+    # history list and manipulate the history file.  When using command-line editing, search commands
+    # are available in each editing mode that provide access to the history list.
+    #
+    # The shell allows control over which commands are saved on the history list.  The HISTCONTROL and
+    # HISTIGNORE variables may be set to cause the shell to save only a subset of the commands entered.
+    # The cmdhist shell option, if enabled, causes the shell to attempt to save each line of a multi-
+    # line command in the same history entry, adding semicolons where necessary to preserve syntactic
+    # correctness.  The lithist shell option causes the shell to save the command with embedded
+    # newlines instead of semicolons.  See the description of the shopt builtin below under SHELL
+    # BUILTIN COMMANDS for information on setting and unsetting shell options.
+
+  }
+
+  chapter__history_expansion() {
+    echo-style --h1="HISTORY EXPANSION"
+  }
 
   chapter__shell_builtin__read() {
 
@@ -1099,7 +1517,24 @@ function bash_playground() (
 
   # echo-style --h1="SHELL COMPATABILITY MODE"
   # echo-style --h1="RESTRICTED SHELL"
-  # echo-style --h1="FILES"
+
+  chapter__files() {
+    echo-style --h1="FILES"
+    # /bin/bash
+    #        The bash executable
+    # /etc/profile
+    #        The systemwide initialization file, executed for login shells
+    # ~/.bash_profile
+    #        The personal initialization file, executed for login shells
+    # ~/.bashrc
+    #        The individual per-interactive-shell startup file
+    # ~/.bash_logout
+    #        The individual login shell cleanup file, executed when a login shell exits
+    # ~/.bash_history
+    #        The default value of HISTFILE, the file in which bash saves the command history
+    # ~/.inputrc
+    #        Individual readline initialization file
+  }
 
   # ============================================
   # ARGS
@@ -1130,18 +1565,25 @@ function bash_playground() (
     esac
   done
 
-  # select `process substitution` -> demo__process_substitution
-  # ...
-  # ...
+  function menu_item_transform() {
+    :
+    # parameter expansion
+    # replace whitespace with underscores.
+  }
 
   # if all then call all functions.
   if [[ "$show_all" = 'yes' ]]; then
     for item in "${BASH_MAN_PAGE_CHAPTERS[@]}"; do
-      chapter__"$item"
+      chapter__"$(menu_item_transform "$item")"
     done
   else
     :
     # TODO: choose / fzf which sections to display.
+    # local selection ="$(choose ...)"
+    for item in "${selection[@]}"; do
+      :
+      # chapter__"$(menu_item_transform "$item")"
+    done
   fi
 )
 
