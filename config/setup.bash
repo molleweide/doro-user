@@ -184,6 +184,8 @@ HOMEBREW_SLOW_FORMULAS=(
 #   'autodesk-fusion360'
 #     'appflowy'
 HOMEBREW_CASKS=(
+  'wezterm'
+  'ghostty'
   'aerial'
   'alinoftimer'
   'breaktimer'
@@ -248,6 +250,13 @@ NPM_INSTALL=(
   'tern'
   'typescript'
   'vim-node-rpc'
+	'@bevry/testen'
+	'@bevry/github-api'
+	'boundation'
+	'serve'
+	'eslint'
+	'json'
+	'typescript'
 )
 
 # rust/cargo/crates.io
