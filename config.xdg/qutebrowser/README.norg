@@ -1,0 +1,12 @@
+@document.meta
+title: README
+description:
+authors: hjalmarjakobsson
+categories:
+created: 2024-12-27T07:42:38-0500
+updated: 2024-12-27T08:01:29-0500
+version: 1.1.1
+@end
+
+~ neovim conf 2024 qute talk
+  `https://www.youtube.com/watch?v=aoLkQSgpUi0&list=PLhlaLyAlbLlq9xWf2xm_9p422GgqvATXk&index=4`
