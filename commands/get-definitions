@@ -41,6 +41,8 @@ function get_definitions() (
 
 	local supports_named_captures='no'
 
+	# JS regexp cheat sheet: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions/Groups_and_backreferences
+
 	local fn_pat1="^\s*function\s+([\w_]+)(\(\))?\s*\{" # captures: `function <name>()? {`
 	local fn_pat2="^\s*([\w_]+)\(\)\s*\{"               # captures: `<name>() {`
 

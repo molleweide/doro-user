@@ -7,6 +7,11 @@
 #       multiple times
 #       [ ] bash.bash -> enable/disable dorothy opts
 
+# NOTE: instruct user to reset shell opts for test-case functions.
+# -> This should allow us to use dorothy to setup the test UX but also
+# manually setup the environment for each test case and have best of both
+# worlds. IE. reset shopts inside of each test case func.
+
 # TODO:Create a choose menu where the contents of each function is stringified
 # and put it into `choose` menu for selecting each alternative.
 #
@@ -26,60 +31,7 @@
 # This would remove the need for the switch case and make it possible
 # to use a flag to run all examples in sequence upon request.
 
-# =========================================
-# SETUP-DNS SNIPPETS
-#
-# THIS IS HOW THE CHOOSE MENU IS PUT TOGETHER
-#
-# NOTE: Look at `	function select_service {` in setup-dns for inspiratn on how
-# to create the choose menu outputs.
-#
-# NOTE: This function renders each entry: `	function render_service_or_provider {`
-#
-# function select_service {
-# 	local id index prev_about__to_be_func_def url options=()
-# 	if __command_exists -- nordvpn; then
-# 		service='system'
-# 		echo-style --notice='NordVPN installation detected, only permitting system DNS service.'
-# 	else
-# 		# add system
-# 		id='system'
-# 		prev_about__to_be_func_def="Use the system's default DNS service. Since 2018, Linux's systemd-resolved v239 includes encryption — https://github.com/systemd/systemd/blob/04c00944d8494b88b29fd432189cf575dd0de0db/NEWS#L9866-L9870 — macOS to this day still requires an alternative service/profile for encryption."
-# 		url=''
-# 		options+=(
-# 			"$id"
-# 			"$(render_service_or_provider "$id" "$prev_about__to_be_func_def" "$url")"
-# 		)
-#
-#     # NOTE: This shows how the choose data is rendered for one single entry.
-#
-# 		# render service options
-# 		for id in "${available_services_id[@]}"; do
-# 			for index in "${!services_id[@]}"; do
-# 				if [[ ${services_id[index]} == "$id" ]]; then
-# 					prev_about__to_be_func_def="${services_about[index]}"
-# 					url="${services_url[index]}"
-# 					break
-# 				fi
-# 			done
-# 			options+=(
-# 				"$id"
-# 				"$(render_service_or_provider "$id" "$prev_about__to_be_func_def" "$url")"
-# 			)
-# 		done
-#
-# 		# prompt the user which dns service they wish to use
-# 		service="$(
-# 			choose --required --linger --confirm="$option_confirm" --label \
-# 				--question='Which DNS service do you wish to be your primary service?' \
-# 				--default="${option_service:-"$DNS_SERVICE"}" -- "${options[@]}"
-# 		)"
-# 	fi
-# }
-#
-
 # ============================================
-#
 
 # declare [-aAfFgiIlnrtux] [-p] [name[=value] ...]
 # typeset [-aAfFgiIlnrtux] [-p] [name[=value] ...]
@@ -135,10 +87,28 @@
 #        for a readonly variable, an attempt is made to turn off array status for an array
 #        variable, or an attempt is made to display a non-existent function with -f.
 
-# =========================================
-
 function bash_error_testing() (
 	source "$DOROTHY/sources/bash.bash"
+
+	# # Dummy func names
+	# function dummy_func1() {
+	# 	function b() {
+	# 		:
+	# 	}
+	# }
+	# function ___test1 { :; }
+	# function testx() { :; }
+	# # These wont be captured with echo-regex due to named captures not being
+	# # supported in echo-regexp yet.
+	# # test2() { :; }
+	# # test3() {
+	# # 	echo "hello"
+	# # }
+
+	# =======================================================
+	# Test cases
+
+	# Prepare
 
 	# our standard failure functions, these will be used by our examples
 	function a_function_which_failure_IS_NOT_the_last_command {
@@ -151,27 +121,140 @@ function bash_error_testing() (
 		false # emit an error to this function, as this returns a non-zero exit status
 	}
 
-	function a() {
-		function b() {
-			:
-		}
-	}
+	# # select an example, either by modifying "1", or by saving this a script and using the first argument
+	# example="${1:-"1"}"
+	# case "$example" in
+	# # these examples are as expected
+	# 1)
+	# 	set +e # disable errors returning immediately, the default bash mode, desirable for the login shell
+	# 	a_function_which_failure_IS_NOT_the_last_command
+	# 	# outputs:
+	# 	# before failure
+	# 	# after failure
+	# 	;;
+	# 2)
+	# 	set -e # enable errors to return immediately, the default bash mode in dorothy enabled when we `source "$DOROTHY/sources/bash.bash"`, desirable for scripting
+	# 	a_function_which_failure_IS_NOT_the_last_command
+	# 	# outputs:
+	# 	# before failure
+	# 	;;
+	#
+	# # however these don't
+	# 3)
+	# 	set -e
+	# 	! a_function_which_failure_IS_NOT_the_last_command
+	# 	printf '%s\n' 'failure'
+	# 	# outputs:
+	# 	# before failure
+	# 	# after failure
+	# 	;;
+	# 4)
+	# 	set -e
+	# 	a_function_which_failure_IS_NOT_the_last_command && printf '%s\n' 'success'
+	# 	# outputs:
+	# 	# before failure
+	# 	# after failure
+	# 	# success
+	# 	;;
+	# 5)
+	# 	set -e
+	# 	a_function_which_failure_IS_NOT_the_last_command || printf '%s\n' 'failure'
+	# 	# outputs:
+	# 	# before failure
+	# 	# after failure
+	# 	;;
+	# 6)
+	# 	set -e
+	# 	if a_function_which_failure_IS_NOT_the_last_command; then
+	# 		printf '%s\n' 'success'
+	# 	else
+	# 		printf '%s\n' 'failure'
+	# 	fi
+	# 	# outputs:
+	# 	# before failure
+	# 	# after failure
+	# 	# success
+	# 	;;
+	# 7)
+	# 	set -e
+	# 	if ! a_function_which_failure_IS_NOT_the_last_command; then
+	# 		printf '%s\n' 'failure'
+	# 	else
+	# 		printf '%s\n' 'success'
+	# 	fi
+	# 	# outputs:
+	# 	# before failure
+	# 	# after failure
+	# 	# success
+	# 	;;
+	#
+	# # if the failure is the last command, then such works as expected, as the exit status of any function is always the exit status of the last executed command, regardless of errexit
+	# 8)
+	# 	set -e
+	# 	a_function_which_failure_IS_the_last_command && printf '%s\n' 'success' || printf '%s\n' 'failure'
+	# 	printf '%s\n' 'ok'
+	# 	# outputs:
+	# 	# before failure without after
+	# 	# failure
+	# 	# ok
+	# 	;;
+	#
+	# # this behaviour also impacts how we fetch exit codes
+	# 9)
+	# 	# without errexit
+	# 	set +e
+	# 	a_function_which_failure_IS_NOT_the_last_command
+	# 	printf '%s\n' "status=$?"
+	# 	# outputs:
+	# 	# before failure
+	# 	# after failure
+	# 	# status=0
+	# 	a_function_which_failure_IS_the_last_command
+	# 	printf '%s\n' "status=$?"
+	# 	# outputs:
+	# 	# before failure without after
+	# 	# status=1
+	# 	;;
+	# 10)
+	# 	# with errexit
+	# 	set -e
+	# 	status=0 && a_function_which_failure_IS_NOT_the_last_command || status=$?
+	# 	printf '%s\n' "status=$status"
+	# 	# outputs:
+	# 	# before failure
+	# 	# after failure
+	# 	# status=0
+	# 	status=0 && a_function_which_failure_IS_the_last_command || status=$?
+	# 	printf '%s\n' "status=$status"
+	# 	# outputs:
+	# 	# before failure without after
+	# 	# status=1
+	# 	;;
+	# esac
 
-	local self_definitions
+
+	# =======================================================
+	# Act
+
 	local this_path="${BASH_SOURCE[0]}"
 
+  echo-style --bold "Func defs found:"
+
+	local self_definitions
 	self_definitions="$(get-definitions "$this_path")"
 
-	function test1 { :; }
-
-	function testx() { :; }
-
-	test2() { :; }
-	test3() {
-	  echo "hello"
-	}
-
 	__print_lines "${self_definitions[@]}"
+
+	# TODO: [ ] filter out func names that we dont want.
+
+	echo-style --bold "Func contents:"
+
+  for i in "${self_definitions[@]}"; do
+    declare -f $i # apparently wrapping with double quotes does not work.
+  done
+
+  # =======================================================
+  # Put together data for choose
 
 	# NOTE: [ ] do I have to modify this function or does it work in its current form.
 	function render_service_or_provider {
@@ -188,7 +271,6 @@ function bash_error_testing() (
 		fi
 	}
 
-	# NOTE: [ ] Get definitions and put them into an array with my_defs < <(...)
 
 	# NOTE: [ ] Render func defs for choose
 	#           Modify this snippet from setup-dns.
@@ -222,6 +304,12 @@ function bash_error_testing() (
 	# 			)
 	# 		done
 
+	# TODO: [ ] Test print options data.
+
+
+	# =======================================================
+	# Run choose command
+
 	# NOTE: [ ] custom choose-test-current-file
 	#           [ ] Use a custom flag that sets how many preview lines of each
 	#           function that we want to allow for output in the terminal.
@@ -247,127 +335,6 @@ function bash_error_testing() (
 
 	# NOTE: [ ] Test that we get the correct func name output.
 
-	# declare -f a_function_which_failure_IS_NOT_the_last_command
-
-	# declare -f
-
-	exit
-
-	# NOTE: instruct user to reset shell opts for test-case functions.
-	# -> This should allow us to use dorothy to setup the test UX but also
-	# manually setup the environment for each test case and have best of both
-	# worlds. IE. reset shopts inside of each test case func.
-
-	# select an example, either by modifying "1", or by saving this a script and using the first argument
-	example="${1:-"1"}"
-	case "$example" in
-	# these examples are as expected
-	1)
-		set +e # disable errors returning immediately, the default bash mode, desirable for the login shell
-		a_function_which_failure_IS_NOT_the_last_command
-		# outputs:
-		# before failure
-		# after failure
-		;;
-	2)
-		set -e # enable errors to return immediately, the default bash mode in dorothy enabled when we `source "$DOROTHY/sources/bash.bash"`, desirable for scripting
-		a_function_which_failure_IS_NOT_the_last_command
-		# outputs:
-		# before failure
-		;;
-
-	# however these don't
-	3)
-		set -e
-		! a_function_which_failure_IS_NOT_the_last_command
-		printf '%s\n' 'failure'
-		# outputs:
-		# before failure
-		# after failure
-		;;
-	4)
-		set -e
-		a_function_which_failure_IS_NOT_the_last_command && printf '%s\n' 'success'
-		# outputs:
-		# before failure
-		# after failure
-		# success
-		;;
-	5)
-		set -e
-		a_function_which_failure_IS_NOT_the_last_command || printf '%s\n' 'failure'
-		# outputs:
-		# before failure
-		# after failure
-		;;
-	6)
-		set -e
-		if a_function_which_failure_IS_NOT_the_last_command; then
-			printf '%s\n' 'success'
-		else
-			printf '%s\n' 'failure'
-		fi
-		# outputs:
-		# before failure
-		# after failure
-		# success
-		;;
-	7)
-		set -e
-		if ! a_function_which_failure_IS_NOT_the_last_command; then
-			printf '%s\n' 'failure'
-		else
-			printf '%s\n' 'success'
-		fi
-		# outputs:
-		# before failure
-		# after failure
-		# success
-		;;
-
-	# if the failure is the last command, then such works as expected, as the exit status of any function is always the exit status of the last executed command, regardless of errexit
-	8)
-		set -e
-		a_function_which_failure_IS_the_last_command && printf '%s\n' 'success' || printf '%s\n' 'failure'
-		printf '%s\n' 'ok'
-		# outputs:
-		# before failure without after
-		# failure
-		# ok
-		;;
-
-	# this behaviour also impacts how we fetch exit codes
-	9)
-		# without errexit
-		set +e
-		a_function_which_failure_IS_NOT_the_last_command
-		printf '%s\n' "status=$?"
-		# outputs:
-		# before failure
-		# after failure
-		# status=0
-		a_function_which_failure_IS_the_last_command
-		printf '%s\n' "status=$?"
-		# outputs:
-		# before failure without after
-		# status=1
-		;;
-	10)
-		# with errexit
-		set -e
-		status=0 && a_function_which_failure_IS_NOT_the_last_command || status=$?
-		printf '%s\n' "status=$status"
-		# outputs:
-		# before failure
-		# after failure
-		# status=0
-		status=0 && a_function_which_failure_IS_the_last_command || status=$?
-		printf '%s\n' "status=$status"
-		# outputs:
-		# before failure without after
-		# status=1
-		;;
-	esac
 )
 
 # Fire if invoked standalone
