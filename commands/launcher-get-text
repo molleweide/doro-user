@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+# NOTE: Get user input text area, if nvim then use nvim scratch buffer.
+# or whatever preferred textediting program.
+
+function launcher_get_text_() (
+  local launch_cmd="find /Applications -maxdepth 1 -name \"*.app\" | fzf" # > \"$log_file\""
+
+  launcher --string="$launch_cmd"
+)
+
+# fire if invoked standalone
+if test "$0" = "${BASH_SOURCE[0]}"; then
+  launcher_get_text_ "$@"
+fi
+

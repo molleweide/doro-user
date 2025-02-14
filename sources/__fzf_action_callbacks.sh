@@ -7,7 +7,7 @@ LOG_FILE="$DOROTHY/user/fzf_log.txt"
 open_in_browser() {
 
   # echo "???????"
-  echo "open in browser" >"$LOG_FILE"
+  echo "open in browser" >>"$LOG_FILE"
 
   # TODO: Getting the data below should go into a dorothy command.
 
@@ -57,6 +57,8 @@ open_in_browser() {
   Darwin) open "$url$path" ;;
   *) xdg-open "$url$path" ;;
   esac
+
+
 
   exit 0
 }

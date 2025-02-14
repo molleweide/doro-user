@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+function launcher_spotlight_menu_() (
+
+# NOTE: Can we somehow pass a function to launcher instead of just a bash string??
+
+  # find programs -> fzf -> open
+  local launch_cmd="find /System/Library/CoreServices /System/Applications /Applications /System/Applications/Utilities -maxdepth 1 -name \"*.app\" |
+  /usr/local/bin/fzf |
+  xargs -I {} open \"{}\""
+
+  launcher --string="$launch_cmd"
+)
+
+# fire if invoked standalone
+if test "$0" = "${BASH_SOURCE[0]}"; then
+  launcher_spotlight_menu_ "$@"
+fi

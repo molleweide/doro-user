@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+function launcher_choose_test_() (
+  local launch_cmd="find /Applications -maxdepth 1 -name \"*.app\" | fzf" # > \"$log_file\""
+
+  launcher --string="$launch_cmd"
+)
+
+# fire if invoked standalone
+if test "$0" = "${BASH_SOURCE[0]}"; then
+  launcher_choose_test_ "$@"
+fi
+

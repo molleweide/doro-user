@@ -1,24 +1,67 @@
 #!/usr/bin/env bash
 
-# ignore this title in yabairc !!
-TITLE=bin_custom_launcher
+# WARN: This file is old deprecated code kept for learning purposes.
 
-SCREEN_WIDTH=`yabai -m query --displays --display | jq .frame.w*2`
-SCREEN_HEIGHT=`yabai -m query --displays --display | jq .frame.h*2`
+# TODO: Make this into a command that facilitates using terminals as popups.
+# Rename -> `popup`
+#
+# TODO: Get `get-text-area-input` -> spawn neovim or other user prefered
+# alternative to get free form text input.
+#
+# NOTE: This seems to be the entry point to the lanucher, so this code
+# has to be called in order to spawn a lanucher.
+# >>> Therefore, maybe this should be designed instead to be the second step.
+#     so that this can be reused in further commands.
+#
+# TODO: option=<terminal-emulator>
+#
+# and she knew how to fucking do that stuff and in the smartest fucking manner
+# they think that is quite fucking crazy and it is a way to kill.
 
-TERM_WIDTH=1280
-TERM_HEIGHT=1260
+# WARN: This how custom launcher was configured to be called from `skhd` before:
+# cmd + alt - space : ~/.local/bin/custom_launcher/custom_launcher_popup ~/.local/bin/custom_launcher/custom_launcher
 
-let "X=SCREEN_WIDTH/2-TERM_WIDTH/2"
-let "Y=SCREEN_HEIGHT/2-TERM_HEIGHT/2"
+function popup_() (
+	local TERMINAL_TITLE=bin_custom_launcher # Ignore this title in yabairc !! ?!
 
-exec > "/Users/hjalmarjakobsson/.config/dorothy/commands/launcher-popup.log" 2>&1
+	# Get focused monitor display height and width
+	local PHYSICAL_SCREEN_WIDTH=$(yabai -m query --displays --display | jq .frame.w*2)
+	local PHYSICAL_SCREEN_HEIGHT=$(yabai -m query --displays --display | jq .frame.h*2)
+	local TERM_WIDTH=1280
+	local TERM_HEIGHT=1260
 
+	# Apparently this is one way you can do math in bash.
+	let "X=PHYSICAL_SCREEN_WIDTH/2-TERM_WIDTH/2"
+	let "Y=PHYSICAL_SCREEN_HEIGHT/2-TERM_HEIGHT/2"
 
-# customizing colors is not working for me
-alacritty \
-  -t "${TITLE}" -o window.position.x="${X}" -o window.position.y="${Y}" \
-  -o window.dimensions.lines=35 -o window.dimensions.columns=80 \
-  -o window.decorations=none --working-directory "$(pwd)" -e "$1" \
-  -o colors.primary.background="#74B573"
+	# ??
+	# TODO: Use unified dorothy log dir.
+	exec >"/Users/hjalmarjakobsson/.config/dorothy/commands/launcher-popup.log" 2>&1
 
+	# FIX: I want to spawn terminal in such a manner that we can get exit code and
+	# returned data??
+	#
+	# NOTE: All these alacritty opts should be moved into the `launcher` command
+	# and put above the -e flag.
+
+	# Alacritty customizing colors is not working for me
+	local alacritty=(
+		alacritty
+		-t "${TERMINAL_TITLE}"
+		-o window.position.x="${X}"
+		-o window.position.y="${Y}"
+		-o window.dimensions.lines=35
+		-o window.dimensions.columns=80
+		-o window.decorations=none
+		-o colors.primary.background="#74B573"
+		-e "$1"
+		--working-directory "$(pwd)"
+	)
+
+	"${alacritty[@]}"
+)
+
+# fire if invoked standalone
+if test "$0" = "${BASH_SOURCE[0]}"; then
+	launcher_ "$@"
+fi

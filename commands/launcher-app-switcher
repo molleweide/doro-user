@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# NOTE: Replace macos Cmd-Tab to switch active application.
+
+function launcher_app_switcher_() (
+  local launch_cmd="find /Applications -maxdepth 1 -name \"*.app\" | fzf" # > \"$log_file\""
+
+  launcher --string="$launch_cmd"
+)
+
+# fire if invoked standalone
+if test "$0" = "${BASH_SOURCE[0]}"; then
+  launcher_app_switcher_ "$@"
+fi
+

@@ -1,6 +1,28 @@
 #!/usr/bin/env bash
 # exec > "/Users/hjalmarjakobsson/.config/dorothy/commands/launcher-filter.log" 2>&1
+#
+# TODO: this could just go back into the term popup
+#
 
-find /System/Library/CoreServices /System/Applications /Applications /System/Applications/Utilities -maxdepth 1 -name "*.app" | /usr/local/bin/fzf # | xargs -I {} open "{}"
+launch_from_tty="$1"
+popup_storage="$2"
+
+# Does NOT open anything currently!
+selection=$(find /System/Library/CoreServices /System/Applications /Applications /System/Applications/Utilities -maxdepth 1 -name "*.app" |
+  /usr/local/bin/fzf)
+# | xargs -I {} open "{}"
+
+# Echos into log file
+echo "tty_first: $launch_from_tty" >"$DOROTHY/user/commands/launcher-filter.log"
+
+# Here I am redirecting to the calling tty.
+# This works for printing back to the calling tty but it does obviously not
+# work for recieving the stdout back into the calling command.
+echo "$selection" > "$launch_from_tty"
+
+# Here we redirect into the temp storage file.
+# This allows for capturing the data back into the calling command.
+echo "$selection" > "$popup_storage"
+
 # find /System/Library/CoreServices /System/Applications /Applications /System/Applications/Utilities -maxdepth 1 -name "*.app" | fzf | xargs -I {} open "{}"
 # find /System/Library/CoreServices /System/Applications /Applications /System/Applications/Utilities -maxdepth 1 -name "*.app" | fzf | xargs -I {} echo "{}" > "/tmp/$1"

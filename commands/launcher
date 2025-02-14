@@ -1,52 +1,276 @@
 #!/usr/bin/env bash
 
-# exec > "/Users/hjalmarjakobsson/.config/dorothy/commands/launcher.log" 2>&1
+# USE CASE: You need user input but command is not run in a tty, eg. you run
+# a command from a keybind script.
+
+# NOTE: `launcher` is the core command and `launcher-*` are usage commands.
+
+# TODO: Make into -> command `spotlight-launcher-menu`
+# Attempt to create a dorothy based macos spotlight alternative.
 #
+# TODO: Absorb the launcher-filter into a func
+#
+# TODO: choose/fzf
+#
+# FIX: Currently, this command is the command responsible for spawning the
+# new terminal window, and the script to be ran in that terminal is provided
+# in the `-e` flag. -> I wonder if this is a similar issue to the FZF issues,
+# where it didnt seem to work to pass the something in a strig to the FZF cmd.
 
-TITLE="custom launcher"
-launcher_filter="/Users/hjalmarjakobsson/.config/dorothy/commands/launcher-filter"
+# NOTE: Screen resolution.
+# https://superuser.com/questions/196532/how-do-i-find-out-my-screen-resolution-from-a-shell-script
+# https://superuser.com/questions/447295/how-can-i-get-the-current-screen-resolution-from-the-command-line-on-os-x
+# https://stackoverflow.com/questions/24972338/get-macbook-screen-size-from-terminal-bash
+# https://osxdaily.com/2014/08/31/how-to-get-current-screen-resolution-from-command-line-in-mac-os-x/
+# https://stackoverflow.com/questions/20099333/terminal-command-to-show-connected-displays-monitors-resolutions
+# https://apple.stackexchange.com/questions/162860/how-to-view-current-display-resolution
 
-# temp_file=$(mktemp)
+function launcher_() (
+  source "$DOROTHY/sources/bash.bash"
 
-fifo="/tmp/alacritty_closed"
-mkfifo "$fifo"
+  # exec > "/Users/hjalmarjakobsson/.config/dorothy/commands/launcher.log" 2>&1
+  #
 
-# selection=$(open -n -a "/Applications/Alacritty.app" --args -t "$TITLE" -e "$launcher_filter") # "$TITLE" # only works if last line writes to tmp file?!
+  # NOTE: Why do we open alacritty again here?
 
-(
-  open \
-    -n \
-    -a "/Applications/Alacritty.app" \
-    --args \
-    -t "$TITLE" \
-    -e "find /Applications -maxdepth 1 -name \"*.app\" | fzf > \"$tmpfile\"; echo \$? > \"$fifo\"" &
+  local LAUNCHER_DEFAULT_TITLE="Dorothy launcher default title"
+  local launcher_filter="$DOROTHY/user/commands/launcher-filter"
+  local log_file="$DOROTHY/user/commands/launcher.log"
+  local stdout_file="$DOROTHY/user/commands/launcher--stdout-file"
+  local tty_first=$(tty)
+  local popup_storage
+
+  echo "tty first: $tty_first"
+
+  # TODO: create temp file. Use dorothy temp
+
+  popup_storage="$(
+    fs-temp \
+      --file="${LAUNCHER_DEFAULT_TITLE}_POPUP_CAPTURE"
+  )"
+
+  # # "$LAUNCHER_DEFAULT_TITLE" # only works if last line writes to tmp file?!
+  # selection=$(open -n -a "/Applications/Alacritty.app" --args -t "$LAUNCHER_DEFAULT_TITLE" -e "$launcher_filter")
+  #
+  # NOTE: Here that -e is in this instance the find filter that is passed to
+  # fzf
+  #
+  # NOTE: One can use the wait flag to capture output of the open command.
+  # NOTE: It seems that one needs to pass a filter as script to alacritty -e.
+  #       Only passing the string does not seem to do anything.
+  #
+  # LINKS:
+  #     https://stackoverflow.com/questions/29510815/how-to-pass-command-line-arguments-to-a-program-run-with-the-open-command
+  #
+  # FLAGS:
+  #     open
+  #         -n  Open a new instance of the application(s) even if one is already running.
+  #         -W  Causes open to wait until the applications it opens (or that were
+  #             already open) have exited.  Use with the -n flag to allow open to function
+  #             as an appropriate app for the $EDITOR environment variable.
+  #         --args
+  #             All remaining arguments are passed to the opened application in the argv parameter to main().  These arguments are not
+  #             opened or interpreted by the open tool.
+  #     alacritty
+  #         -e, --command <COMMAND>...
+  #
+  # NOTE: Because the popup terminal is not associated with the process of the
+  # command running `open`, the solution for storing the data is to use a temp
+  # file.
+  # Look at how the temp files are used in bash.bash.
+
+  local bash_c_launch_filter=(
+    "bash"
+    "-c"
+    "find /Applications -maxdepth 1 -name \"*.app\" | fzf" # > \"$log_file\""
+  )
+
+  # Get focused monitor display height and width
+  # TODO: check if yabai then get values; else use hardcoded values.
+  local PHYSICAL_SCREEN_WIDTH=$(yabai -m query --displays --display | jq .frame.w*2)
+  local PHYSICAL_SCREEN_HEIGHT=$(yabai -m query --displays --display | jq .frame.h*2)
+
+  local TERM_WIDTH=1280
+  local TERM_HEIGHT=1260
+
+  # Apparently this is one way you can do math in bash.
+  let "X=PHYSICAL_SCREEN_WIDTH/2-TERM_WIDTH/2"
+  let "Y=PHYSICAL_SCREEN_HEIGHT/2-TERM_HEIGHT/2"
+
+  local alacritty_default_opts=(
+    -o window.position.x="${X}"
+    -o window.position.y="${Y}"
+    -o window.dimensions.lines=35
+    -o window.dimensions.columns=80
+    -o window.decorations=none
+    -o colors.primary.background="#74B573"
+  )
+
+  # =====================================
+  # Arguments
+
+  function help {
+    cat <<-EOF >/dev/stderr
+			ABOUT:
+			Facilitate running a command in a new spawned terminal similar to how
+			ui popups or modals work. This is like running a tty but we spawn a
+			new terminal app instance instead, and return on exit.
+
+			USAGE:
+			fs-temp [...options] --directory[=<dirname>]   # generate a directory path
+			fs-temp [...options] --file[=<filename>]       # generate a file path
+
+			OPTIONS:
+			--xdg
+			    If truthy, enforce XDG usage.
+			    If falsey, disable XDG usage.
+			    If omitted, use system XDG prefernce.
+
+			--root=<root> | --inside=<root>
+			    Use this as the root directory path.
+			    If omitted, will detect it based on XDG usage.
+
+			--directory=<dirname>
+			    Append the <root> path with this <dirname>.
+			    Use an empty <dirname> to generate a non-existent directory name.
+
+			--file=<filename>
+			    Append the <root> path with this <filename>.
+			    Use an empty <filename> to generate a non-existent filename.
+			    You can specify multiple if you want multiple filenames generated.
+
+			--prefix=<prefix>
+			    When generating a <dirname> or <filename>, use this <prefix>.
+
+			--suffix=<suffix>
+			    When generating a <dirname> or <filename>, use this <suffix>.
+
+			--extension=<extension>
+			    When generating a <filename>, use this <extension>.
+
+			--touch
+			    If a <filename> was provided, then touch the file to ensure it exists.
+
+			QUIRKS:
+			Unless [--touch] is truthy, then file paths won't be created on the file system.
+			However, directory paths will be created regardless.
+			This combination is to avoid your tooling complaining about existing files,
+			while avoiding complaints about unable to write a new file to a non-existent path.
+		EOF
+    if test "$#" -ne 0; then
+      echo-error "$@"
+    fi
+    return 22 # EINVAL 22 Invalid argument
+  }
+
+  # process
+  local item
+  local option_string=''
+  local option_cmd=''
+  # local option_xdg="${PREFER_XDG:-"no"}"
+  # local option_directories=()
+  # local option_files=()
+  # local option_prefix=''
+  # local option_suffix=''
+  # local option_extension=''
+  # local option_touch='no'
+  while test "$#" -ne 0; do
+    item="$1"
+    shift
+    case "$item" in
+    '--help' | '-h') help ;;
+    '--string='*) option_string="${item#*=}" ;;
+    # TODO: It probably makes more sense to take all args after -- as cmd
+    # args and use this as default, and then only if --string then take the string
+    # param.
+    '--cmd='*) option_cmd="${item#*=}" ;;
+    # '--no-xdg'* | '--xdg'*)
+    # 	option_xdg="$(get-flag-value --affirmative --fallback="$option_xdg" -- "$item")"
+    # 	;;
+    # '--no-touch'* | '--touch'*)
+    # 	option_touch="$(get-flag-value --affirmative --fallback="$option_touch" -- "$item")"
+    # 	;;
+    # '--root='* | '--inside='*) option_root="${item#*=}" ;;
+    # '--directory') option_directories+=('') ;;
+    # '--directory='*) option_directories+=("${item#*=}") ;;
+    # '--file') option_files+=('') ;;
+    # '--file='*) option_files+=("${item#*=}") ;;
+    # '--prefix='*) option_prefix="${item#*=}" ;;
+    # '--suffix='*) option_suffix="${item#*=}" ;;
+    # '--extension='*) option_extension="${item#*=}" ;;
+		'--')
+			option_cmd+=("$@")
+			shift $#
+			break
+			;;
+    '--'*) help "An unrecognised flag was provided: $item" ;;
+    *) help "An unrecognised argument was provided: $item" ;;
+    esac
+  done
+
+  local e_opts=()
+
+  # If --string
+  if [[ -n $option_string ]]; then
+    e_opts+=("bash" "-c" "$option_string")
+
+    # Else if `-- args1,...`
+  elif [[ "${#option_cmd[@]}" -ge 0 ]]; then
+    e_opts+=("${option_cmd[@]}")
+  else
+    return 22
+  fi
+
+  (
+    open \
+      -n \
+      -W \
+      -a "/Applications/Alacritty.app" \
+      --stdout "$stdout_file" \
+      --args \
+      -t "$LAUNCHER_DEFAULT_TITLE" \
+      -e "${e_opts[@]}"
+    # -e "${bash_c_launch_filter[@]}"
+    # -e "$launcher_filter" "$tty_first" "popup_storage"
+    # -e "find /Applications -maxdepth 1 -name \"*.app\" | fzf > \"$log_file\""
+    # -e "find /Applications -maxdepth 1 -name \"*.app\" | fzf > \"$log_file\"; echo \$? > \"$fifo\"" &
+    # -e "echo \"hello world\"" # Should print hellow world in new terminal?
+  )
+
+  local status=$?
+
+  # capture status of last command
+  if [[ status -ne 0 ]]; then
+    echo "[open] cmd failed for some reason"
+  fi
+  # Remove temp file
+  fs-rm --quiet --no-confirm -- "$popup_storage"
+
+  echo "finish"
+
+  # search_locations="/System/Library/CoreServices /System/Applications /Applications /System/Applications/Utilities"
+  # cmd="find /Applications -maxdepth 1 -name \"*.app\" | /usr/local/bin/fzf > \"$temp_file\""
+  # (open -n -a "/Applications/Alacritty.app" --args -t "$LAUNCHER_DEFAULT_TITLE" \
+  #     -e "find /Applications -maxdepth 1 -name \"*.app\" | /usr/local/bin/fzf > \"$temp_file\"")
+
+  # alacritty_pid=$!
+
+  # fifo="/tmp/selection_fifo"
+  # mkfifo "$fifo"
+  # (open -n -a "/Applications/Alacritty.app" --args -t "$LAUNCHER_DEFAULT_TITLE" -e "$launcher_filter" > "$fifo" &)
+  # coproc { wait "${COPROC[0]}"; }
+  # selection=$(cat "$fifo")
+  # exec {COPROC[0]}>&-
+  # rm "$fifo"
+
+  # selection=$(cat "$fifo")
+
+  # echo "sel: $selection"
+  # echo "$selection" >"/Users/hjalmarjakobsson/reaper/tmp/cli/launcher.txt"
+
 )
 
-wait
-
-exitcode=$(cat "$fifo")
-
-# Remove the named pipe (FIFO)
-rm "$fifo"
-
-echo "Alacritty closed with exit code: $exitcode"
-
-# search_locations="/System/Library/CoreServices /System/Applications /Applications /System/Applications/Utilities"
-# cmd="find /Applications -maxdepth 1 -name \"*.app\" | /usr/local/bin/fzf > \"$temp_file\""
-# (open -n -a "/Applications/Alacritty.app" --args -t "$TITLE" \
-#     -e "find /Applications -maxdepth 1 -name \"*.app\" | /usr/local/bin/fzf > \"$temp_file\"")
-
-# alacritty_pid=$!
-
-# fifo="/tmp/selection_fifo"
-# mkfifo "$fifo"
-# (open -n -a "/Applications/Alacritty.app" --args -t "$TITLE" -e "$launcher_filter" > "$fifo" &)
-# coproc { wait "${COPROC[0]}"; }
-# selection=$(cat "$fifo")
-# exec {COPROC[0]}>&-
-# rm "$fifo"
-
-# selection=$(cat "$fifo")
-
-# echo "sel: $selection"
-# echo "$selection" >"/Users/hjalmarjakobsson/reaper/tmp/cli/launcher.txt"
+# fire if invoked standalone
+if test "$0" = "${BASH_SOURCE[0]}"; then
+  launcher_ "$@"
+fi

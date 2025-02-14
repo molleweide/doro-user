@@ -65,6 +65,8 @@ function fzf_helper() (
   # - [ ] target a specific path
   # - [ ] just pick files in general.
 
+  # FIX: Why does this script require ruby really??
+  #
   # SOURCES__FZF_HACK=${BASH_SOURCE[0]:-${(%):-%x}}
   local SOURCES__FZF_HACK="$DOROTHY/user/sources/__fzf_action_callbacks.sh"
   SOURCES__FZF_HACK=$(readlink -f "$SOURCES__FZF_HACK" 2>/dev/null ||
@@ -280,6 +282,7 @@ function fzf_helper() (
   # the command is complete. For asynchronous execution, start your command as a
   # background process (i.e. appending &).
   # --
+  # NOTE: ON FZF --BIND EXECUTE
   # On *nix systems, fzf runs the command with $SHELL -c if SHELL is set, otherwise
   # with sh -c, so in this case make sure that the command is POSIX-compliant.
   # --

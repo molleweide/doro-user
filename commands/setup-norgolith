@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+# NOTE: norgolith static site generator for the `Norg` markup language.
+# ~ https://github.com/NTBBloodbath/norgolith
+# ~ https://github.com/NTBBloodbath/norgolith/releases
+# ~ https://github.com/nvim-neorg/neorg
+
+# =====================================
+# MAIN COMMAND `SETUP-LAUNCHER`
+
+function setup_norgolith() (
+  source "$DOROTHY/sources/bash.bash"
+
+  # =====================================
+  # Action
+  :
+)
+
+# Fire if invoked standalone
+if test "$0" = "${BASH_SOURCE[0]}"; then
+  setup_norgolith "$@"
+fi
