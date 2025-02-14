@@ -1,5 +1,8 @@
 #! /usr/bin/env bash
 
+# https://stackoverflow.com/questions/42420717/print-out-a-list-of-all-cases-of-a-switch
+# https://stackoverflow.com/questions/4471364/how-do-i-list-the-functions-defined-in-my-shell
+
 # NOTE: declare lists all func defs in sourced files as well, ie. we need to
 # ensure that we only get func defs from the current file.
 # See: https://superuser.com/questions/1111219/can-i-get-all-functions-in-a-script-file-using-bash
@@ -15,6 +18,9 @@
 # 2. [ ] Get all existing func defs in current file, including dynamically
 #    created ones -> custom solution.
 # 3. [*] Only get explicitly defined func defs -> use echo-regexp on self.
+
+# declare -f a_function_which_failure_IS_NOT_the_last_command
+# declare -f
 
 function get_definitions() (
 	source "$DOROTHY/sources/bash.bash"

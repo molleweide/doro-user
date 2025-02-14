@@ -12,145 +12,65 @@
 # manually setup the environment for each test case and have best of both
 # worlds. IE. reset shopts inside of each test case func.
 
-# TODO:Create a choose menu where the contents of each function is stringified
-# and put it into `choose` menu for selecting each alternative.
-#
-# https://stackoverflow.com/questions/9894872/how-to-print-a-function-definition-in-bash
-# `declare -f gpm will just print the function definition of function gpm with no other text.`
-#
-# Print contents of a switch case.
-# https://stackoverflow.com/questions/42420717/print-out-a-list-of-all-cases-of-a-switch
-#
-# https://stackoverflow.com/questions/4471364/how-do-i-list-the-functions-defined-in-my-shell
-
-# TODO: Each entry should then map to the number index for each one.
-# >>> This might not be necessary
-# TEST: With the `declare -f|F` command we can retrieve all func definitions
-# in the current script and then use the name strings to then build the
-# choose menu and then run each function by evaling the name string.
-# This would remove the need for the switch case and make it possible
-# to use a flag to run all examples in sequence upon request.
-
-# ============================================
-
-# declare [-aAfFgiIlnrtux] [-p] [name[=value] ...]
-# typeset [-aAfFgiIlnrtux] [-p] [name[=value] ...]
-#        Declare variables and/or give them attributes.  If no names are given then display the
-#        values of variables.  The -p option will display the attributes and values of each name.
-#        When -p is used with name arguments, additional options, other than -f and -F, are
-#        ignored.  When -p is supplied without name arguments, it will display the attributes and
-#        values of all variables having the attributes specified by the additional options.  If no
-#        other options are supplied with -p, declare will display the attributes and values of all
-#        shell variables.  The -f option will restrict the display to shell functions.  The -F
-#        option inhibits the display of function definitions; only the function name and attributes
-#        are printed.  If the extdebug shell option is enabled using shopt, the source file name
-#        and line number where each name is defined are displayed as well.  The -F option implies
-#        -f.  The -g option forces variables to be created or modified at the global scope, even
-#        when declare is executed in a shell function.  It is ignored in all other cases.  The -I
-#        option causes local variables to inherit the attributes (except the nameref attribute) and
-#        value of any existing variable with the same name at a surrounding scope.  If there is no
-#        existing variable, the local variable is initially unset.  The following options can be
-#        used to restrict output to variables with the specified attribute or to give variables
-#        attributes:
-#        -a     Each name is an indexed array variable (see Arrays above).
-#        -A     Each name is an associative array variable (see Arrays above).
-#        -f     Use function names only.
-#        -i     The variable is treated as an integer; arithmetic evaluation (see ARITHMETIC
-#               EVALUATION above) is performed when the variable is assigned a value.
-#        -l     When the variable is assigned a value, all upper-case characters are converted to
-#               lower-case.  The upper-case attribute is disabled.
-#        -n     Give each name the nameref attribute, making it a name reference to another
-#               variable.  That other variable is defined by the value of name.  All references,
-#               assignments, and attribute modifications to name, except those using or changing
-#               the -n attribute itself, are performed on the variable referenced by name's value.
-#               The nameref attribute cannot be applied to array variables.
-#        -r     Make names readonly.  These names cannot then be assigned values by subsequent
-#               assignment statements or unset.
-#        -t     Give each name the trace attribute.  Traced functions inherit the DEBUG and RETURN
-#               traps from the calling shell.  The trace attribute has no special meaning for
-#               variables.
-#        -u     When the variable is assigned a value, all lower-case characters are converted to
-#               upper-case.  The lower-case attribute is disabled.
-#        -x     Mark names for export to subsequent commands via the environment.
-#
-#        Using `+' instead of `-' turns off the attribute instead, with the exceptions that +a and
-#        +A may not be used to destroy array variables and +r will not remove the readonly
-#        attribute.  When used in a function, declare and typeset make each name local, as with the
-#        local command, unless the -g option is supplied.  If a variable name is followed by
-#        =value, the value of the variable is set to value.  When using -a or -A and the compound
-#        assignment syntax to create array variables, additional attributes do not take effect
-#        until subsequent assignments.  The return value is 0 unless an invalid option is
-#        encountered, an attempt is made to define a function using ``-f foo=bar'', an attempt is
-#        made to assign a value to a readonly variable, an attempt is made to assign a value to an
-#        array variable without using the compound assignment syntax (see Arrays above), one of the
-#        names is not a valid shell variable name, an attempt is made to turn off readonly status
-#        for a readonly variable, an attempt is made to turn off array status for an array
-#        variable, or an attempt is made to display a non-existent function with -f.
+# NOTE: [ ] custom choose-test-current-file
+#           [ ] Use a custom flag that sets how many preview lines of each
+#           function that we want to allow for output in the terminal.
+#           Or maybe this could be done dynamically inside of the command
+#           by reusing Ben's custom commands for getting terminal dimensions
+#           etc.
+#           --
+#           Name ideas:
+#           choose-function-runner, choose-fn-tester, choose-tester,
+#           func-runner-ui
+#           --
+#           >> run this command in a command where you keep various func
+#           test cases that you want to run by selecting them via choose.
 
 function bash_error_testing() (
 	source "$DOROTHY/sources/bash.bash"
-
-	# # Dummy func names
-	# function dummy_func1() {
-	# 	function b() {
-	# 		:
-	# 	}
-	# }
-	# function ___test1 { :; }
-	# function testx() { :; }
-	# # These wont be captured with echo-regex due to named captures not being
-	# # supported in echo-regexp yet.
-	# # test2() { :; }
-	# # test3() {
-	# # 	echo "hello"
-	# # }
+	__require_array 'mapfile'
 
 	# =======================================================
 	# Test cases
 
 	# Prepare
 
-	# our standard failure functions, these will be used by our examples
-	function a_function_which_failure_IS_NOT_the_last_command {
+	# Our standard failure functions, these will be used by our examples
+	function _a_function_which_failure_IS_NOT_the_last_command {
 		printf '%s\n' 'before failure'
 		false # emit an error to this function, as this returns a non-zero exit status
 		printf '%s\n' 'after failure'
 	}
-	function a_function_which_failure_IS_the_last_command {
+	function _a_function_which_failure_IS_the_last_command {
 		printf '%s\n' 'before failure without after'
 		false # emit an error to this function, as this returns a non-zero exit status
 	}
 
-	# # select an example, either by modifying "1", or by saving this a script and using the first argument
-	# example="${1:-"1"}"
-	# case "$example" in
-	# # these examples are as expected
-	# 1)
-	# 	set +e # disable errors returning immediately, the default bash mode, desirable for the login shell
-	# 	a_function_which_failure_IS_NOT_the_last_command
-	# 	# outputs:
-	# 	# before failure
-	# 	# after failure
-	# 	;;
-	# 2)
-	# 	set -e # enable errors to return immediately, the default bash mode in dorothy enabled when we `source "$DOROTHY/sources/bash.bash"`, desirable for scripting
-	# 	a_function_which_failure_IS_NOT_the_last_command
-	# 	# outputs:
-	# 	# before failure
-	# 	;;
-	#
-	# # however these don't
-	# 3)
-	# 	set -e
-	# 	! a_function_which_failure_IS_NOT_the_last_command
-	# 	printf '%s\n' 'failure'
-	# 	# outputs:
-	# 	# before failure
-	# 	# after failure
+	function disable_err_which_outputs_before_and_after_failure {
+		set +e # disable errors returning immediately, the default bash mode, desirable for the login shell
+		_a_function_which_failure_IS_NOT_the_last_command
+		# outputs:
+		# before failure
+		# after failure
+	}
+	function enable_default_errs_to_return_immediately_before_failure {
+		set -e # enable errors to return immediately, the default bash mode in dorothy enabled when we `source "$DOROTHY/sources/bash.bash"`, desirable for scripting
+		_a_function_which_failure_IS_NOT_the_last_command
+		# outputs:
+		# before failure
+	}
+	function output_before_and_after_fail {
+		set -e
+		! _a_function_which_failure_IS_NOT_the_last_command
+		printf '%s\n' 'failure'
+		# outputs:
+		# before failure
+		# after failure
+	}
 	# 	;;
 	# 4)
 	# 	set -e
-	# 	a_function_which_failure_IS_NOT_the_last_command && printf '%s\n' 'success'
+	# 	_a_function_which_failure_IS_NOT_the_last_command && printf '%s\n' 'success'
 	# 	# outputs:
 	# 	# before failure
 	# 	# after failure
@@ -158,14 +78,14 @@ function bash_error_testing() (
 	# 	;;
 	# 5)
 	# 	set -e
-	# 	a_function_which_failure_IS_NOT_the_last_command || printf '%s\n' 'failure'
+	# 	_a_function_which_failure_IS_NOT_the_last_command || printf '%s\n' 'failure'
 	# 	# outputs:
 	# 	# before failure
 	# 	# after failure
 	# 	;;
 	# 6)
 	# 	set -e
-	# 	if a_function_which_failure_IS_NOT_the_last_command; then
+	# 	if _a_function_which_failure_IS_NOT_the_last_command; then
 	# 		printf '%s\n' 'success'
 	# 	else
 	# 		printf '%s\n' 'failure'
@@ -177,7 +97,7 @@ function bash_error_testing() (
 	# 	;;
 	# 7)
 	# 	set -e
-	# 	if ! a_function_which_failure_IS_NOT_the_last_command; then
+	# 	if ! _a_function_which_failure_IS_NOT_the_last_command; then
 	# 		printf '%s\n' 'failure'
 	# 	else
 	# 		printf '%s\n' 'success'
@@ -191,7 +111,7 @@ function bash_error_testing() (
 	# # if the failure is the last command, then such works as expected, as the exit status of any function is always the exit status of the last executed command, regardless of errexit
 	# 8)
 	# 	set -e
-	# 	a_function_which_failure_IS_the_last_command && printf '%s\n' 'success' || printf '%s\n' 'failure'
+	# 	_a_function_which_failure_IS_the_last_command && printf '%s\n' 'success' || printf '%s\n' 'failure'
 	# 	printf '%s\n' 'ok'
 	# 	# outputs:
 	# 	# before failure without after
@@ -203,13 +123,13 @@ function bash_error_testing() (
 	# 9)
 	# 	# without errexit
 	# 	set +e
-	# 	a_function_which_failure_IS_NOT_the_last_command
+	# 	_a_function_which_failure_IS_NOT_the_last_command
 	# 	printf '%s\n' "status=$?"
 	# 	# outputs:
 	# 	# before failure
 	# 	# after failure
 	# 	# status=0
-	# 	a_function_which_failure_IS_the_last_command
+	# 	_a_function_which_failure_IS_the_last_command
 	# 	printf '%s\n' "status=$?"
 	# 	# outputs:
 	# 	# before failure without after
@@ -218,13 +138,13 @@ function bash_error_testing() (
 	# 10)
 	# 	# with errexit
 	# 	set -e
-	# 	status=0 && a_function_which_failure_IS_NOT_the_last_command || status=$?
+	# 	status=0 && _a_function_which_failure_IS_NOT_the_last_command || status=$?
 	# 	printf '%s\n' "status=$status"
 	# 	# outputs:
 	# 	# before failure
 	# 	# after failure
 	# 	# status=0
-	# 	status=0 && a_function_which_failure_IS_the_last_command || status=$?
+	# 	status=0 && _a_function_which_failure_IS_the_last_command || status=$?
 	# 	printf '%s\n' "status=$status"
 	# 	# outputs:
 	# 	# before failure without after
@@ -232,108 +152,62 @@ function bash_error_testing() (
 	# 	;;
 	# esac
 
-
 	# =======================================================
 	# Act
 
 	local this_path="${BASH_SOURCE[0]}"
 
-  echo-style --bold "Func defs found:"
+	# Why is it that this returns a single string it seems?!
+	# func_names_found="$(get-definitions "$this_path")"
 
-	local self_definitions
-	self_definitions="$(get-definitions "$this_path")"
+	local func_names_found=() func_names_final=() choose_data=()
+	mapfile -t func_names_found < <(get-definitions "$this_path")
 
-	__print_lines "${self_definitions[@]}"
-
-	# TODO: [ ] filter out func names that we dont want.
-
-	echo-style --bold "Func contents:"
-
-  for i in "${self_definitions[@]}"; do
-    declare -f $i # apparently wrapping with double quotes does not work.
-  done
-
-  # =======================================================
-  # Put together data for choose
-
-	# NOTE: [ ] do I have to modify this function or does it work in its current form.
-	function render_service_or_provider {
-		# prefix with an empty dim to disable the default dimming in results
-		local id="$1" prev_about__to_be_func_def="$2" url="$3"
-		if is-value -- "$prev_about__to_be_func_def" "$url"; then
-			echo-style --dim='' --bold+underline="$id" $':\n' "$prev_about__to_be_func_def" $'\n' --dim="$url"
-		elif is-value -- "$prev_about__to_be_func_def"; then
-			echo-style --dim='' --bold+underline="$id" $':\n' "$prev_about__to_be_func_def"
-		elif is-value -- "$url"; then
-			echo-style --dim='' --bold+underline="$id" $':\n' --dim="$url"
-		else
-			echo-style --dim='' --bold+underline="$id"
+	# This should prolly go into a command called echo-filter
+	local remove_ids=(
+		"render_choose_data"
+	)
+	for id in "${func_names_found[@]}"; do
+		local add='yes'
+		local rm_id
+		for rm_id in "${remove_ids[@]}"; do
+			if [[ "$id" == _* || "$rm_id" == "$id" ]]; then
+				add='no'
+			fi
+		done
+		if [[ "$add" == 'yes' ]]; then
+			func_names_final+=("$id")
 		fi
+	done
+
+	function render_choose_data {
+		local id="$1" description body
+		description="${id//_/ }"
+		description="${description^}"
+		# Unfortunately, using negative numbers does not work with head on macos.
+		# body="$(echo-lines "$(declare -f "$id")" | tail -n +3 | head -n -1)"
+		body="$(echo-lines "$(declare -f "$id")" | sed '1,2d; $d')"
+		# prefix with an empty dim to disable the default dimming in results
+		# Why is the final linebreak trimmed when displaying the information??
+		echo-style --dim='' --bold+underline="$description" $'\n' --dim="$body" $'\n'
 	}
+	for id in "${func_names_final[@]}"; do
+		choose_data+=(
+			"$id"
+			"$(render_choose_data "$id")"
+		)
+	done
 
+	local selection
+	selection="$(
+		choose --required --label \
+			--question='Which test do you want to run?' \
+			-- "${choose_data[@]}"
+	)"
 
-	# NOTE: [ ] Render func defs for choose
-	#           Modify this snippet from setup-dns.
-	#
-	# 	local id index prev_about__to_be_func_def url options=()
-	# 	if __command_exists -- nordvpn; then
-	# 		service='system'
-	# 		echo-style --notice='NordVPN installation detected, only permitting system DNS service.'
-	# 	else
-	# 		# add system
-	# 		id='system'
-	# 		prev_about__to_be_func_def="Use the system's default DNS service. Since 2018, Linux's systemd-resolved v239 includes encryption — https://github.com/systemd/systemd/blob/04c00944d8494b88b29fd432189cf575dd0de0db/NEWS#L9866-L9870 — macOS to this day still requires an alternative service/profile for encryption."
-	# 		url=''
-	# 		options+=(
-	# 			"$id"
-	# 			"$(render_service_or_provider "$id" "$prev_about__to_be_func_def" "$url")"
-	# 		)
-	#
-	# 		# render service options
-	# 		for id in "${available_services_id[@]}"; do
-	# 			for index in "${!services_id[@]}"; do
-	# 				if [[ ${services_id[index]} == "$id" ]]; then
-	# 					prev_about__to_be_func_def="${services_about[index]}"
-	# 					url="${services_url[index]}"
-	# 					break
-	# 				fi
-	# 			done
-	# 			options+=(
-	# 				"$id"
-	# 				"$(render_service_or_provider "$id" "$prev_about__to_be_func_def" "$url")"
-	# 			)
-	# 		done
+	__print_lines "Selection: [$selection]"
 
-	# TODO: [ ] Test print options data.
-
-
-	# =======================================================
-	# Run choose command
-
-	# NOTE: [ ] custom choose-test-current-file
-	#           [ ] Use a custom flag that sets how many preview lines of each
-	#           function that we want to allow for output in the terminal.
-	#           Or maybe this could be done dynamically inside of the command
-	#           by reusing Ben's custom commands for getting terminal dimensions
-	#           etc.
-	#           --
-	#           Name ideas:
-	#           choose-function-runner, choose-fn-tester, choose-tester,
-	#           func-runner-ui
-	#           --
-	#           >> run this command in a command where you keep various func
-	#           test cases that you want to run by selecting them via choose.
-	#
-	# NOTE: [ ] Run `choose` command
-	#
-	# 		# prompt the user which dns service they wish to use
-	# 		service="$(
-	# 			choose --required --linger --confirm="$option_confirm" --label \
-	# 				--question='Which DNS service do you wish to be your primary service?' \
-	# 				--default="${option_service:-"$DNS_SERVICE"}" -- "${options[@]}"
-	# 		)"
-
-	# NOTE: [ ] Test that we get the correct func name output.
+	"$selection"
 
 )
 
