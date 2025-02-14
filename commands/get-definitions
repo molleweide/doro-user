@@ -1,0 +1,26 @@
+#! /usr/bin/env bash
+
+# NOTE: declare lists all func defs in sourced files as well, ie. we need to
+# ensure that we only get func defs from the current file.
+# See: https://superuser.com/questions/1111219/can-i-get-all-functions-in-a-script-file-using-bash
+# Basically we make a custom call to this file itself with env -i so that we
+# can parse the file exclusively.
+# ...
+# Hmmm, now that I think about it. We could just run echo-regexp on the file
+# itself and check for all the func names which would be the easiest solution.
+# ...
+# TODO: Create command `get-definitions`
+# So there are three cases.
+# 1. [ ] Get all existing func defs -> declare -f
+# 2. [ ] Get all existing func defs in current file, including dynamically
+#    created ones -> custom solution.
+# 3. [*] Only get explicitly defined func defs -> use echo-regexp on self.
+
+function get_definitions() (
+	source "$DOROTHY/sources/bash.bash"
+)
+
+# Fire if invoked standalone
+if test "$0" = "${BASH_SOURCE[0]}"; then
+	get_definitions "$@"
+fi

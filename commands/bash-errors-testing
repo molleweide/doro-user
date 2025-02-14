@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# TODO: [ ] create the get-definitions command.
+#       [ ] render data for choose menu
+#       [ ] If possible, try to re run the choose menu after having run the
+#       select function so that user can continuously select and run funcs
+#       multiple times
+
 # TODO:Create a choose menu where the contents of each function is stringified
 # and put it into `choose` menu for selecting each alternative.
 #
@@ -150,23 +156,67 @@ function bash_error_testing() (
 		}
 	}
 
+
+  # NOTE: [ ] do I have to modify this function or does it work in its current form.
+	function render_service_or_provider {
+		# prefix with an empty dim to disable the default dimming in results
+		local id="$1" about="$2" url="$3"
+		if is-value -- "$about" "$url"; then
+			echo-style --dim='' --bold+underline="$id" $':\n' "$about" $'\n' --dim="$url"
+		elif is-value -- "$about"; then
+			echo-style --dim='' --bold+underline="$id" $':\n' "$about"
+		elif is-value -- "$url"; then
+			echo-style --dim='' --bold+underline="$id" $':\n' --dim="$url"
+		else
+			echo-style --dim='' --bold+underline="$id"
+		fi
+	}
+
+
+
+	# NOTE: [ ] Get definitions and put them into an array with my_defs < <(...)
+
+	# NOTE: [ ] Render func defs for choose
+	#           Modify this snippet from setup-dns.
+	#
+	# 	local id index about url options=()
+	# 	if __command_exists -- nordvpn; then
+	# 		service='system'
+	# 		echo-style --notice='NordVPN installation detected, only permitting system DNS service.'
+	# 	else
+	# 		# add system
+	# 		id='system'
+	# 		about="Use the system's default DNS service. Since 2018, Linux's systemd-resolved v239 includes encryption — https://github.com/systemd/systemd/blob/04c00944d8494b88b29fd432189cf575dd0de0db/NEWS#L9866-L9870 — macOS to this day still requires an alternative service/profile for encryption."
+	# 		url=''
+	# 		options+=(
+	# 			"$id"
+	# 			"$(render_service_or_provider "$id" "$about" "$url")"
+	# 		)
+	#
+	# 		# render service options
+	# 		for id in "${available_services_id[@]}"; do
+	# 			for index in "${!services_id[@]}"; do
+	# 				if [[ ${services_id[index]} == "$id" ]]; then
+	# 					about="${services_about[index]}"
+	# 					url="${services_url[index]}"
+	# 					break
+	# 				fi
+	# 			done
+	# 			options+=(
+	# 				"$id"
+	# 				"$(render_service_or_provider "$id" "$about" "$url")"
+	# 			)
+	# 		done
+
+	# NOTE: [ ] Run `choose` command
+	#
+	# 			choose --required --linger --confirm="$option_confirm" --label \
+	# 				--question='Which DNS service do you wish to be your primary service?' \
+	# 				--default="${option_service:-"$DNS_SERVICE"}" -- "${options[@]}"
+
 	# declare -f a_function_which_failure_IS_NOT_the_last_command
 
-	# WARN: declare lists all func defs in sourced files as well, ie. we need to
-	# ensure that we only get func defs from the current file.
-	# See: https://superuser.com/questions/1111219/can-i-get-all-functions-in-a-script-file-using-bash
-	# Basically we make a custom call to this file itself with env -i so that we
-	# can parse the file exclusively.
-	# ...
-	# Hmmm, now that I think about it. We could just run echo-regexp on the file
-	# itself and check for all the func names which would be the easiest solution.
-	# ...
-	# So there are three cases.
-	# 1. Get all existing func defs -> declare -f
-	# 2. Get all existing func defs in current file -> custom solution.
-	# 3. Only get explicitly defined func defs -> use echo-regexp on self.
-
-	declare -f
+	# declare -f
 
 	exit
 
@@ -183,7 +233,7 @@ function bash_error_testing() (
 	# NOTE: instruct user to reset shell opts for test-case functions.
 	# -> This should allow us to use dorothy to setup the test UX but also
 	# manually setup the environment for each test case and have best of both
-	# worlds.
+	# worlds. IE. reset shopts inside of each test case func.
 
 	# select an example, either by modifying "1", or by saving this a script and using the first argument
 	example="${1:-"1"}"
