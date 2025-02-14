@@ -2,135 +2,302 @@
 
 # TODO:Create a choose menu where the contents of each function is stringified
 # and put it into `choose` menu for selecting each alternative.
+#
 # https://stackoverflow.com/questions/9894872/how-to-print-a-function-definition-in-bash
 # `declare -f gpm will just print the function definition of function gpm with no other text.`
 #
+# Print contents of a switch case.
+# https://stackoverflow.com/questions/42420717/print-out-a-list-of-all-cases-of-a-switch
+#
+# https://stackoverflow.com/questions/4471364/how-do-i-list-the-functions-defined-in-my-shell
+
+# TODO: Each entry should then map to the number index for each one.
+# >>> This might not be necessary
+# TEST: With the `declare -f|F` command we can retrieve all func definitions
+# in the current script and then use the name strings to then build the
+# choose menu and then run each function by evaling the name string.
+# This would remove the need for the switch case and make it possible
+# to use a flag to run all examples in sequence upon request.
+
+# =========================================
+# SETUP-DNS SNIPPETS
+#
+# THIS IS HOW THE CHOOSE MENU IS PUT TOGETHER
+#
 # NOTE: Look at `	function select_service {` in setup-dns for inspiratn on how
 # to create the choose menu outputs.
+#
+# NOTE: This function renders each entry: `	function render_service_or_provider {`
+#
+# function select_service {
+# 	local id index about url options=()
+# 	if __command_exists -- nordvpn; then
+# 		service='system'
+# 		echo-style --notice='NordVPN installation detected, only permitting system DNS service.'
+# 	else
+# 		# add system
+# 		id='system'
+# 		about="Use the system's default DNS service. Since 2018, Linux's systemd-resolved v239 includes encryption — https://github.com/systemd/systemd/blob/04c00944d8494b88b29fd432189cf575dd0de0db/NEWS#L9866-L9870 — macOS to this day still requires an alternative service/profile for encryption."
+# 		url=''
+# 		options+=(
+# 			"$id"
+# 			"$(render_service_or_provider "$id" "$about" "$url")"
+# 		)
+#
+#     # NOTE: This shows how the choose data is rendered for one single entry.
+#
+# 		# render service options
+# 		for id in "${available_services_id[@]}"; do
+# 			for index in "${!services_id[@]}"; do
+# 				if [[ ${services_id[index]} == "$id" ]]; then
+# 					about="${services_about[index]}"
+# 					url="${services_url[index]}"
+# 					break
+# 				fi
+# 			done
+# 			options+=(
+# 				"$id"
+# 				"$(render_service_or_provider "$id" "$about" "$url")"
+# 			)
+# 		done
+#
+# 		# prompt the user which dns service they wish to use
+# 		service="$(
+# 			choose --required --linger --confirm="$option_confirm" --label \
+# 				--question='Which DNS service do you wish to be your primary service?' \
+# 				--default="${option_service:-"$DNS_SERVICE"}" -- "${options[@]}"
+# 		)"
+# 	fi
+# }
+#
 
+# ============================================
+#
 
-# our standard failure functions, these will be used by our examples
-function a_function_which_failure_IS_NOT_the_last_command {
-	printf '%s\n' 'before failure'
-	false # emit an error to this function, as this returns a non-zero exit status
-	printf '%s\n' 'after failure'
-}
-function a_function_which_failure_IS_the_last_command {
-	printf '%s\n' 'before failure without after'
-	false # emit an error to this function, as this returns a non-zero exit status
-}
+# declare [-aAfFgiIlnrtux] [-p] [name[=value] ...]
+# typeset [-aAfFgiIlnrtux] [-p] [name[=value] ...]
+#        Declare variables and/or give them attributes.  If no names are given then display the
+#        values of variables.  The -p option will display the attributes and values of each name.
+#        When -p is used with name arguments, additional options, other than -f and -F, are
+#        ignored.  When -p is supplied without name arguments, it will display the attributes and
+#        values of all variables having the attributes specified by the additional options.  If no
+#        other options are supplied with -p, declare will display the attributes and values of all
+#        shell variables.  The -f option will restrict the display to shell functions.  The -F
+#        option inhibits the display of function definitions; only the function name and attributes
+#        are printed.  If the extdebug shell option is enabled using shopt, the source file name
+#        and line number where each name is defined are displayed as well.  The -F option implies
+#        -f.  The -g option forces variables to be created or modified at the global scope, even
+#        when declare is executed in a shell function.  It is ignored in all other cases.  The -I
+#        option causes local variables to inherit the attributes (except the nameref attribute) and
+#        value of any existing variable with the same name at a surrounding scope.  If there is no
+#        existing variable, the local variable is initially unset.  The following options can be
+#        used to restrict output to variables with the specified attribute or to give variables
+#        attributes:
+#        -a     Each name is an indexed array variable (see Arrays above).
+#        -A     Each name is an associative array variable (see Arrays above).
+#        -f     Use function names only.
+#        -i     The variable is treated as an integer; arithmetic evaluation (see ARITHMETIC
+#               EVALUATION above) is performed when the variable is assigned a value.
+#        -l     When the variable is assigned a value, all upper-case characters are converted to
+#               lower-case.  The upper-case attribute is disabled.
+#        -n     Give each name the nameref attribute, making it a name reference to another
+#               variable.  That other variable is defined by the value of name.  All references,
+#               assignments, and attribute modifications to name, except those using or changing
+#               the -n attribute itself, are performed on the variable referenced by name's value.
+#               The nameref attribute cannot be applied to array variables.
+#        -r     Make names readonly.  These names cannot then be assigned values by subsequent
+#               assignment statements or unset.
+#        -t     Give each name the trace attribute.  Traced functions inherit the DEBUG and RETURN
+#               traps from the calling shell.  The trace attribute has no special meaning for
+#               variables.
+#        -u     When the variable is assigned a value, all lower-case characters are converted to
+#               upper-case.  The lower-case attribute is disabled.
+#        -x     Mark names for export to subsequent commands via the environment.
+#
+#        Using `+' instead of `-' turns off the attribute instead, with the exceptions that +a and
+#        +A may not be used to destroy array variables and +r will not remove the readonly
+#        attribute.  When used in a function, declare and typeset make each name local, as with the
+#        local command, unless the -g option is supplied.  If a variable name is followed by
+#        =value, the value of the variable is set to value.  When using -a or -A and the compound
+#        assignment syntax to create array variables, additional attributes do not take effect
+#        until subsequent assignments.  The return value is 0 unless an invalid option is
+#        encountered, an attempt is made to define a function using ``-f foo=bar'', an attempt is
+#        made to assign a value to a readonly variable, an attempt is made to assign a value to an
+#        array variable without using the compound assignment syntax (see Arrays above), one of the
+#        names is not a valid shell variable name, an attempt is made to turn off readonly status
+#        for a readonly variable, an attempt is made to turn off array status for an array
+#        variable, or an attempt is made to display a non-existent function with -f.
 
-declare -f a_function_which_failure_IS_NOT_the_last_command
+# =========================================
 
-exit
+function bash_error_testing() (
+	source "$DOROTHY/sources/bash.bash"
 
-# select an example, either by modifying "1", or by saving this a script and using the first argument
-example="${1:-"1"}"
-case "$example" in
-# these examples are as expected
-1)
-	set +e # disable errors returning immediately, the default bash mode, desirable for the login shell
-	a_function_which_failure_IS_NOT_the_last_command
-	# outputs:
-	# before failure
-	# after failure
-	;;
-2)
-	set -e # enable errors to return immediately, the default bash mode in dorothy enabled when we `source "$DOROTHY/sources/bash.bash"`, desirable for scripting
-	a_function_which_failure_IS_NOT_the_last_command
-    # outputs:
-	# before failure
-	;;
+	# our standard failure functions, these will be used by our examples
+	function a_function_which_failure_IS_NOT_the_last_command {
+		printf '%s\n' 'before failure'
+		false # emit an error to this function, as this returns a non-zero exit status
+		printf '%s\n' 'after failure'
+	}
+	function a_function_which_failure_IS_the_last_command {
+		printf '%s\n' 'before failure without after'
+		false # emit an error to this function, as this returns a non-zero exit status
+	}
 
-# however these don't
-3)
-	set -e
-	! a_function_which_failure_IS_NOT_the_last_command
-	printf '%s\n' 'failure'
-	# outputs:
-	# before failure
-	# after failure
-	;;
-4)
-	set -e
-	a_function_which_failure_IS_NOT_the_last_command && printf '%s\n' 'success'
-	# outputs:
-	# before failure
-	# after failure
-	# success
-	;;
-5)
-	set -e
-	a_function_which_failure_IS_NOT_the_last_command || printf '%s\n' 'failure'
-    # outputs:
-	# before failure
-	# after failure
-	;;
-6)
-	set -e
-	if a_function_which_failure_IS_NOT_the_last_command; then
-		printf '%s\n' 'success'
-	else
+	function a() {
+		function b() {
+			:
+		}
+	}
+
+	# declare -f a_function_which_failure_IS_NOT_the_last_command
+
+	# WARN: declare lists all func defs in sourced files as well, ie. we need to
+	# ensure that we only get func defs from the current file.
+	# See: https://superuser.com/questions/1111219/can-i-get-all-functions-in-a-script-file-using-bash
+	# Basically we make a custom call to this file itself with env -i so that we
+	# can parse the file exclusively.
+	# ...
+	# Hmmm, now that I think about it. We could just run echo-regexp on the file
+	# itself and check for all the func names which would be the easiest solution.
+	# ...
+	# So there are three cases.
+	# 1. Get all existing func defs -> declare -f
+	# 2. Get all existing func defs in current file -> custom solution.
+	# 3. Only get explicitly defined func defs -> use echo-regexp on self.
+
+	declare -f
+
+	exit
+
+	func_defs=$(declare -f)
+
+	# printf '%s\n' "${func_defs[@]}" | echo-regexp -g -m -o -n --search='^([\w\_]+)\(\)'
+	echo-lines "${func_defs[@]}" | echo-regexp -g -m -o -n --search='^([\w\_]+)\(\)'
+
+	# NOTE: Prints the functions exactly BUT it puts the function name statement on
+	# distinct lines -> Use echo-regexp to capture the func names exclusively.
+
+	exit
+
+	# NOTE: instruct user to reset shell opts for test-case functions.
+	# -> This should allow us to use dorothy to setup the test UX but also
+	# manually setup the environment for each test case and have best of both
+	# worlds.
+
+	# select an example, either by modifying "1", or by saving this a script and using the first argument
+	example="${1:-"1"}"
+	case "$example" in
+	# these examples are as expected
+	1)
+		set +e # disable errors returning immediately, the default bash mode, desirable for the login shell
+		a_function_which_failure_IS_NOT_the_last_command
+		# outputs:
+		# before failure
+		# after failure
+		;;
+	2)
+		set -e # enable errors to return immediately, the default bash mode in dorothy enabled when we `source "$DOROTHY/sources/bash.bash"`, desirable for scripting
+		a_function_which_failure_IS_NOT_the_last_command
+		# outputs:
+		# before failure
+		;;
+
+	# however these don't
+	3)
+		set -e
+		! a_function_which_failure_IS_NOT_the_last_command
 		printf '%s\n' 'failure'
-	fi
-	# outputs:
-	# before failure
-	# after failure
-	# success
-	;;
-7)
-	set -e
-	if ! a_function_which_failure_IS_NOT_the_last_command; then
-		printf '%s\n' 'failure'
-	else
-		printf '%s\n' 'success'
-	fi
-	# outputs:
-	# before failure
-	# after failure
-	# success
-	;;
+		# outputs:
+		# before failure
+		# after failure
+		;;
+	4)
+		set -e
+		a_function_which_failure_IS_NOT_the_last_command && printf '%s\n' 'success'
+		# outputs:
+		# before failure
+		# after failure
+		# success
+		;;
+	5)
+		set -e
+		a_function_which_failure_IS_NOT_the_last_command || printf '%s\n' 'failure'
+		# outputs:
+		# before failure
+		# after failure
+		;;
+	6)
+		set -e
+		if a_function_which_failure_IS_NOT_the_last_command; then
+			printf '%s\n' 'success'
+		else
+			printf '%s\n' 'failure'
+		fi
+		# outputs:
+		# before failure
+		# after failure
+		# success
+		;;
+	7)
+		set -e
+		if ! a_function_which_failure_IS_NOT_the_last_command; then
+			printf '%s\n' 'failure'
+		else
+			printf '%s\n' 'success'
+		fi
+		# outputs:
+		# before failure
+		# after failure
+		# success
+		;;
 
-# if the failure is the last command, then such works as expected, as the exit status of any function is always the exit status of the last executed command, regardless of errexit
-8)
-	set -e
-	a_function_which_failure_IS_the_last_command && printf '%s\n' 'success' || printf '%s\n' 'failure'
-	printf '%s\n' 'ok'
-	# outputs:
-	# before failure without after
-	# failure
-	# ok
-	;;
+	# if the failure is the last command, then such works as expected, as the exit status of any function is always the exit status of the last executed command, regardless of errexit
+	8)
+		set -e
+		a_function_which_failure_IS_the_last_command && printf '%s\n' 'success' || printf '%s\n' 'failure'
+		printf '%s\n' 'ok'
+		# outputs:
+		# before failure without after
+		# failure
+		# ok
+		;;
 
-# this behaviour also impacts how we fetch exit codes
-9)
-    # without errexit
-    set +e
-    a_function_which_failure_IS_NOT_the_last_command
-    printf '%s\n' "status=$?"
-    # outputs:
-    # before failure
-    # after failure
-    # status=0
-    a_function_which_failure_IS_the_last_command
-    printf '%s\n' "status=$?"
-    # outputs:
-    # before failure without after
-    # status=1
-    ;;
-10)
-    # with errexit
-    set -e
-    status=0 && a_function_which_failure_IS_NOT_the_last_command || status=$?
-    printf '%s\n' "status=$status"
-    # outputs:
-    # before failure
-    # after failure
-    # status=0
-    status=0 && a_function_which_failure_IS_the_last_command || status=$?
-    printf '%s\n' "status=$status"
-    # outputs:
-    # before failure without after
-    # status=1
-    ;;
-esac
+	# this behaviour also impacts how we fetch exit codes
+	9)
+		# without errexit
+		set +e
+		a_function_which_failure_IS_NOT_the_last_command
+		printf '%s\n' "status=$?"
+		# outputs:
+		# before failure
+		# after failure
+		# status=0
+		a_function_which_failure_IS_the_last_command
+		printf '%s\n' "status=$?"
+		# outputs:
+		# before failure without after
+		# status=1
+		;;
+	10)
+		# with errexit
+		set -e
+		status=0 && a_function_which_failure_IS_NOT_the_last_command || status=$?
+		printf '%s\n' "status=$status"
+		# outputs:
+		# before failure
+		# after failure
+		# status=0
+		status=0 && a_function_which_failure_IS_the_last_command || status=$?
+		printf '%s\n' "status=$status"
+		# outputs:
+		# before failure without after
+		# status=1
+		;;
+	esac
+)
+
+# Fire if invoked standalone
+if test "$0" = "${BASH_SOURCE[0]}"; then
+	bash_error_testing "$@"
+fi
