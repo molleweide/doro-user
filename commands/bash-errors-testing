@@ -5,6 +5,7 @@
 #       [ ] If possible, try to re run the choose menu after having run the
 #       select function so that user can continuously select and run funcs
 #       multiple times
+#       [ ] bash.bash -> enable/disable dorothy opts
 
 # TODO:Create a choose menu where the contents of each function is stringified
 # and put it into `choose` menu for selecting each alternative.
@@ -36,18 +37,18 @@
 # NOTE: This function renders each entry: `	function render_service_or_provider {`
 #
 # function select_service {
-# 	local id index about url options=()
+# 	local id index prev_about__to_be_func_def url options=()
 # 	if __command_exists -- nordvpn; then
 # 		service='system'
 # 		echo-style --notice='NordVPN installation detected, only permitting system DNS service.'
 # 	else
 # 		# add system
 # 		id='system'
-# 		about="Use the system's default DNS service. Since 2018, Linux's systemd-resolved v239 includes encryption — https://github.com/systemd/systemd/blob/04c00944d8494b88b29fd432189cf575dd0de0db/NEWS#L9866-L9870 — macOS to this day still requires an alternative service/profile for encryption."
+# 		prev_about__to_be_func_def="Use the system's default DNS service. Since 2018, Linux's systemd-resolved v239 includes encryption — https://github.com/systemd/systemd/blob/04c00944d8494b88b29fd432189cf575dd0de0db/NEWS#L9866-L9870 — macOS to this day still requires an alternative service/profile for encryption."
 # 		url=''
 # 		options+=(
 # 			"$id"
-# 			"$(render_service_or_provider "$id" "$about" "$url")"
+# 			"$(render_service_or_provider "$id" "$prev_about__to_be_func_def" "$url")"
 # 		)
 #
 #     # NOTE: This shows how the choose data is rendered for one single entry.
@@ -56,14 +57,14 @@
 # 		for id in "${available_services_id[@]}"; do
 # 			for index in "${!services_id[@]}"; do
 # 				if [[ ${services_id[index]} == "$id" ]]; then
-# 					about="${services_about[index]}"
+# 					prev_about__to_be_func_def="${services_about[index]}"
 # 					url="${services_url[index]}"
 # 					break
 # 				fi
 # 			done
 # 			options+=(
 # 				"$id"
-# 				"$(render_service_or_provider "$id" "$about" "$url")"
+# 				"$(render_service_or_provider "$id" "$prev_about__to_be_func_def" "$url")"
 # 			)
 # 		done
 #
@@ -156,15 +157,30 @@ function bash_error_testing() (
 		}
 	}
 
+	local self_definitions
+	local this_path="${BASH_SOURCE[0]}"
 
-  # NOTE: [ ] do I have to modify this function or does it work in its current form.
+	self_definitions="$(get-definitions "$this_path")"
+
+	function test1 { :; }
+
+	function testx() { :; }
+
+	test2() { :; }
+	test3() {
+	  echo "hello"
+	}
+
+	__print_lines "${self_definitions[@]}"
+
+	# NOTE: [ ] do I have to modify this function or does it work in its current form.
 	function render_service_or_provider {
 		# prefix with an empty dim to disable the default dimming in results
-		local id="$1" about="$2" url="$3"
-		if is-value -- "$about" "$url"; then
-			echo-style --dim='' --bold+underline="$id" $':\n' "$about" $'\n' --dim="$url"
-		elif is-value -- "$about"; then
-			echo-style --dim='' --bold+underline="$id" $':\n' "$about"
+		local id="$1" prev_about__to_be_func_def="$2" url="$3"
+		if is-value -- "$prev_about__to_be_func_def" "$url"; then
+			echo-style --dim='' --bold+underline="$id" $':\n' "$prev_about__to_be_func_def" $'\n' --dim="$url"
+		elif is-value -- "$prev_about__to_be_func_def"; then
+			echo-style --dim='' --bold+underline="$id" $':\n' "$prev_about__to_be_func_def"
 		elif is-value -- "$url"; then
 			echo-style --dim='' --bold+underline="$id" $':\n' --dim="$url"
 		else
@@ -172,61 +188,68 @@ function bash_error_testing() (
 		fi
 	}
 
-
-
 	# NOTE: [ ] Get definitions and put them into an array with my_defs < <(...)
 
 	# NOTE: [ ] Render func defs for choose
 	#           Modify this snippet from setup-dns.
 	#
-	# 	local id index about url options=()
+	# 	local id index prev_about__to_be_func_def url options=()
 	# 	if __command_exists -- nordvpn; then
 	# 		service='system'
 	# 		echo-style --notice='NordVPN installation detected, only permitting system DNS service.'
 	# 	else
 	# 		# add system
 	# 		id='system'
-	# 		about="Use the system's default DNS service. Since 2018, Linux's systemd-resolved v239 includes encryption — https://github.com/systemd/systemd/blob/04c00944d8494b88b29fd432189cf575dd0de0db/NEWS#L9866-L9870 — macOS to this day still requires an alternative service/profile for encryption."
+	# 		prev_about__to_be_func_def="Use the system's default DNS service. Since 2018, Linux's systemd-resolved v239 includes encryption — https://github.com/systemd/systemd/blob/04c00944d8494b88b29fd432189cf575dd0de0db/NEWS#L9866-L9870 — macOS to this day still requires an alternative service/profile for encryption."
 	# 		url=''
 	# 		options+=(
 	# 			"$id"
-	# 			"$(render_service_or_provider "$id" "$about" "$url")"
+	# 			"$(render_service_or_provider "$id" "$prev_about__to_be_func_def" "$url")"
 	# 		)
 	#
 	# 		# render service options
 	# 		for id in "${available_services_id[@]}"; do
 	# 			for index in "${!services_id[@]}"; do
 	# 				if [[ ${services_id[index]} == "$id" ]]; then
-	# 					about="${services_about[index]}"
+	# 					prev_about__to_be_func_def="${services_about[index]}"
 	# 					url="${services_url[index]}"
 	# 					break
 	# 				fi
 	# 			done
 	# 			options+=(
 	# 				"$id"
-	# 				"$(render_service_or_provider "$id" "$about" "$url")"
+	# 				"$(render_service_or_provider "$id" "$prev_about__to_be_func_def" "$url")"
 	# 			)
 	# 		done
 
+	# NOTE: [ ] custom choose-test-current-file
+	#           [ ] Use a custom flag that sets how many preview lines of each
+	#           function that we want to allow for output in the terminal.
+	#           Or maybe this could be done dynamically inside of the command
+	#           by reusing Ben's custom commands for getting terminal dimensions
+	#           etc.
+	#           --
+	#           Name ideas:
+	#           choose-function-runner, choose-fn-tester, choose-tester,
+	#           func-runner-ui
+	#           --
+	#           >> run this command in a command where you keep various func
+	#           test cases that you want to run by selecting them via choose.
+	#
 	# NOTE: [ ] Run `choose` command
 	#
+	# 		# prompt the user which dns service they wish to use
+	# 		service="$(
 	# 			choose --required --linger --confirm="$option_confirm" --label \
 	# 				--question='Which DNS service do you wish to be your primary service?' \
 	# 				--default="${option_service:-"$DNS_SERVICE"}" -- "${options[@]}"
+	# 		)"
+
+	# NOTE: [ ] Test that we get the correct func name output.
 
 	# declare -f a_function_which_failure_IS_NOT_the_last_command
 
 	# declare -f
-
-	exit
-
-	func_defs=$(declare -f)
-
-	# printf '%s\n' "${func_defs[@]}" | echo-regexp -g -m -o -n --search='^([\w\_]+)\(\)'
-	echo-lines "${func_defs[@]}" | echo-regexp -g -m -o -n --search='^([\w\_]+)\(\)'
-
-	# NOTE: Prints the functions exactly BUT it puts the function name statement on
-	# distinct lines -> Use echo-regexp to capture the func names exclusively.
 
 	exit
 

@@ -18,6 +18,43 @@
 
 function get_definitions() (
 	source "$DOROTHY/sources/bash.bash"
+
+	# NOTE: options
+	#
+	# --globally:
+	#
+	# --executing-cmd:
+	#
+	# --dorothy-cmd-top-level: Funcs inside a dorothy command are indented by one
+	#             so this could be checked for in order to avoid/filter out unwanted
+	#             func defs.
+
+	# func_defs=$(declare -f)
+	# printf '%s\n' "${func_defs[@]}" | echo-regexp -g -m -o -n --search='^([\w\_]+)\(\)'
+	# echo-lines "${func_defs[@]}" | echo-regexp -g -m -o -n --search='^([\w\_]+)\(\)'
+
+	# TODO: arguments
+
+	local exec_path="$1" # "${BASH_SOURCE[0]}"
+
+	# __print_lines "exec path in get def: $exec_path"
+
+	local supports_named_captures='no'
+
+	local fn_pat1="^\s*function\s+([\w_]+)(\(\))?\s*\{" # captures: `function <name>()? {`
+	local fn_pat2="^\s*([\w_]+)\(\)\s*\{"               # captures: `<name>() {`
+
+	local fn_regex=''
+	if [[ "$supports_named_captures" == "yes" ]]; then
+		fn_regex="$fn_pat1|$fn_pat2"
+	else
+		fn_regex="$fn_pat1"
+	fi
+
+	# local gpt="function\s+(\w+)\s*\{|(\w+)\s*\(\)\s*\{"
+
+	echo-file --raw -- "$exec_path" | echo-regexp -gmon --search="$fn_regex" --replace='$1'
+
 )
 
 # Fire if invoked standalone
