@@ -66,90 +66,88 @@ function bash_error_testing() (
 		# before failure
 		# after failure
 	}
-	# 	;;
-	# 4)
-	# 	set -e
-	# 	_a_function_which_failure_IS_NOT_the_last_command && printf '%s\n' 'success'
-	# 	# outputs:
-	# 	# before failure
-	# 	# after failure
-	# 	# success
-	# 	;;
-	# 5)
-	# 	set -e
-	# 	_a_function_which_failure_IS_NOT_the_last_command || printf '%s\n' 'failure'
-	# 	# outputs:
-	# 	# before failure
-	# 	# after failure
-	# 	;;
-	# 6)
-	# 	set -e
-	# 	if _a_function_which_failure_IS_NOT_the_last_command; then
-	# 		printf '%s\n' 'success'
-	# 	else
-	# 		printf '%s\n' 'failure'
-	# 	fi
-	# 	# outputs:
-	# 	# before failure
-	# 	# after failure
-	# 	# success
-	# 	;;
-	# 7)
-	# 	set -e
-	# 	if ! _a_function_which_failure_IS_NOT_the_last_command; then
-	# 		printf '%s\n' 'failure'
-	# 	else
-	# 		printf '%s\n' 'success'
-	# 	fi
-	# 	# outputs:
-	# 	# before failure
-	# 	# after failure
-	# 	# success
-	# 	;;
-	#
-	# # if the failure is the last command, then such works as expected, as the exit status of any function is always the exit status of the last executed command, regardless of errexit
-	# 8)
-	# 	set -e
-	# 	_a_function_which_failure_IS_the_last_command && printf '%s\n' 'success' || printf '%s\n' 'failure'
-	# 	printf '%s\n' 'ok'
-	# 	# outputs:
-	# 	# before failure without after
-	# 	# failure
-	# 	# ok
-	# 	;;
-	#
-	# # this behaviour also impacts how we fetch exit codes
-	# 9)
-	# 	# without errexit
-	# 	set +e
-	# 	_a_function_which_failure_IS_NOT_the_last_command
-	# 	printf '%s\n' "status=$?"
-	# 	# outputs:
-	# 	# before failure
-	# 	# after failure
-	# 	# status=0
-	# 	_a_function_which_failure_IS_the_last_command
-	# 	printf '%s\n' "status=$?"
-	# 	# outputs:
-	# 	# before failure without after
-	# 	# status=1
-	# 	;;
-	# 10)
-	# 	# with errexit
-	# 	set -e
-	# 	status=0 && _a_function_which_failure_IS_NOT_the_last_command || status=$?
-	# 	printf '%s\n' "status=$status"
-	# 	# outputs:
-	# 	# before failure
-	# 	# after failure
-	# 	# status=0
-	# 	status=0 && _a_function_which_failure_IS_the_last_command || status=$?
-	# 	printf '%s\n' "status=$status"
-	# 	# outputs:
-	# 	# before failure without after
-	# 	# status=1
-	# 	;;
-	# esac
+	function output_both_and_success {
+		set -e
+		_a_function_which_failure_IS_NOT_the_last_command && printf '%s\n' 'success'
+		# outputs:
+		# before failure
+		# after failure
+		# success
+	}
+	function before_fail_and_after_fail {
+		set -e
+		_a_function_which_failure_IS_NOT_the_last_command || printf '%s\n' 'failure'
+		# outputs:
+		# before failure
+		# after failure
+	}
+	function failure_in_conditional {
+		set -e
+		if _a_function_which_failure_IS_NOT_the_last_command; then
+			printf '%s\n' 'success'
+		else
+			printf '%s\n' 'failure'
+		fi
+		# outputs:
+		# before failure
+		# after failure
+		# success
+	}
+	function negated_conditional_success {
+		set -e
+		if ! _a_function_which_failure_IS_NOT_the_last_command; then
+			printf '%s\n' 'failure'
+		else
+			printf '%s\n' 'success'
+		fi
+		# outputs:
+		# before failure
+		# after failure
+		# success
+	}
+
+	# If the failure is the last command, then such works as expected, as the exit status of any function is always the exit status of the last executed command, regardless of errexit
+	function before_failure_without_after {
+		set -e
+		_a_function_which_failure_IS_the_last_command && printf '%s\n' 'success' || printf '%s\n' 'failure'
+		printf '%s\n' 'ok'
+		# outputs:
+		# before failure without after
+		# failure
+		# ok
+	}
+
+	# This behaviour also impacts how we fetch exit codes
+	function status_check_without_errexit {
+		# without errexit
+		set +e
+		_a_function_which_failure_IS_NOT_the_last_command
+		printf '%s\n' "status=$?"
+		# outputs:
+		# before failure
+		# after failure
+		# status=0
+		_a_function_which_failure_IS_the_last_command
+		printf '%s\n' "status=$?"
+		# outputs:
+		# before failure without after
+		# status=1
+	}
+	function status_check_with_errexit {
+		# with errexit
+		set -e
+		status=0 && _a_function_which_failure_IS_NOT_the_last_command || status=$?
+		printf '%s\n' "status=$status"
+		# outputs:
+		# before failure
+		# after failure
+		# status=0
+		status=0 && _a_function_which_failure_IS_the_last_command || status=$?
+		printf '%s\n' "status=$status"
+		# outputs:
+		# before failure without after
+		# status=1
+	}
 
 	# =======================================================
 	# Act

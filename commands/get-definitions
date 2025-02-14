@@ -50,6 +50,13 @@ function get_definitions() (
 
 	# __print_lines "exec path in get def: $exec_path"
 
+	# TODO: since ripgrep is the fastest use it to find the func names.
+	# if command-exits rg; then
+	# elif command-exists grep; then
+	# elif command-exists sed; then
+	# else
+	# fi
+
 	local supports_named_captures='no'
 
 	# JS regexp cheat sheet: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions/Groups_and_backreferences
