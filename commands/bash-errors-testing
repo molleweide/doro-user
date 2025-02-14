@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# TODO: [ ] create the get-definitions command.
-#       [ ] render data for choose menu
+# TODO: [ ] choose -> select run all tests
 #       [ ] If possible, try to re run the choose menu after having run the
 #       select function so that user can continuously select and run funcs
 #       multiple times

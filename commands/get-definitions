@@ -19,6 +19,11 @@
 #    created ones -> custom solution.
 # 3. [*] Only get explicitly defined func defs -> use echo-regexp on self.
 
+# FIX: Support
+# [ ] sed
+# [ ] standard grep
+# [ ] ripgrep
+
 # declare -f a_function_which_failure_IS_NOT_the_last_command
 # declare -f
 
