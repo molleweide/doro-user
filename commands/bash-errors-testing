@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+
+# TODO:Create a choose menu where the contents of each function is stringified
+# and put it into `choose` menu for selecting each alternative.
+# https://stackoverflow.com/questions/9894872/how-to-print-a-function-definition-in-bash
+# `declare -f gpm will just print the function definition of function gpm with no other text.`
+#
+# NOTE: Look at `	function select_service {` in setup-dns for inspiratn on how
+# to create the choose menu outputs.
+
+
+# our standard failure functions, these will be used by our examples
+function a_function_which_failure_IS_NOT_the_last_command {
+	printf '%s\n' 'before failure'
+	false # emit an error to this function, as this returns a non-zero exit status
+	printf '%s\n' 'after failure'
+}
+function a_function_which_failure_IS_the_last_command {
+	printf '%s\n' 'before failure without after'
+	false # emit an error to this function, as this returns a non-zero exit status
+}
+
+declare -f a_function_which_failure_IS_NOT_the_last_command
+
+exit
+
+# select an example, either by modifying "1", or by saving this a script and using the first argument
+example="${1:-"1"}"
+case "$example" in
+# these examples are as expected
+1)
+	set +e # disable errors returning immediately, the default bash mode, desirable for the login shell
+	a_function_which_failure_IS_NOT_the_last_command
+	# outputs:
+	# before failure
+	# after failure
+	;;
+2)
+	set -e # enable errors to return immediately, the default bash mode in dorothy enabled when we `source "$DOROTHY/sources/bash.bash"`, desirable for scripting
+	a_function_which_failure_IS_NOT_the_last_command
+    # outputs:
+	# before failure
+	;;
+
+# however these don't
+3)
+	set -e
+	! a_function_which_failure_IS_NOT_the_last_command
+	printf '%s\n' 'failure'
+	# outputs:
+	# before failure
+	# after failure
+	;;
+4)
+	set -e
+	a_function_which_failure_IS_NOT_the_last_command && printf '%s\n' 'success'
+	# outputs:
+	# before failure
+	# after failure
+	# success
+	;;
+5)
+	set -e
+	a_function_which_failure_IS_NOT_the_last_command || printf '%s\n' 'failure'
+    # outputs:
+	# before failure
+	# after failure
+	;;
+6)
+	set -e
+	if a_function_which_failure_IS_NOT_the_last_command; then
+		printf '%s\n' 'success'
+	else
+		printf '%s\n' 'failure'
+	fi
+	# outputs:
+	# before failure
+	# after failure
+	# success
+	;;
+7)
+	set -e
+	if ! a_function_which_failure_IS_NOT_the_last_command; then
+		printf '%s\n' 'failure'
+	else
+		printf '%s\n' 'success'
+	fi
+	# outputs:
+	# before failure
+	# after failure
+	# success
+	;;
+
+# if the failure is the last command, then such works as expected, as the exit status of any function is always the exit status of the last executed command, regardless of errexit
+8)
+	set -e
+	a_function_which_failure_IS_the_last_command && printf '%s\n' 'success' || printf '%s\n' 'failure'
+	printf '%s\n' 'ok'
+	# outputs:
+	# before failure without after
+	# failure
+	# ok
+	;;
+
+# this behaviour also impacts how we fetch exit codes
+9)
+    # without errexit
+    set +e
+    a_function_which_failure_IS_NOT_the_last_command
+    printf '%s\n' "status=$?"
+    # outputs:
+    # before failure
+    # after failure
+    # status=0
+    a_function_which_failure_IS_the_last_command
+    printf '%s\n' "status=$?"
+    # outputs:
+    # before failure without after
+    # status=1
+    ;;
+10)
+    # with errexit
+    set -e
+    status=0 && a_function_which_failure_IS_NOT_the_last_command || status=$?
+    printf '%s\n' "status=$status"
+    # outputs:
+    # before failure
+    # after failure
+    # status=0
+    status=0 && a_function_which_failure_IS_the_last_command || status=$?
+    printf '%s\n' "status=$status"
+    # outputs:
+    # before failure without after
+    # status=1
+    ;;
+esac

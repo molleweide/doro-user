@@ -2,7 +2,7 @@
 
 function launcher_spotlight_menu_() (
 
-# NOTE: Can we somehow pass a function to launcher instead of just a bash string??
+  # NOTE: Can we somehow pass a function to launcher instead of just a bash string??
 
   # find programs -> fzf -> open
   local launch_cmd="find /System/Library/CoreServices /System/Applications /Applications /System/Applications/Utilities -maxdepth 1 -name \"*.app\" |

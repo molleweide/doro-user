@@ -7,14 +7,16 @@ pane	7	1	1	:##*	1	:/Users/hjalmarjakobsson	1	zsh	:
 pane	8	1	1	:##*	1	:/Users/hjalmarjakobsson	1	zsh	:
 pane	9	1	1	:##*	1	:/Users/hjalmarjakobsson	1	zsh	:
 pane	bevry	1	1	:##*	1	:/Users/hjalmarjakobsson/code/repos/github.com/bevry/boundation	1	nvim	:/Users/hjalmarjakobsson/.local/share/bob/nvim-bin/nvim
-pane	doro	1	1	:*Z	1	:/Users/hjalmarjakobsson/.config/dorothy	1	nvim	:/Users/hjalmarjakobsson/.local/share/bob/nvim-bin/nvim
-pane	doro	1	1	:*Z	2	:/Users/hjalmarjakobsson	0	bash	:/bin/sh /usr/bin/man xargs
+pane	doro	1	1	:*Z	1	:/Users/hjalmarjakobsson/.config/dorothy	1	zsh	:
+pane	doro	1	1	:*Z	2	:/Users/hjalmarjakobsson/.local/share/dorothy	0	zsh	:
 pane	main	1	1	:##*	1	:/Users/hjalmarjakobsson	1	zsh	:
 pane	pm	1	1	:*	1	:/Users/hjalmarjakobsson/code/repos/github.com/molleweide/pitch-machine	1	bat	:bat package.json
-pane	rpp	1	0	:	1	:/Users/hjalmarjakobsson/reaper/packages/reaper-keys	1	zsh	:
-pane	rpp	2	1	:*	1	:/Users/hjalmarjakobsson/neorg	1	nvim	:/Users/hjalmarjakobsson/.local/share/bob/nvim-bin/nvim
-pane	rpp	3	0	:-Z	1	:/Users/hjalmarjakobsson/code/repos/github.com/molleweide/doom-nvim	1	nvim	:/Users/hjalmarjakobsson/.local/share/bob/nvim-bin/nvim
-pane	rpp	3	0	:-Z	2	:/Users/hjalmarjakobsson/code/repos/github.com/molleweide/doom-nvim	0	zsh	:
+pane	rpp	1	0	:-	1	:/Users/hjalmarjakobsson/reaper/packages/reaper-keys	1	zsh	:
+pane	rpp	2	1	:*Z	1	:/Users/hjalmarjakobsson/neorg	1	nvim	:/Users/hjalmarjakobsson/.local/share/bob/nvim-bin/nvim
+pane	rpp	2	1	:*Z	2	:/Users/hjalmarjakobsson/neorg	0	bash	:/bin/sh /usr/bin/man bash
+pane	rpp	2	1	:*Z	3	:/Users/hjalmarjakobsson/neorg	0	bash	:/bin/sh /usr/bin/man uniq
+pane	rpp	3	0	:Z	1	:/Users/hjalmarjakobsson/code/repos/github.com/molleweide/doom-nvim	1	nvim	:/Users/hjalmarjakobsson/.local/share/bob/nvim-bin/nvim
+pane	rpp	3	0	:Z	2	:/Users/hjalmarjakobsson/code/repos/github.com/molleweide/doom-nvim	0	zsh	:
 window	10	1	:zsh	1	:##*	ae5f,213x50,0,0,2	:
 window	11	1	:zsh	1	:##*	ae60,213x50,0,0,3	:
 window	4	1	:zsh	1	:##*	ae61,213x50,0,0,4	:
@@ -24,10 +26,10 @@ window	7	1	:zsh	1	:##*	ae64,213x50,0,0,7	:
 window	8	1	:zsh	1	:##*	ae65,213x50,0,0,8	:
 window	9	1	:zsh	1	:##*	ae66,213x50,0,0,9	:
 window	bevry	1	:boundation	1	:##*	5768,213x50,0,0,19	off
-window	doro	1	:doro	1	:*Z	5df6,213x50,0,0{81x50,0,0,10,131x50,82,0,11}	off
+window	doro	1	:doro	1	:*Z	9f6d,213x50,0,0{106x50,0,0,10,106x50,107,0,23}	off
 window	main	1	:zsh	1	:##*	5761,213x50,0,0,12	:
 window	pm	1	:pitch-machine	1	:*	ae5e,213x50,0,0,1	off
-window	rpp	1	:rk	0	:	5762,213x50,0,0,13	off
-window	rpp	2	:reaper	1	:*	5763,213x50,0,0,14	off
-window	rpp	3	:doom	0	:-Z	023f,213x50,0,0{126x50,0,0,15,86x50,127,0,16}	off
-state	doro	rpp
+window	rpp	1	:rk	0	:-	5762,213x50,0,0,13	off
+window	rpp	2	:reaper	1	:*Z	8856,213x50,0,0{111x50,0,0,14,101x50,112,0[101x25,112,0,22,101x24,112,26,27]}	off
+window	rpp	3	:doom	0	:Z	023f,213x50,0,0{126x50,0,0,15,86x50,127,0,16}	off
+state	rpp	doro
