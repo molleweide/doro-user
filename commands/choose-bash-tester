@@ -2,6 +2,12 @@
 
 # FIX: [ ] Now that this naturally is running as a subshell, we need to figure
 # out a way to access the functions in the parent process.
+# https://unix.stackexchange.com/questions/214340/using-a-function-defined-in-a-parent-script
+# https://askubuntu.com/questions/1494982/problem-regarding-passing-a-function-to-child-process-in-linux-shell
+# https://stackoverflow.com/questions/2199455/bash-how-to-call-a-function-declared-in-a-parent-shell
+# https://stackoverflow.com/questions/3412318/calling-bash-functions-from-sub-process?noredirect=1&lq=1
+# TEST: Try re-sourcing the target command with `test cases` in the
+# `choose-bash-testet` command.
 
 function choose_bash_tester() (
 	source "$DOROTHY/sources/bash.bash"
