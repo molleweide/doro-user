@@ -149,62 +149,67 @@ function bash_error_testing() (
 		# status=1
 	}
 
-	# =======================================================
-	# Act
+	# ============================================
+	# A. Build UI here in current command.
 
-	local this_path="${BASH_SOURCE[0]}"
+	# local this_path="${BASH_SOURCE[0]}"
+	#
+	# # Why is it that this returns a single string it seems?!
+	# # func_names_found="$(get-definitions "$this_path")"
+	#
+	# local func_names_found=() func_names_final=() choose_data=()
+	# mapfile -t func_names_found < <(get-definitions "$this_path")
+	#
+	# # This should prolly go into a command called echo-filter
+	# local remove_ids=(
+	# 	"render_choose_data"
+	# )
+	# for id in "${func_names_found[@]}"; do
+	# 	local add='yes'
+	# 	local rm_id
+	# 	for rm_id in "${remove_ids[@]}"; do
+	# 		if [[ "$id" == _* || "$rm_id" == "$id" ]]; then
+	# 			add='no'
+	# 		fi
+	# 	done
+	# 	if [[ "$add" == 'yes' ]]; then
+	# 		func_names_final+=("$id")
+	# 	fi
+	# done
+	#
+	# function render_choose_data {
+	# 	local id="$1" description body
+	# 	description="${id//_/ }"
+	# 	description="${description^}"
+	# 	# Unfortunately, using negative numbers does not work with head on macos.
+	# 	# body="$(echo-lines "$(declare -f "$id")" | tail -n +3 | head -n -1)"
+	# 	body="$(echo-lines "$(declare -f "$id")" | sed '1,2d; $d')"
+	# 	# prefix with an empty dim to disable the default dimming in results
+	# 	# Why is the final linebreak trimmed when displaying the information??
+	# 	echo-style --dim='' --bold+underline="$description" $'\n' --dim="$body" $'\n'
+	# }
+	# for id in "${func_names_final[@]}"; do
+	# 	choose_data+=(
+	# 		"$id"
+	# 		"$(render_choose_data "$id")"
+	# 	)
+	# done
+	#
+	# local selection
+	# selection="$(
+	# 	choose --required --label \
+	# 		--question='Which test do you want to run?' \
+	# 		-- "${choose_data[@]}"
+	# )"
+	#
+	# __print_lines "Selection: [$selection]"
+	#
+	# "$selection"
 
-	# Why is it that this returns a single string it seems?!
-	# func_names_found="$(get-definitions "$this_path")"
+	# ============================================
+	# B. Try build and run UI in external command.
 
-	local func_names_found=() func_names_final=() choose_data=()
-	mapfile -t func_names_found < <(get-definitions "$this_path")
-
-	# This should prolly go into a command called echo-filter
-	local remove_ids=(
-		"render_choose_data"
-	)
-	for id in "${func_names_found[@]}"; do
-		local add='yes'
-		local rm_id
-		for rm_id in "${remove_ids[@]}"; do
-			if [[ "$id" == _* || "$rm_id" == "$id" ]]; then
-				add='no'
-			fi
-		done
-		if [[ "$add" == 'yes' ]]; then
-			func_names_final+=("$id")
-		fi
-	done
-
-	function render_choose_data {
-		local id="$1" description body
-		description="${id//_/ }"
-		description="${description^}"
-		# Unfortunately, using negative numbers does not work with head on macos.
-		# body="$(echo-lines "$(declare -f "$id")" | tail -n +3 | head -n -1)"
-		body="$(echo-lines "$(declare -f "$id")" | sed '1,2d; $d')"
-		# prefix with an empty dim to disable the default dimming in results
-		# Why is the final linebreak trimmed when displaying the information??
-		echo-style --dim='' --bold+underline="$description" $'\n' --dim="$body" $'\n'
-	}
-	for id in "${func_names_final[@]}"; do
-		choose_data+=(
-			"$id"
-			"$(render_choose_data "$id")"
-		)
-	done
-
-	local selection
-	selection="$(
-		choose --required --label \
-			--question='Which test do you want to run?' \
-			-- "${choose_data[@]}"
-	)"
-
-	__print_lines "Selection: [$selection]"
-
-	"$selection"
+	choose-bash-tester -- "${BASH_SOURCE[0]}"
 
 )
 

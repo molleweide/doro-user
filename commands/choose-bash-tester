@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+
+# FIX: [ ] Now that this naturally is running as a subshell, we need to figure
+# out a way to access the functions in the parent process.
+
+function choose_bash_tester() (
+	source "$DOROTHY/sources/bash.bash"
+	__require_array 'mapfile'
+
+	# =====================================
+	# Arguments
+
+	# TODO: [ ] fix this
+	function help {
+		cat <<-EOF >/dev/stderr
+			ABOUT:
+			Helper UI for running test examples when researching bash/shell features.
+
+			USAGE:
+			choose-bash-testet [...options forwarded to choose] -- ...<path>s
+		EOF
+		return 22 # EINVAL 22 Invalid argument
+	}
+
+	# process
+	local item option_paths=() options=()
+	while [[ $# -ne 0 ]]; do
+		item="$1"
+		shift
+		case "$item" in
+		'--help' | '-h') help ;;
+		'--')
+			option_paths+=("$@")
+			shift "$#"
+			break
+			;;
+		*) options+=("$item") ;;
+		esac
+	done
+
+	# WARN: currently only expects one single path!
+
+	# check
+	if [[ ${#option_paths[@]} -eq 0 ]]; then
+		help 'No <path>s provided.'
+	fi
+
+	# "$1" # "${BASH_SOURCE[0]}"
+	local this_path="${option_paths[0]}"
+
+	__print_lines "This path => $this_path"
+
+	# =====================================
+	# Action
+
+	# # adjust args to paths and basenames
+	# local values=()
+	# mapfile -t values < <(echo-paths-and-basenames -- "${option_paths[@]}")
+	#
+	# # ask with label
+	# choose --label "${options[@]}" -- "${values[@]}"
+
+	# Why is it that this returns a single string it seems?!
+	# func_names_found="$(get-definitions "$this_path")"
+
+	local func_names_found=() func_names_final=() choose_data=()
+	mapfile -t func_names_found < <(get-definitions -- "$this_path")
+
+	# __print_lines "${func_names_found[@]}"
+
+	# ---------
+	# NOTE: Since this is now running in an isolated command, this block might
+	# be unnecessary.
+	# However, we might always want to exclude definitis in certain commands,
+	# such as this one??
+
+	# This should prolly go into a command called echo-filter
+	local remove_ids=(
+		"render_choose_data"
+	)
+	for id in "${func_names_found[@]}"; do
+		local add='yes'
+		local rm_id
+		for rm_id in "${remove_ids[@]}"; do
+			if [[ "$id" == _* || "$rm_id" == "$id" ]]; then
+				add='no'
+			fi
+		done
+		if [[ "$add" == 'yes' ]]; then
+			func_names_final+=("$id")
+		fi
+	done
+
+	# ---------
+
+	function render_choose_data {
+		local id="$1" description body body_formatted
+		description="${id//_/ }"
+		description="${description^}"
+
+		# NOTE: Now when this command is running in a subshell, it means that it needs
+		# a workaround to be able to access the functions defined in the parent process.
+
+		set -x
+		body="$(declare -f "$id")"
+		set +x
+		# Unfortunately, using negative numbers does not work with head on macos.
+		# body_formatted="$(echo-lines "$(declare -f "$id")" | tail -n +3 | head -n -1)"
+		body_formatted="$(echo-lines "$body" | sed '1,2d; $d')"
+		# prefix with an empty dim to disable the default dimming in results
+		# Why is the final linebreak trimmed when displaying the information??
+		echo-style --dim='' --bold+underline="$description" $'\n' --dim="$body_formatted" $'\n'
+	}
+	for id in "${func_names_final[@]}"; do
+		choose_data+=(
+			"$id"
+			"$(render_choose_data "$id")"
+		)
+	done
+
+	local selection
+	selection="$(
+		choose --required --label \
+			--question='Which test do you want to run?' \
+			-- "${choose_data[@]}"
+	)"
+
+	# =================================
+	# Run selection
+
+	__print_lines "Selection: [$selection]"
+
+	"$selection"
+
+)
+
+# fire if invoked standalone
+if test "$0" = "${BASH_SOURCE[0]}"; then
+	choose_bash_tester "$@"
+fi

@@ -19,62 +19,111 @@
 #    created ones -> custom solution.
 # 3. [*] Only get explicitly defined func defs -> use echo-regexp on self.
 
-# FIX: Support
-# [ ] sed
-# [ ] standard grep
-# [ ] ripgrep
-
-# declare -f a_function_which_failure_IS_NOT_the_last_command
-# declare -f
-
 function get_definitions() (
 	source "$DOROTHY/sources/bash.bash"
 
-	# NOTE: options
-	#
-	# --globally:
-	#
-	# --executing-cmd:
-	#
-	# --dorothy-cmd-top-level: Funcs inside a dorothy command are indented by one
-	#             so this could be checked for in order to avoid/filter out unwanted
-	#             func defs.
+	# =================================
+	# Arguments
 
-	# func_defs=$(declare -f)
-	# printf '%s\n' "${func_defs[@]}" | echo-regexp -g -m -o -n --search='^([\w\_]+)\(\)'
-	# echo-lines "${func_defs[@]}" | echo-regexp -g -m -o -n --search='^([\w\_]+)\(\)'
+	# TODO: [ ] Finish the help text.
+	function help {
+		cat <<-EOF >/dev/stderr
+			ABOUT:
+			Query code for bash definitions and identifiers.
+			If no path is supplied then query current env/shell.
 
-	# TODO: arguments
+			USAGE:
+			get-definitions [...options] [--] ..<paths>
 
-	local exec_path="$1" # "${BASH_SOURCE[0]}"
+			OPTIONS:
+			--search=<search> | <search>
+			    The regular expression to search for.
 
-	# __print_lines "exec path in get def: $exec_path"
+			--replace=<replace> | <replace>
+			    The string to replace the search with.
 
-	# TODO: since ripgrep is the fastest use it to find the func names.
-	# if command-exits rg; then
-	# elif command-exists grep; then
-	# elif command-exists sed; then
-	# else
-	# fi
+			--flags=<flags> | <flags>
+			    Regular expression flags, e.g. 'i' for case-insensitive.
 
-	local supports_named_captures='no'
+			    --globally:
 
-	# JS regexp cheat sheet: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions/Groups_and_backreferences
+			    --executing-cmd:
 
-	local fn_pat1="^\s*function\s+([\w_]+)(\(\))?\s*\{" # captures: `function <name>()? {`
-	local fn_pat2="^\s*([\w_]+)\(\)\s*\{"               # captures: `<name>() {`
+			    --dorothy-cmd-top-level: Funcs inside a dorothy command are indented by one
+			                so this could be checked for in order to avoid/filter out unwanted
+			                func defs.
 
-	local fn_regex=''
-	if [[ "$supports_named_captures" == "yes" ]]; then
-		fn_regex="$fn_pat1|$fn_pat2"
-	else
-		fn_regex="$fn_pat1"
+			      --funcs
+			      --vars
+			      --both
+
+		EOF
+		if [[ $# -ne 0 ]]; then
+			echo-error "$@"
+		fi
+		return 22 # EINVAL 22 Invalid argument
+	}
+
+	# process
+	local item option_flags='' option_args=() option_inputs=() option_echo_regexp='no'
+	while [[ $# -ne 0 ]]; do
+		item="$1"
+		shift
+		case "$item" in
+		'--help' | '-h') help ;;
+		'--flags='*) option_flags="${item#*=}" ;;
+		'--global') option_flags+='g' ;;
+		'--ignore-case') option_flags+='i' ;;
+		'--echo-regexp') option_echo_regexp='yes' ;;
+		'--')
+			option_inputs+=("$@")
+			shift $#
+			break
+			;;
+		*) option_args+=("$item") ;;
+		esac
+	done
+
+	# WARN: currently only expects one single path!
+
+	# Check for search pattern
+	if [[ ${#option_inputs[@]} -eq 0 ]]; then
+		help 'No <search> file path(s) were provided.'
 	fi
+	# "$1" # "${BASH_SOURCE[0]}"
+	local exec_path="${option_inputs[0]}"
 
-	# local gpt="function\s+(\w+)\s*\{|(\w+)\s*\(\)\s*\{"
+	# =================================
+	# Action
 
-	echo-file --raw -- "$exec_path" | echo-regexp -gmon --search="$fn_regex" --replace='$1'
+	# FIX: [ ] named caputers are actually used in config-helper.
+	#       Add this to the echo-regexp js patterns.
+	# FIX: Support
+	# [ ] sed
+	# [ ] standard grep
+	# [ ] ripgrep
 
+	local fn_regex='' supports_named_captures='no'
+	if [[ $option_echo_regexp == 'yes' ]]; then
+		# TODO: since ripgrep is the fastest use it to find the func names.
+		if command-exits rg; then
+			:
+		elif command-exists grep; then
+			:
+		elif command-exists sed; then
+			:
+		fi
+	else
+		# JS regexp cheat sheet: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions/Groups_and_backreferences
+		local fn_pat1="^\s*function\s+([\w_]+)(\(\))?\s*\{" # captures: `function <name>()? {`
+		local fn_pat2="^\s*([\w_]+)\(\)\s*\{"               # captures: `<name>() {`
+		if [[ "$supports_named_captures" == "yes" ]]; then
+			fn_regex="$fn_pat1|$fn_pat2"
+		else
+			fn_regex="$fn_pat1"
+		fi
+		echo-file --raw -- "$exec_path" | echo-regexp -gmon --search="$fn_regex" --replace='$1'
+	fi
 )
 
 # Fire if invoked standalone
