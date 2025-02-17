@@ -1,5 +1,5 @@
 function doc_helper() {
-  source "$DOROTHY/sources/bash.bash"
+	source "$DOROTHY/sources/bash.bash"
 	# function_bodies=()
 
 	# local item cmd=() exit_status_local exit_status_variable='exit_status_local' stdout_variable='' stderr_variable='' output_variable='' stdout_pipe='/dev/stdout' stderr_pipe='/dev/stderr'
@@ -91,8 +91,8 @@ function doc_helper() {
 	local function_names=() function_bodies=()
 
 	# handle input
-	while read -r line; do
-		# while IFS= read -r line; do
+	# while read -r line; do
+	while IFS= read -r line; do
 		function_names+=("$line")
 		function_bodies+=("$(declare -f "$line")")
 	done
@@ -111,13 +111,32 @@ function doc_helper() {
 	#
 	# from the code
 
+	# ============================================
+	# run choose internally
+
 	# prepare data for choose
 	function_names_with_bodies=()
 	for index in "${!function_names[@]}"; do
 		function_names_with_bodies+=("${function_names[index]}" "${function_bodies[index]}")
-		# echo "${function_names[index]}"
-		# echo "${function_bodies[index]}"
 	done
+
+	# for elem in "${function_names_with_bodies[@]}"; do
+	# 	echo "$elem"
+	# done
+
+	fn="$(choose --required --linger 'Which function to execute?' --label -- "${function_names_with_bodies[@]}")"
+	# args="$(ask --linger 'Arguments to pass to the function?')"
+	# $fn $args
+
+	# ============================================
+	# pass data to stoud
+
+	# # prepare data for choose
+	# for index in "${!function_names[@]}"; do
+	# 	# function_names_with_bodies+=("${function_names[index]}" "${function_bodies[index]}")
+	# 	echo "${function_names[index]}"
+	# 	echo "${function_bodies[index]}"
+	# done
 
 	# local idx=0
 	# for item in "${function_names_with_bodies[@]}"; do
