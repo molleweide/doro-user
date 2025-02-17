@@ -1,154 +1,120 @@
+#
+# TODO: move this to a standalone command where we avoid (subshell) syntax.
+#
+# TODO: ARGS
+# [ ] Use entry title
+#     - based on func name?
+#     - based on defined heredocs?
+# [ ] How to format fn/code body
+#     - full func
+#     - trim surroundings
+#     - [ ] CODE VS DESCRIPTION
+#         ~ only descriptions need the `__|__desc` suffix, right?
+#             check if index - 1 contains __desc
+#         ~ descr is assumed to come before `code`
+#         ~ use rg to capture comments above each function.
+# [ ]
+# [ ]
+#
+#
+# TODO: UI
+# [ ] If choose is run once, then properly display the `code` above the output.
+# [ ] capture the output of selected function and display it above the choose
+# menu in the next iteration.
+# [ ] ASK: how can we check if the function takes arguments?
+#
+
 function doc_helper() {
 	source "$DOROTHY/sources/bash.bash"
-	# function_bodies=()
 
-	# local item cmd=() exit_status_local exit_status_variable='exit_status_local' stdout_variable='' stderr_variable='' output_variable='' stdout_pipe='/dev/stdout' stderr_pipe='/dev/stderr'
-	# while [[ $# -ne 0 ]]; do
-	# 	item="$1"
-	# 	shift
-	# 	case "$item" in
-	# 	'--help')
-	# 		cat <<-EOF >/dev/stderr
-	# 			ABOUT:
-	# 			Capture or ignore exit status, without disabling errexit, and without a subshell.
-	# 			Copyright 2023+ Benjamin Lupton <b@lupton.cc> (https://balupton.com)
-	# 			Written for Dorothy (https://github.com/bevry/dorothy)
-	# 			Licensed under the CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/)
-	# 			For more information: https://github.com/bevry/dorothy/blob/master/docs/bash/errors.md
-	#
-	# 			USAGE:
-	# 			local status=0 stdout='' stderr='' output=''
-	# 			eval_capture [--statusvar=status] [--stdoutvar=stdout] [--stderrvar=stderr] [--outputvar=output] [--stdoutpipe=/dev/stdout] [--stderrpipe=/dev/stderr] [--outputpipe=...] [--no-stdout] [--no-stderr] [--no-output] [--] cmd ...
-	#
-	# 			QUIRKS:
-	# 			Using --stdoutvar will set --stdoutpipe=/dev/null
-	# 			Using --stderrvar will set --stderrpipe=/dev/null
-	# 			Using --outputvar will set --stdoutpipe=/dev/null --stderrpipe=/dev/null
-	#
-	# 			WARNING:
-	# 			If [eval_capture] triggers something that still does function invocation via [if], [&&], [||], or [!], then errexit will still be disabled for that invocation.
-	# 			This is a limitation of bash, with no workaround (at least at the time of bash v5.2).
-	# 			Refer to https://github.com/bevry/dorothy/blob/master/docs/bash/errors.md for guidance.
-	# 		EOF
-	# 		return 22 # EINVAL 22 Invalid argument
-	# 		;;
-	# 	'--statusvar='* | '--status-var='*)
-	# 		exit_status_variable="${item#*=}"
-	# 		;;
-	# 	'--stdoutvar='* | '--stdout-var='*)
-	# 		stdout_variable="${item#*=}"
-	# 		stdout_pipe='/dev/null'
-	# 		;;
-	# 	'--stderrvar='* | '--stderr-var='*)
-	# 		stderr_variable="${item#*=}"
-	# 		stderr_pipe='/dev/null'
-	# 		;;
-	# 	'--outputvar='* | '--output-var='*)
-	# 		output_variable="${item#*=}"
-	# 		stdout_pipe='/dev/null'
-	# 		stderr_pipe='/dev/null'
-	# 		;;
-	# 	'--no-stdout' | '--ignore-stdout' | '--stdout=no')
-	# 		stdout_pipe='/dev/null'
-	# 		;;
-	# 	'--no-stderr' | '--ignore-stderr' | '--stderr=no')
-	# 		stderr_pipe='/dev/null'
-	# 		;;
-	# 	'--no-output' | '--ignore-output' | '--output=no')
-	# 		stdout_pipe='/dev/null'
-	# 		stderr_pipe='/dev/null'
-	# 		;;
-	# 	'--stdoutpipe='* | '--stdout-pipe='*)
-	# 		stdout_pipe="${item#*=}"
-	# 		;;
-	# 	'--stderrpipe='* | '--stderr-pipe='*)
-	# 		stderr_pipe="${item#*=}"
-	# 		;;
-	# 	'--outputpipe='* | '--output-pipe='*)
-	# 		stdout_pipe="${item#*=}"
-	# 		stderr_pipe="$stdout_pipe"
-	# 		;;
-	# 	'--')
-	# 		cmd+=("$@")
-	# 		shift $#
-	# 		break
-	# 		;;
-	# 	'-'*)
-	# 		# __print_line "ERROR: $0: ${FUNCNAME[0]}: $LINENO: An unrecognised flag was provided: $item" >/dev/stderr
-	# 		return 22 # EINVAL 22 Invalid argument
-	# 		;;
-	# 	*)
-	# 		cmd+=(
-	# 			"$item"
-	# 			"$@"
-	# 		)
-	# 		shift $#
-	# 		break
-	# 		;;
-	# 	esac
-	# done
+	# =======================================================
+	# arguments
+
+	function help {
+		cat <<-EOF >/dev/stderr
+			ABOUT:
+			xxx
+
+			USAGE:
+			xxx
+
+			OPTIONS:
+			xxx
+
+		EOF
+		if [[ $# -ne 0 ]]; then
+			echo-error "$@"
+		fi
+		return 22 # EINVAL 22 Invalid argument
+	}
+
+	# process
+	local item option_format=''
+	while [[ $# -ne 0 ]]; do
+		item="$1"
+		shift
+		case "$item" in
+		'--help' | '-h') help ;;
+		'--format='*) option_format="${item#*=}" ;;
+		# '--global') option_flags+='g' ;;
+		# '--ignore-case') option_flags+='i' ;;
+		# # currently just default to echo-regexp
+		# '--echo-regexp') option_echo_regexp='yes' ;;
+		# '--contents') option_get_func_contsents='yes' ;;
+		# '--target-func='*) option_target_func="${item#*=}" ;;
+		'--')
+			option_inputs+=("$@")
+			shift $#
+			break
+			;;
+		*) option_args+=("$item") ;;
+		esac
+	done
+
+	# =======================================================
+	# COLLECT INFORMATION
 
 	local function_names=() function_bodies=()
 
-	# handle input
-	# while read -r line; do
-	while IFS= read -r line; do
-		function_names+=("$line")
-		function_bodies+=("$(declare -f "$line")")
+	mapfile -t function_names < <(get-definitions)
+
+	for function_name in "${function_names[@]}"; do
+		if [[ "$option_format" == "inner" ]]; then
+			function_bodies+=("$(declare -f "$function_name" | sed '1,2d; $d' | bat --style plain --color always --language bash --paging=never)")
+		elif [[ "$option_format" == "new" ]]; then
+		  :
+		else
+			function_bodies+=("$(declare -f "$function_name")")
+		fi
+
 	done
-
-	# # bodies
-	# for function_name in "${function_names[@]}"; do
-	# 	function_bodies+=("$(declare -f "$function_name")")
-	# done
-
-	# echo "${function_bodies[@]}"
-
-	# NOTE: parts:
-	# ~ function *
-	# ~ code (subset of *) **
-	# ~ label rendered (subset of **)
-	#
-	# from the code
-
-	# ============================================
-	# run choose internally
 
 	# prepare data for choose
 	function_names_with_bodies=()
+
+  # WARN: fails because i havent handled the `new` formatting yet
 	for index in "${!function_names[@]}"; do
 		function_names_with_bodies+=("${function_names[index]}" "${function_bodies[index]}")
 	done
 
+	# # LOG DATA
 	# for elem in "${function_names_with_bodies[@]}"; do
 	# 	echo "$elem"
 	# done
 
-	fn="$(choose --required --linger 'Which function to execute?' --label -- "${function_names_with_bodies[@]}")"
-	# args="$(ask --linger 'Arguments to pass to the function?')"
-	# $fn $args
+	# ============================================
+	# SETUP UI
+
+	selected_fn_name="$(choose --required --linger 'Which function to execute?' --label -- "${function_names_with_bodies[@]}")"
+
+	echo "selected_fn_name: $selected_fn_name"
+
+	# # args="$(ask --linger 'Arguments to pass to the function?')"
+	local output_header="output from [$selected_fn_name]"
+	echo-style --h1 "$output_header"
+	$selected_fn_name # $args
+	echo-style --g1 "${output_header//?/ }"
 
 	# ============================================
-	# pass data to stoud
-
-	# # prepare data for choose
-	# for index in "${!function_names[@]}"; do
-	# 	# function_names_with_bodies+=("${function_names[index]}" "${function_bodies[index]}")
-	# 	echo "${function_names[index]}"
-	# 	echo "${function_bodies[index]}"
-	# done
-
-	# local idx=0
-	# for item in "${function_names_with_bodies[@]}"; do
-	# 	idx=$((idx + 1))
-	# 	echo "IDX: $idx --------"
-	# 	echo "$item"
-	# done
-
-	# echo "${function_names_with_bodies[@]}"
-
-	# fn="$(choose --required --linger 'Which function to execute?' --label -- "${function_names_with_bodies[@]}")"
-	# args="$(ask --linger 'Arguments to pass to the function?')"
-	# $fn $args
 
 }

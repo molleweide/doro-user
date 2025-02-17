@@ -25,14 +25,35 @@
 #           >> run this command in a command where you keep various func
 #           test cases that you want to run by selecting them via choose.
 
+# =======================================================
+# ERREXIT
+
+# -e      Exit immediately if a pipeline (which may consist of a single simple command), a list,
+#         or a compound command (see SHELL GRAMMAR above), exits with a non-zero status.  The
+#         shell does not exit if the command that fails is part of the command list immediately
+#         following a while or until keyword, part of the test following the if or elif reserved
+#         words, part of any command executed in a && or || list except the command following the
+#         final && or ||, any command in a pipeline but the last, or if the command's return
+#         value is being inverted with !.  If a compound command other than a subshell returns a
+#         non-zero status because a command failed while -e was being ignored, the shell does not
+#         exit.  A trap on ERR, if set, is executed before the shell exits.  This option applies
+#         to the shell environment and each subshell environment separately (see COMMAND
+#         EXECUTION ENVIRONMENT above), and may cause subshells to exit before executing all the
+#         commands in the subshell.
+#
+#         If a compound command or shell function executes in a context where -e is being
+#         ignored, none of the commands executed within the compound command or function body
+#         will be affected by the -e setting, even if -e is set and a command returns a failure
+#         status.  If a compound command or shell function sets -e while executing in a context
+#         where -e is ignored, that setting will not have any effect until the compound command
+#         or the command containing the function call completes.
+
 function bash_error_testing() (
 	source "$DOROTHY/sources/bash.bash"
 	__require_array 'mapfile'
 
 	# =======================================================
-	# Test cases
-
-	# Prepare
+	# SETUP
 
 	# Our standard failure functions, these will be used by our examples
 	function _a_function_which_failure_IS_NOT_the_last_command {
@@ -46,7 +67,8 @@ function bash_error_testing() (
 		false # emit an error to this function, as this returns a non-zero exit status
 	}
 
-	# ------
+	# =======================================================
+	# TEST CASES
 
 	function disable_err_which_outputs_before_and_after_failure {
 		set +e # disable errors returning immediately, the default bash mode, desirable for the login shell
@@ -55,8 +77,6 @@ function bash_error_testing() (
 		# before failure
 		# after failure
 	}
-
-	# export -f disable_err_which_outputs_before_and_after_failure
 
 	function enable_default_errs_to_return_immediately_before_failure {
 		set -e # enable errors to return immediately, the default bash mode in dorothy enabled when we `source "$DOROTHY/sources/bash.bash"`, desirable for scripting
@@ -224,21 +244,19 @@ function bash_error_testing() (
 	# 1. Use `declare -f $fn` which has to be run in this file.
 	# 2.
 
-	clear
+	# clear
+	# echo-style $'\n' --bold="-- TEST FILE --" $'\n'
+	# __print_lines "CURRENT PID: $$ -> exec cmd/script: $(ps -o command= -p $$)"
+	# __print_lines "PARRENT PID: $PPID -> exec cmd/script: $(ps -o command= -p $PPID)"
+	# __print_lines "PWD: $PWD"
+	# # __print_lines "parrent pid = $(ps -o command= -p $PPID)"
+	# # local this_file="${BASH_SOURCE[0]}" local_function_ids=()
+	# # mapfile -t local_function_ids < <(get-definitions -- "$this_file")
+	# # choose-bash-tester --path="$this_file" -- "${local_function_ids[@]}"
+	# choose-bash-tester
 
-	echo-style $'\n' --bold="-- TEST FILE --" $'\n'
-
-	__print_lines "CURRENT PID: $$ -> exec cmd/script: $(ps -o command= -p $$)"
-	__print_lines "PARRENT PID: $PPID -> exec cmd/script: $(ps -o command= -p $PPID)"
-	__print_lines "PWD: $PWD"
-	# __print_lines "parrent pid = $(ps -o command= -p $PPID)"
-
-	# local this_file="${BASH_SOURCE[0]}" local_function_ids=()
-	# mapfile -t local_function_ids < <(get-definitions -- "$this_file")
-	# choose-bash-tester --path="$this_file" -- "${local_function_ids[@]}"
-
-	choose-bash-tester
-
+	source "$DOROTHY/user/sources/_doc_helper.bash"
+	doc_helper --format=new
 )
 
 # Fire if invoked standalone

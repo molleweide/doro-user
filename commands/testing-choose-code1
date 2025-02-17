@@ -2,10 +2,6 @@
 
 clear
 
-source "$DOROTHY/sources/bash.bash"
-__require_array 'mapfile'
-
-source "$DOROTHY/user/sources/_doc_helper.bash"
 
 function one_fn {
 	echo "one_fn function content:" "$@"
@@ -15,20 +11,5 @@ function two_fn {
 	echo "two_fn function content:" "$@"
 }
 
-# # mapfile -t data < <(get-definitions | doc_helper)
-# data="$(get-definitions | doc_helper)"
-# idx=0
-# for item in "${data[@]}"; do
-# 	idx=$((idx + 1))
-# 	echo "IDX: $idx --------"
-# 	echo "$item"
-# done
-# # fn="$(choose --required --linger 'Which function to execute?' --label -- "${data[@]}")"
-# # args="$(ask --linger 'Arguments to pass to the function?')"
-# # $fn $args
-
-# choose fails
-doc_helper < <(get-definitions)
-
-# source "$DOROTHY/user/sources/_choose.bash"
-# test_run_choose_from_script
+source "$DOROTHY/user/sources/_doc_helper.bash"
+doc_helper
