@@ -5,6 +5,7 @@
 
 function get_definitions() (
 	source "$DOROTHY/sources/bash.bash"
+	__require_array 'mapfile'
 
 	# # TODO: Obtain func contents from arbitrary script.
 	# # See: https://superuser.com/questions/1111219/can-i-get-all-functions-in-a-script-file-using-bash
@@ -44,7 +45,7 @@ function get_definitions() (
 			    The string to replace the search with.
 
 			--map-id-to-body
-			  Iterate all func ids and return an array where each `id` is followed
+			  Iterate all func ids and return an array where each $(id) is followed
 			  by the contents of respective func.
 
 			--flags=<flags> | <flags>
@@ -77,7 +78,7 @@ function get_definitions() (
 	}
 
 	# process
-	local item option_flags='' option_args=() option_inputs=() option_echo_regexp='no'
+	local item option_flags='' option_args=() option_inputs=() option_echo_regexp='no' option_get_func_contsents='no' option_target_func=''
 	while [[ $# -ne 0 ]]; do
 		item="$1"
 		shift
@@ -87,6 +88,8 @@ function get_definitions() (
 		'--global') option_flags+='g' ;;
 		'--ignore-case') option_flags+='i' ;;
 		'--echo-regexp') option_echo_regexp='yes' ;;
+		'--contents') option_get_func_contsents='yes' ;;
+		'--target-func='*) option_target_func="${item#*=}" ;;
 		'--')
 			option_inputs+=("$@")
 			shift $#
@@ -108,6 +111,61 @@ function get_definitions() (
 	# =================================
 	# Action
 
+	# ----------------------
+	# GET FUNC CONTENTS
+
+	if [[ "$option_get_func_contsents" == "yes" ]]; then
+		echo "TARGET FUNC: $option_target_func"
+		if [[ -z "$option_target_func" ]]; then
+			help "Obtaining the contents of a function requires passing the target function."
+		fi
+
+		local get_target_func_body='
+		    source "'"$exec_path"'" >/dev/null
+		    while read -r line; do
+		      echo ${line##* }
+		    done < <(declare -f "'"$option_target_func"'")
+		    '
+		# env -i bash --noprofile --norc -c "$get_target_func_body"
+		# env -i bash -c "$get_target_func_body"
+		env -i bash -c "$get_target_func_body"
+
+		# env -i bash --noprofile --norc -c '
+		#     source "'"$exec_path"'" >/dev/null
+		#     while read -r line; do
+		#       echo ${line##* }
+		#     done < <(declare -f "'"$option_target_func"'")
+		#     '
+
+		# set -x
+		# # --noprofile --norc
+		# env -i bash -c '
+		#     source "'"$exec_path"'" >/dev/null
+		#     declare -f "'"$option_target_func"'"
+		#     '
+		# set +x
+
+		# function get_body() {
+		# 	env -i bash --noprofile --norc -c '
+		#     source "'"$exec_path"'" >/dev/null
+		#     while read -r line; do
+		#       echo ${line##* }
+		#     done < <(declare -F "'"$option_target_func"'")
+		#     '
+		# }
+		#
+		# for fcn_name in $(get_body); do
+		#     echo "$fcn_name"
+		# done
+
+		# __print_lines "$get_target_func_body"
+
+		return 0
+	fi
+
+	# ----------------------
+	# GET ID'S
+
 	# FIX: [ ] named caputers are actually used in config-helper.
 	#       Add this to the echo-regexp js patterns.
 	# FIX: Support
@@ -115,7 +173,7 @@ function get_definitions() (
 	# [ ] standard grep
 	# [ ] ripgrep
 
-	local fn_regex='' supports_named_captures='no'
+	local fn_regex='' supports_named_captures='no' func_ids_found=()
 	if [[ $option_echo_regexp == 'yes' ]]; then
 		# TODO: since ripgrep is the fastest use it to find the func names.
 		if command-exits rg; then
@@ -134,8 +192,47 @@ function get_definitions() (
 		else
 			fn_regex="$fn_pat1"
 		fi
-		echo-file --raw -- "$exec_path" | echo-regexp -gmon --search="$fn_regex" --replace='$1'
+		mapfile -t func_ids_found < <(
+			echo-file --raw -- "$exec_path" |
+				echo-regexp -gmon --search="$fn_regex" --replace='$1'
+		)
 	fi
+
+	# --------------------------------------------
+	# filter unwanted ids
+
+	# NOTE: Since this is now running in an isolated command, this block might
+	# be unnecessary.
+	# However, we might always want to exclude definitis in certain commands,
+	# such as this one??
+
+	# FIX: [ ] Move this filter into the `get-definitions` command
+
+	# # This should prolly go into a command called echo-filter
+	# local remove_ids=(
+	# 	"render_choose_data"
+	# )
+	local func_names_final=() remove_ids=()
+	for id in "${func_ids_found[@]}"; do
+		local add='yes'
+		local rm_id
+
+		if [[ "$id" == _* ]]; then
+			add='no'
+		else
+			for rm_id in "${remove_ids[@]}"; do
+				if [[ "$id" == _* || "$rm_id" == "$id" ]]; then
+					add='no'
+				fi
+			done
+		fi
+		if [[ "$add" == 'yes' ]]; then
+			func_names_final+=("$id")
+		fi
+	done
+
+	echo-lines -- "${func_names_final[@]}"
+
 )
 
 # Fire if invoked standalone

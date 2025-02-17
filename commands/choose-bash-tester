@@ -124,7 +124,6 @@ function choose_bash_tester() (
 
 	# process
 	local item option_paths=() options=()
-	local func_names_found=()
 	local func_names_final=() choose_data=()
 
 	while [[ $# -ne 0 ]]; do
@@ -162,10 +161,6 @@ function choose_bash_tester() (
 		option_paths+=("$caller_command")
 	fi
 
-	# if [[ ${#func_names_found[@]} -eq 0 ]]; then
-	# 	help 'No <function_ids>s provided.'
-	# fi
-
 	# __print_lines "option_paths:"
 	# __print_lines "${option_paths[@]}"
 
@@ -174,12 +169,10 @@ function choose_bash_tester() (
 
 	# NOTE: currently only supports one single target path!
 
-
 	# "$1" # "${BASH_SOURCE[0]}"
 	local this_path="${option_paths[0]}"
 
 	echo-style --bold "Target this path: [$this_path]"
-	# echo-lines "${func_names_found[@]}"
 
 	#  # [x] Test resource the target file. Does not work.
 	#  set -x
@@ -198,42 +191,19 @@ function choose_bash_tester() (
 	# choose --label "${options[@]}" -- "${values[@]}"
 
 	# Why is it that this returns a single string it seems?!
-	# func_names_found="$(get-definitions "$this_path")"
+	# func_names_final="$(get-definitions "$this_path")"
 
 	# # [*] Test move this into the test case file.
-	# local func_names_found=()
-	mapfile -t func_names_found < <(get-definitions -- "$this_path")
+	# local func_names_final=()
+	mapfile -t func_names_final < <(get-definitions -- "$this_path")
 
-	__print_lines "${func_names_found[@]}"
+	echo-style --bold "FUNCTION IDS"
+	__print_lines "${func_names_final[@]}"
+
+	echo-style --bold "FUNC BODY TEST"
+	get-definitions --contents --target-func="before_failure_without_after" -- "$this_path"
 
 	exit
-
-	# --------------------------------------------
-	# filter unwanted ids
-
-	# NOTE: Since this is now running in an isolated command, this block might
-	# be unnecessary.
-	# However, we might always want to exclude definitis in certain commands,
-	# such as this one??
-
-	# FIX: [ ] Move this filter into the `get-definitions` command
-
-	# This should prolly go into a command called echo-filter
-	local remove_ids=(
-		"render_choose_data"
-	)
-	for id in "${func_names_found[@]}"; do
-		local add='yes'
-		local rm_id
-		for rm_id in "${remove_ids[@]}"; do
-			if [[ "$id" == _* || "$rm_id" == "$id" ]]; then
-				add='no'
-			fi
-		done
-		if [[ "$add" == 'yes' ]]; then
-			func_names_final+=("$id")
-		fi
-	done
 
 	# ---------
 
