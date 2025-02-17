@@ -19,8 +19,11 @@ function two__code {
 	echo-lowercase -- "$@"
 }
 
+# ids
 function_names=()
 mapfile -t function_names < <(declare -F | awk '{print $3}') # [declare -f one_fn] to [one_fn]
+
+# bodies + prepare data
 function_code_with_labels=()
 for function_name in "${function_names[@]}"; do
 	# check function is a __code function
@@ -41,6 +44,24 @@ for function_name in "${function_names[@]}"; do
 	function_code_with_labels+=("$function_code" "$function_label"$'\n')
 done
 
+# ui loop
 code="$(choose --linger 'Which code to execute?' --label -- "${function_code_with_labels[@]}")"
 args="$(ask --linger 'Arguments to pass to the code?')"
 bash -c "$code" -- $args
+
+# =======================================================
+# notes
+
+# TEST: Make the description in the form of
+#
+# fn_description() {
+#   while IFS= read -r line; do
+#     echo "$line"
+#   done
+# }
+# fn_description <<EOF
+# some text...
+# more text...
+# EOF
+
+

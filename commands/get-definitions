@@ -3,6 +3,8 @@
 # https://stackoverflow.com/questions/42420717/print-out-a-list-of-all-cases-of-a-switch
 # https://stackoverflow.com/questions/4471364/how-do-i-list-the-functions-defined-in-my-shell
 
+# TODO: [ ] issue with declare is the order
+
 function get_definitions() (
 	source "$DOROTHY/sources/bash.bash"
 	__require_array 'mapfile'
@@ -33,8 +35,12 @@ function get_definitions() (
 			ABOUT:
 			Query code for bash definitions and identifiers.
 			If no path is supplied then query current env/shell.
+			Gets definitions in the order they occur. This is why
+			`declare -F` is not used, since it always sorts results.
 
 			USAGE:
+			get-definitions
+			  Assume we want to get definitions from executing script.
 			get-definitions [...options] [--] ..<paths>
 
 			OPTIONS:
@@ -69,7 +75,10 @@ function get_definitions() (
 	}
 
 	# process
-	local item option_flags='' option_args=() option_inputs=() option_echo_regexp='no' option_get_func_contsents='no' option_target_func=''
+	local item option_flags='' no_args='no' option_args=() option_inputs=() option_echo_regexp='yes' option_get_func_contsents='no' option_target_func=''
+	if [[ $# -eq 0 ]]; then
+		no_args='yes'
+	fi
 	while [[ $# -ne 0 ]]; do
 		item="$1"
 		shift
@@ -78,6 +87,7 @@ function get_definitions() (
 		'--flags='*) option_flags="${item#*=}" ;;
 		'--global') option_flags+='g' ;;
 		'--ignore-case') option_flags+='i' ;;
+		# currently just default to echo-regexp
 		'--echo-regexp') option_echo_regexp='yes' ;;
 		'--contents') option_get_func_contsents='yes' ;;
 		'--target-func='*) option_target_func="${item#*=}" ;;
@@ -90,14 +100,19 @@ function get_definitions() (
 		esac
 	done
 
-	# WARN: currently only expects one single path!
 
-	# Check for search pattern
-	if [[ ${#option_inputs[@]} -eq 0 ]]; then
+	# if no args were given at all, then assume that we want to collect names
+	# from executing script.
+	local exec_path
+	if [[ "$no_args" == 'yes' ]]; then
+		exec_path=$(ps -o command= -p "$PPID" | echo-split ' ' | tail -n 1)
+	elif [[ ${#option_inputs[@]} -eq 0 ]]; then
+		# Check for search pattern
 		help 'No <search> file path(s) were provided.'
+	else
+		# "$1" # "${BASH_SOURCE[0]}"
+		exec_path="${option_inputs[0]}"
 	fi
-	# "$1" # "${BASH_SOURCE[0]}"
-	local exec_path="${option_inputs[0]}"
 
 	# =================================
 	# Action
@@ -136,6 +151,7 @@ function get_definitions() (
 			cat <<-EOF
 				source "$exec_path" >/dev/null
 				declare -f $option_target_func | cat
+
 				# contents="\$(declare -f $option_target_func)"
 				# "length of content: "\${#contents}""
 				# printf "%s\n" "\${contents[@]}"
@@ -230,7 +246,7 @@ function get_definitions() (
 	# [ ] ripgrep
 
 	local fn_regex='' supports_named_captures='no' func_ids_found=()
-	if [[ $option_echo_regexp == 'yes' ]]; then
+	if [[ $option_echo_regexp == 'no' ]]; then
 		# TODO: since ripgrep is the fastest use it to find the func names.
 		if command-exits rg; then
 			:

@@ -9,5 +9,11 @@ source "$DOROTHY/config/interactive.bash"
 source "$DOROTHY/user/config/interactive.sh"
 
 for f in "$DOROTHY/user/sources/"*.bash; do
+
+  # do not load sources prefixed with underscore
+  if [[ "$f" == _* ]]; then
+    continue
+  fi
+
   source "$f"
 done
