@@ -19,8 +19,9 @@
 #
 # TODO: UI
 # [ ] If choose is run once, then properly display the `code` above the output.
-# [ ] capture the output of selected function and display it above the choose
-# menu in the next iteration.
+# [ ] Capture the output of selected function and display it above the choose
+#       menu in the next iteration.
+# [ ] Add entry to run all tests if possible? in sequence?
 # [ ] ASK: how can we check if the function takes arguments?
 #
 
@@ -49,7 +50,7 @@ function doc_helper() {
 	}
 
 	# process
-	local item option_format='' option_trim='no' option_use_colors='no' option_func_name_as_title='no'
+	local item option_format='' option_trim='no' option_use_colors='no' option_func_name_as_title='no' option_lang_hl='markdown'
 	while [[ $# -ne 0 ]]; do
 		item="$1"
 		shift
@@ -59,6 +60,7 @@ function doc_helper() {
 		'--trim') option_trim='yes' ;;
 		'--colors') option_use_colors='yes' ;;
 		'--func-header') option_func_name_as_title='yes' ;;
+		'--desc-hl='*)option_lang_hl="${item#*=}" ;;
 		*) help "An unrecognised arg/flag was provided: $item" ;;
 		esac
 	done
@@ -70,7 +72,7 @@ function doc_helper() {
 
 	mapfile -t function_names < <(get-definitions)
 
-	local body
+	local result_label
 	for function_name in "${function_names[@]}"; do
 
 		# echo ============================================
@@ -92,6 +94,9 @@ function doc_helper() {
 			name_formatted="${function_name//_/ }"
 			name_formatted="${name_formatted^}"
 			result_label="$name_formatted"$'\n'"$result_label"
+		else
+		  # parse color highlights into description
+		  :
 		fi
 
 		# echo "$result_label"
