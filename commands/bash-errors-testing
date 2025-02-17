@@ -164,7 +164,7 @@ function bash_error_testing() (
 	# # local_function_ids="$(get-definitions "$this_path")"
 	#
 	# local local_function_ids=() func_names_final=() choose_data=()
-	# mapfile -t local_function_ids < <(get-definitions "$this_path")
+	# mapfile -t local_function_ids < <(get-definitions -- "$this_path")
 	#
 	# # This should prolly go into a command called echo-filter
 	# local remove_ids=(

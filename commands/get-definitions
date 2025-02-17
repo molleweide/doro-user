@@ -38,18 +38,9 @@ function get_definitions() (
 			get-definitions [...options] [--] ..<paths>
 
 			OPTIONS:
-			--search=<search> | <search>
-			    The regular expression to search for.
-
-			--replace=<replace> | <replace>
-			    The string to replace the search with.
-
 			--map-id-to-body
 			  Iterate all func ids and return an array where each $(id) is followed
 			  by the contents of respective func.
-
-			--flags=<flags> | <flags>
-			    Regular expression flags, e.g. 'i' for case-insensitive.
 
 			--exclude-prefix=...
 
@@ -121,6 +112,7 @@ function get_definitions() (
 		fi
 
 		# NOTE: The func name cannot be quoted.
+		# NOTE: declare -F only outputs the func names and attributes.
 
 		# while read -r line; do
 		#   echo ${line##* }
@@ -130,6 +122,8 @@ function get_definitions() (
 		    declare -f
 		    '
 
+		# NOTE: use cat heredoc.
+
 		# while read -r line; do
 		#   echo ${line##* }
 		# done < <(declare -f '"$option_target_func"')
@@ -138,12 +132,23 @@ function get_definitions() (
 		    declare -f '$option_target_func'
 		    '
 
+		local get_single="$(
+			cat <<-EOF
+				source "$exec_path" >/dev/null
+				declare -f $option_target_func | cat
+				# contents="\$(declare -f $option_target_func)"
+				# "length of content: "\${#contents}""
+				# printf "%s\n" "\${contents[@]}"
+				# echo "\$contents"
+			EOF
+		)"
+
 		# local get_single2='
 		#     source "'"$exec_path"'" >/dev/null
 		#     declare -F before_failure_without_after
 		#     '
 
-          # echo ${line##* }
+		# echo ${line##* }
 		local get_single3='
 		    source "'"$exec_path"'" >/dev/null
         while read -r line; do
@@ -151,32 +156,35 @@ function get_definitions() (
         done < <(declare -f '"$option_target_func"')
 		    '
 
+		local runner="$get_single"
+		__print_lines "------------"
+		echo-style --bold "STRING THAT WILL BE RUN"
+		__print_lines "$runner"
+		__print_lines "------------"
 
 		function run() {
 
-			local runner="$get_single3"
+			# TEST:
+			# Ensure bash -c "$runner" runs in the same execution flow by using eval instead:
+			# According to chat gpt...
+			#
 
-			__print_lines "------------"
-			echo-style --bold "STRING THAT WILL BE RUN"
-			__print_lines "$runner"
-			__print_lines "------------"
-
-		# TEST:
-		# Ensure bash -c "$runner" runs in the same execution flow by using eval instead:
-		# According to chat gpt...
-
+			set -x
 			# env -i bash --noprofile --norc -c "$runner"
 			# env -i bash -c "$runner"
 			bash -c "$runner"
+			set +x
 		}
+
+		# NOTE:
 
 		local data
 
-		data=$(run)
+		data="$(run)"
+		# run
 
 		echo-style --bold "LENGTH OF DATA: ${#data}"
-
-		__print_lines "${data[@]}"
+		__print_lines "$data"
 
 		# env -i bash --noprofile --norc -c '
 		#     source "'"$exec_path"'" >/dev/null
@@ -269,7 +277,7 @@ function get_definitions() (
 			add='no'
 		else
 			for rm_id in "${remove_ids[@]}"; do
-				if [[ "$id" == _* || "$rm_id" == "$id" ]]; then
+				if [[ "$rm_id" == "$id" ]]; then
 					add='no'
 				fi
 			done
