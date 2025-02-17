@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+function one_fn {
+    echo "one_fn function content:" "$@"
+}
+
+function two_fn {
+    echo "two_fn function content:" "$@"
+}
+
+function_names=()
+mapfile -t function_names < <(declare -F | awk '{print $3}') # [declare -f one_fn] to [one_fn]
+function_bodies=()
+for function_name in "${function_names[@]}"; do
+    function_bodies+=("$(declare -f "$function_name" | sed '1,2d; $d' | bat --style plain --color always --language bash --paging=never)")
+    # --file-name "${BASH_SOURCE[0]}:$function_name"
+    # --style numbers
+    # tail -n +2 | head -n -1
+done
+function_names_with_bodies=()
+for index in "${!function_names[@]}"; do
+    function_names_with_bodies+=("${function_names[index]}" "${function_bodies[index]}")
+done
+
+fn="$(choose --linger 'Which function to execute?' --label -- "${function_names_with_bodies[@]}")"
+args="$(ask --linger 'Arguments to pass to the function?')"
+$fn $args
+
