@@ -49,25 +49,17 @@ function doc_helper() {
 	}
 
 	# process
-	local item option_format=''
+	local item option_format='' option_trim='no' option_use_colors='no' option_func_name_as_title='no'
 	while [[ $# -ne 0 ]]; do
 		item="$1"
 		shift
 		case "$item" in
 		'--help' | '-h') help ;;
 		'--format='*) option_format="${item#*=}" ;;
-		# '--global') option_flags+='g' ;;
-		# '--ignore-case') option_flags+='i' ;;
-		# # currently just default to echo-regexp
-		# '--echo-regexp') option_echo_regexp='yes' ;;
-		# '--contents') option_get_func_contsents='yes' ;;
-		# '--target-func='*) option_target_func="${item#*=}" ;;
-		'--')
-			option_inputs+=("$@")
-			shift $#
-			break
-			;;
-		*) option_args+=("$item") ;;
+		'--trim') option_trim='yes' ;;
+		'--colors') option_use_colors='yes' ;;
+		'--func-header') option_func_name_as_title='yes' ;;
+		*) help "An unrecognised arg/flag was provided: $item" ;;
 		esac
 	done
 
@@ -78,21 +70,50 @@ function doc_helper() {
 
 	mapfile -t function_names < <(get-definitions)
 
+	local body
 	for function_name in "${function_names[@]}"; do
-		if [[ "$option_format" == "inner" ]]; then
-			function_bodies+=("$(declare -f "$function_name" | sed '1,2d; $d' | bat --style plain --color always --language bash --paging=never)")
-		elif [[ "$option_format" == "new" ]]; then
-		  :
-		else
-			function_bodies+=("$(declare -f "$function_name")")
+
+		# echo ============================================
+
+		result_label="$(declare -f "$function_name")"
+
+		if [[ "$option_trim" == 'yes' ]]; then
+			result_label="$(__print_lines "$result_label" | sed '1,2d; $d')"
 		fi
 
+		if [[ "$option_use_colors" == 'yes' ]]; then
+			result_label="$(__print_lines "$result_label" | bat --style plain --color always --language bash --paging=never)"
+		fi
+
+		if [[ "$option_func_name_as_title" == 'yes' ]]; then
+			# function_label="$(bat --style plain --color always --language bash --paging=never \
+			# 	<<<"$function_description"$'\n'"$function_code")"
+			local name_formatted
+			name_formatted="${function_name//_/ }"
+			name_formatted="${name_formatted^}"
+			result_label="$name_formatted"$'\n'"$result_label"
+		fi
+
+		# echo "$result_label"
+		function_bodies+=("$result_label"$'\n')
+
+		# if [[ "$option_format" == "inner" ]]; then
+		# 	function_bodies+=("$(declare -f "$function_name" | sed '1,2d; $d' |
+		# 		bat --style plain --color always --language bash --paging=never)")
+		# elif [[ "$option_format" == "new" ]]; then
+		# 	:
+		# else
+		# 	function_bodies+=("$(declare -f "$function_name")")
+		# fi
+
 	done
+
+	# exit
 
 	# prepare data for choose
 	function_names_with_bodies=()
 
-  # WARN: fails because i havent handled the `new` formatting yet
+	# WARN: fails because i havent handled the `new` formatting yet
 	for index in "${!function_names[@]}"; do
 		function_names_with_bodies+=("${function_names[index]}" "${function_bodies[index]}")
 	done

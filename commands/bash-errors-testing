@@ -256,7 +256,7 @@ function bash_error_testing() (
 	# choose-bash-tester
 
 	source "$DOROTHY/user/sources/_doc_helper.bash"
-	doc_helper --format=new
+	doc_helper --format=inner --trim --colors --func-header
 )
 
 # Fire if invoked standalone
