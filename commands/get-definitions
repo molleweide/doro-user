@@ -120,15 +120,63 @@ function get_definitions() (
 			help "Obtaining the contents of a function requires passing the target function."
 		fi
 
-		local get_target_func_body='
+		# NOTE: The func name cannot be quoted.
+
+		# while read -r line; do
+		#   echo ${line##* }
+		# done < <(declare -f)
+		local get_all='
 		    source "'"$exec_path"'" >/dev/null
-		    while read -r line; do
-		      echo ${line##* }
-		    done < <(declare -f "'"$option_target_func"'")
+		    declare -f
 		    '
-		# env -i bash --noprofile --norc -c "$get_target_func_body"
-		# env -i bash -c "$get_target_func_body"
-		env -i bash -c "$get_target_func_body"
+
+		# while read -r line; do
+		#   echo ${line##* }
+		# done < <(declare -f '"$option_target_func"')
+		local get_single='
+		    source "'"$exec_path"'" >/dev/null
+		    declare -f '$option_target_func'
+		    '
+
+		# local get_single2='
+		#     source "'"$exec_path"'" >/dev/null
+		#     declare -F before_failure_without_after
+		#     '
+
+          # echo ${line##* }
+		local get_single3='
+		    source "'"$exec_path"'" >/dev/null
+        while read -r line; do
+          echo $line
+        done < <(declare -f '"$option_target_func"')
+		    '
+
+
+		function run() {
+
+			local runner="$get_single3"
+
+			__print_lines "------------"
+			echo-style --bold "STRING THAT WILL BE RUN"
+			__print_lines "$runner"
+			__print_lines "------------"
+
+		# TEST:
+		# Ensure bash -c "$runner" runs in the same execution flow by using eval instead:
+		# According to chat gpt...
+
+			# env -i bash --noprofile --norc -c "$runner"
+			# env -i bash -c "$runner"
+			bash -c "$runner"
+		}
+
+		local data
+
+		data=$(run)
+
+		echo-style --bold "LENGTH OF DATA: ${#data}"
+
+		__print_lines "${data[@]}"
 
 		# env -i bash --noprofile --norc -c '
 		#     source "'"$exec_path"'" >/dev/null
@@ -158,7 +206,7 @@ function get_definitions() (
 		#     echo "$fcn_name"
 		# done
 
-		# __print_lines "$get_target_func_body"
+		# __print_lines "$get_single"
 
 		return 0
 	fi

@@ -228,8 +228,8 @@ function bash_error_testing() (
 
 	echo-style $'\n' --bold="-- TEST FILE --" $'\n'
 
-	__print_lines "Current PID: $$ -> exec cmd/script: $(ps -o command= -p $$)"
-	__print_lines "Parrent PID: $PPID -> exec cmd/script: $(ps -o command= -p $PPID)"
+	__print_lines "CURRENT PID: $$ -> exec cmd/script: $(ps -o command= -p $$)"
+	__print_lines "PARRENT PID: $PPID -> exec cmd/script: $(ps -o command= -p $PPID)"
 	__print_lines "PWD: $PWD"
 	# __print_lines "parrent pid = $(ps -o command= -p $PPID)"
 
