@@ -3,24 +3,25 @@
 # https://stackoverflow.com/questions/42420717/print-out-a-list-of-all-cases-of-a-switch
 # https://stackoverflow.com/questions/4471364/how-do-i-list-the-functions-defined-in-my-shell
 
-# NOTE: declare lists all func defs in sourced files as well, ie. we need to
-# ensure that we only get func defs from the current file.
-# See: https://superuser.com/questions/1111219/can-i-get-all-functions-in-a-script-file-using-bash
-# Basically we make a custom call to this file itself with env -i so that we
-# can parse the file exclusively.
-# ...
-# Hmmm, now that I think about it. We could just run echo-regexp on the file
-# itself and check for all the func names which would be the easiest solution.
-# ...
-# TODO: Create command `get-definitions`
-# So there are three cases.
-# 1. [ ] Get all existing func defs -> declare -f
-# 2. [ ] Get all existing func defs in current file, including dynamically
-#    created ones -> custom solution.
-# 3. [*] Only get explicitly defined func defs -> use echo-regexp on self.
-
 function get_definitions() (
 	source "$DOROTHY/sources/bash.bash"
+
+	# # TODO: Obtain func contents from arbitrary script.
+	# # See: https://superuser.com/questions/1111219/can-i-get-all-functions-in-a-script-file-using-bash
+	#
+	# # get_fcn_list () {
+	# #   env -i bash --noprofile --norc -c '
+	# #     source "'"$1"'" >/dev/null
+	# #     while read -r line; do
+	# #       echo ${line##* }
+	# #     done < <(declare -F)
+	# #     '
+	# # }
+	# #
+	# # for fcn_name in $(get_fcn_list dome.sh); do
+	# #     echo "$fcn_name"
+	# # done
+	# #
 
 	# =================================
 	# Arguments
@@ -42,8 +43,19 @@ function get_definitions() (
 			--replace=<replace> | <replace>
 			    The string to replace the search with.
 
+			--map-id-to-body
+			  Iterate all func ids and return an array where each `id` is followed
+			  by the contents of respective func.
+
 			--flags=<flags> | <flags>
 			    Regular expression flags, e.g. 'i' for case-insensitive.
+
+			--exclude-prefix=...
+
+			--exclude-suffix=...
+
+			--exclude-substring=...
+			    Iterate all matches and filter out specific patterns.
 
 			    --globally:
 

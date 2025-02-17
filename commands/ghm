@@ -2,6 +2,16 @@
 
 # NAME: GIT HELP MOLLEWEIDE
 
+# WARN: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# Leverage dorothy's `git-helper` command
+# ----
+# It contains so many existing powerful helpers and this could in
+# the end allow for easilly re-implementing `ghq` in dorothy for
+# repo management.
+# Maybe but repos under.
+# .local/vcs/git/github/<repos> || ~/code/repos/<repo>
+# WARN: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 # NOTE: CRUD wrapper around GHQ for Dorothy.
 # It makes sure that information about what repos your are using are backed
 # up properly to your dorothy user config.

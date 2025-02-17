@@ -40,10 +40,13 @@ function bash_error_testing() (
 		false # emit an error to this function, as this returns a non-zero exit status
 		printf '%s\n' 'after failure'
 	}
+
 	function _a_function_which_failure_IS_the_last_command {
 		printf '%s\n' 'before failure without after'
 		false # emit an error to this function, as this returns a non-zero exit status
 	}
+
+	# ------
 
 	function disable_err_which_outputs_before_and_after_failure {
 		set +e # disable errors returning immediately, the default bash mode, desirable for the login shell
@@ -52,6 +55,9 @@ function bash_error_testing() (
 		# before failure
 		# after failure
 	}
+
+	# export -f disable_err_which_outputs_before_and_after_failure
+
 	function enable_default_errs_to_return_immediately_before_failure {
 		set -e # enable errors to return immediately, the default bash mode in dorothy enabled when we `source "$DOROTHY/sources/bash.bash"`, desirable for scripting
 		_a_function_which_failure_IS_NOT_the_last_command
@@ -155,16 +161,16 @@ function bash_error_testing() (
 	# local this_path="${BASH_SOURCE[0]}"
 	#
 	# # Why is it that this returns a single string it seems?!
-	# # func_names_found="$(get-definitions "$this_path")"
+	# # local_function_ids="$(get-definitions "$this_path")"
 	#
-	# local func_names_found=() func_names_final=() choose_data=()
-	# mapfile -t func_names_found < <(get-definitions "$this_path")
+	# local local_function_ids=() func_names_final=() choose_data=()
+	# mapfile -t local_function_ids < <(get-definitions "$this_path")
 	#
 	# # This should prolly go into a command called echo-filter
 	# local remove_ids=(
 	# 	"render_choose_data"
 	# )
-	# for id in "${func_names_found[@]}"; do
+	# for id in "${local_function_ids[@]}"; do
 	# 	local add='yes'
 	# 	local rm_id
 	# 	for rm_id in "${remove_ids[@]}"; do
@@ -209,7 +215,29 @@ function bash_error_testing() (
 	# ============================================
 	# B. Try build and run UI in external command.
 
-	choose-bash-tester -- "${BASH_SOURCE[0]}"
+	# FIX: GET DEFINITIONS
+	# get-definitions needs to have an option that excludes certain definitions
+	# eg. specifyc --exclude-prefix=_*
+	# So that we dont get the prep funcs.
+	# ---
+	# Options:
+	# 1. Use `declare -f $fn` which has to be run in this file.
+	# 2.
+
+	clear
+
+	echo-style $'\n' --bold="-- TEST FILE --" $'\n'
+
+	__print_lines "Current PID: $$ -> exec cmd/script: $(ps -o command= -p $$)"
+	__print_lines "Parrent PID: $PPID -> exec cmd/script: $(ps -o command= -p $PPID)"
+	__print_lines "PWD: $PWD"
+	# __print_lines "parrent pid = $(ps -o command= -p $PPID)"
+
+	# local this_file="${BASH_SOURCE[0]}" local_function_ids=()
+	# mapfile -t local_function_ids < <(get-definitions -- "$this_file")
+	# choose-bash-tester --path="$this_file" -- "${local_function_ids[@]}"
+
+	choose-bash-tester
 
 )
 
