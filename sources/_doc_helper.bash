@@ -12,13 +12,15 @@
 #   ~ Call doc_helper on executed script.
 #     ~ A. Play w test cases
 #     ---
-#     ~ B. Run main-browser
+#     ~ B. Run main-browser (**)
 #       ~ Call choose on DOC dir paths.
 #         ~ Select path and run
 #           ~ Calls doc_helper again.
 #                     ? Now what ids will get-definitions collect???
 #                     Options: Maybe use exec to replace the environment??
 #                     arst
+# ~ doc-helper standalone
+#   ~ call (**)
 #
 #
 
@@ -32,7 +34,7 @@
 #       [ ] Run doc helper on multiple test files at once? All even?
 #
 # TODO: [*] jump back to main browser.
-#           - decide where to put test files
+#           - decide where to put test files -> commands.tests
 #           -
 #       [ ] run all in seq
 #       [ ] run print all and close
@@ -42,10 +44,11 @@
 
 function doc_helper() {
 	source "$DOROTHY/sources/bash.bash"
+	__require_array 'mapfile'
 
 	local \
 		THIS_NAME="doc_helper" \
-		DIR_DOC_TESTS="$DOROTHY/docs/tests"
+		DIR_DOC_TESTS="$DOROTHY/user/commands.tests"
 
 	# =======================================================
 	# Arguments
@@ -103,19 +106,24 @@ function doc_helper() {
 
 	# WARN: will these be picked up by declare -f.
 
-	run__refresh_test_cases(){
-	  # setup background watcher that checks current targets for changes and
-	  # updates the content variables??
-	  todo try refresh test cases.
+	function run__refresh_test_cases {
+		# setup background watcher that checks current targets for changes and
+		# updates the content variables??
+		todo try refresh test cases.
 	}
-	run__doc_browser_main() {
-	  echo todo doc browser main
+	function run__doc_browser_main {
+		echo todo doc browser main
+		#
+		local doc_test_commands=()
+		mapfile -t doc_test_commands < <(find "$DIR_DOC_TESTS" -type f -maxdepth 1)
+		# __print_lines "${doc_test_commands[@]}"
+		choose-path --required --question="Select which [doc test]" -- "${doc_test_commands[@]}"
 	}
-	run__all_current() {
-	  echo todo run all current
+	function run__all_current {
+		echo todo run all current
 	}
-	run__print_all_and_exit(){
-	  echo todo print all and exit
+	function run__print_all_and_exit {
+		echo todo print all and exit
 	}
 
 	# =====================================================================
@@ -300,7 +308,7 @@ function doc_helper() {
 
 	if [[ "$is_meta" == 'yes' ]]; then
 		function handle_meta_selections() {
-			case "$item" in
+			case "$1" in
 			_browse_all) run__doc_browser_main ;;
 			_print_and_exit) run__print_all_and_exit ;;
 			_run_all_current) run__all_current ;; # NOTE: will this work with `ask`??
