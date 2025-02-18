@@ -21,7 +21,8 @@
 # [ ] If choose is run once, then properly display the `code` above the output.
 # [ ] Capture the output of selected function and display it above the choose
 #       menu in the next iteration.
-# [ ] Add entry to run all tests if possible? in sequence?
+# [ ] option_select: Add entry to run all tests if possible? in sequence?
+# [ ] option_select: Simply print out all cases to stdout
 # [ ] ASK: how can we check if the function takes arguments?
 #
 
@@ -60,7 +61,8 @@ function doc_helper() {
 		'--trim') option_trim='yes' ;;
 		'--colors') option_use_colors='yes' ;;
 		'--func-header') option_func_name_as_title='yes' ;;
-		'--desc-hl='*)option_lang_hl="${item#*=}" ;;
+		'--desc-hl='*) option_lang_hl="${item#*=}" ;;
+		'--only-func-names') ;; # Only list function-names-formatted
 		*) help "An unrecognised arg/flag was provided: $item" ;;
 		esac
 	done
@@ -68,70 +70,94 @@ function doc_helper() {
 	# =======================================================
 	# COLLECT INFORMATION
 
-	local function_names=() function_bodies=()
+	local parsed_function_IDs=() finalized_function_labels=() results_mapped=()
+	local code_func_names=() count_code_funcs=0
 
-	mapfile -t function_names < <(get-definitions)
+	mapfile -t parsed_function_IDs < <(get-definitions)
 
-	local result_label
-	for function_name in "${function_names[@]}"; do
+	# __print_lines "${parsed_function_IDs[@]}"
+
+	local has_description='no'
+	for function_name in "${parsed_function_IDs[@]}"; do
+		local fn_name fn_body fn_code fn_descr
+		local result_fn_code result_fn_desc result_final result_fn_formatted
 
 		# echo ============================================
 
-		result_label="$(declare -f "$function_name")"
+		# ---------------------------------
+		# prepare names and description
 
+		fn_name="$function_name"
+		if [[ "$function_name" == *__* ]]; then
+			fn_name="${function_name%__*}" # handle name__code case
+		fi
+		# check function is a __description
+		if [[ "$function_name" == *'__description' ]]; then
+			has_description='yes'
+			continue
+		fi
+		fn_body="$(declare -f "$function_name")"
+		count_code_funcs=$((count_code_funcs + 1))
+		code_func_names+=("$fn_name")
+
+		# ---------------------------------
+		# process results code
+
+		# results trim code
 		if [[ "$option_trim" == 'yes' ]]; then
-			result_label="$(__print_lines "$result_label" | sed '1,2d; $d')"
+			result_fn_code="$(__print_lines "$fn_body" | sed '1,2d; $d')"
 		fi
-
+		# results code colors
 		if [[ "$option_use_colors" == 'yes' ]]; then
-			result_label="$(__print_lines "$result_label" | bat --style plain --color always --language bash --paging=never)"
+			result_fn_code="$(__print_lines "$result_fn_code" | bat --style plain --color always --language bash --paging=never)"
 		fi
 
-		if [[ "$option_func_name_as_title" == 'yes' ]]; then
-			# function_label="$(bat --style plain --color always --language bash --paging=never \
-			# 	<<<"$function_description"$'\n'"$function_code")"
-			local name_formatted
-			name_formatted="${function_name//_/ }"
-			name_formatted="${name_formatted^}"
-			result_label="$name_formatted"$'\n'"$result_label"
+		# ---------------------------------
+		# process results description
+
+		if [[ "$option_func_name_as_title" == 'yes' || "$has_description" != 'yes' ]]; then
+			# no description
+			result_fn_desc="${function_name//_/ }"
+			result_fn_desc="${result_fn_desc^}"
 		else
-		  # parse color highlights into description
-		  :
+			result_fn_desc="$("${fn_name}__description")"
+			if [[ "$option_use_colors" == 'yes' ]]; then
+				result_fn_desc="$(bat --style plain --color always --language markdown --paging=never <<<"$result_fn_desc")"
+			fi
 		fi
 
-		# echo "$result_label"
-		function_bodies+=("$result_label"$'\n')
+		# ---------------------------------
+		# concat data
 
-		# if [[ "$option_format" == "inner" ]]; then
-		# 	function_bodies+=("$(declare -f "$function_name" | sed '1,2d; $d' |
-		# 		bat --style plain --color always --language bash --paging=never)")
-		# elif [[ "$option_format" == "new" ]]; then
-		# 	:
-		# else
-		# 	function_bodies+=("$(declare -f "$function_name")")
-		# fi
+		result_final="$result_fn_desc"$'\n'"$result_fn_code"
+		finalized_function_labels+=("$result_final"$'\n')
+		# echo "$result_final"
 
+		has_description='no'
+	done
+
+	# echo ====
+	# echo "cound code funcs: $count_code_funcs"
+	# echo "#code_func_names: ${#code_func_names[@]}"
+	# echo =====
+
+	for index in "${!code_func_names[@]}"; do
+	  # echo "${code_func_names[index]}"
+	  # echo ""
+		results_mapped+=("${code_func_names[index]}" "${finalized_function_labels[index]}")
 	done
 
 	# exit
 
-	# prepare data for choose
-	function_names_with_bodies=()
-
-	# WARN: fails because i havent handled the `new` formatting yet
-	for index in "${!function_names[@]}"; do
-		function_names_with_bodies+=("${function_names[index]}" "${function_bodies[index]}")
-	done
-
 	# # LOG DATA
-	# for elem in "${function_names_with_bodies[@]}"; do
+	# for elem in "${results_mapped[@]}"; do
 	# 	echo "$elem"
 	# done
 
 	# ============================================
 	# SETUP UI
 
-	selected_fn_name="$(choose --required --linger 'Which function to execute?' --label -- "${function_names_with_bodies[@]}")"
+	selected_fn_name="$(choose --required --linger 'Which function to execute?' --label -- "${results_mapped[@]}")"
 
 	echo "selected_fn_name: $selected_fn_name"
 
