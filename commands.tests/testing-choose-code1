@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-clear
-
-
 function one_fn {
 	echo "one_fn function content:" "$@"
 }
@@ -12,4 +9,4 @@ function two_fn {
 }
 
 source "$DOROTHY/user/sources/_doc_helper.bash"
-doc_helper
+doc_helper --debug

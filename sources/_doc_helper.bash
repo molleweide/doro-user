@@ -28,19 +28,30 @@
 # Eg. - run selected line/chunk in terminal and open it.
 # ---
 # Todo: Use doc_helper for the interactive bash man pages documentation file.
-#
+
 # TEST: [ ] move this to a standalone command where we avoid (subshell) syntax.
 #           In commands.test
 #       [ ] Run doc helper on multiple test files at once? All even?
-#
-# TODO: [*] jump back to main browser.
-#           - decide where to put test files -> commands.tests
-#           -
+
+# TODO: (*) jump back to main browser.
+#           - (*) update all test files to use doc_helper
 #       [ ] run all in seq
 #       [ ] run print all and close
+#       [ ] run doc-helper standalone -> fire up main browser.
+#       [ ] choose should return index - requires storing code bodies in an array.
+#           - option return index
+#           - store code bodies into array
+#           - trim the code for `evaling` just before evaling.
+#               If we use index, then we need to store all code chunks in an array so that
+#               and obtain in by the index output of choose.
+#       [ ] code evaluation
+#           - trim func bodies if necessary
+#           - check if code accepts arguments.
 #       [ ] capture output fs-rm style.
+#       [ ] Load multiple doc tests at once.
 
-# FIX: capture commands that fail
+# FIX: Correctly obtain the path of the currently targeted test file.
+# FIX: Capture/wrap test cases that fail
 
 function doc_helper() {
 	source "$DOROTHY/sources/bash.bash"
@@ -56,17 +67,18 @@ function doc_helper() {
 	function help {
 		cat <<-EOF >/dev/stderr
 			ABOUT:
-			xxx
 			Define test functions in a file and source run $THIS_NAME on last line.
 			Optionally you can define a description function that returns a string
 			before its respective test function suffixed with $(__description)
+			Put all your doc tests in [commands.tests/*]
 
 			USAGE:
+			(inside my_doc_test file)
 			...
 			function test__desc() {...)
 			function test() {...}
 			...
-			  $THIS_NAME
+			$THIS_NAME
 
 			OPTIONS:
 			xxx
@@ -79,20 +91,20 @@ function doc_helper() {
 	}
 
 	# process
-	local item option_format='' option_trim='no' option_use_colors='no' option_func_name_as_title='no' option_lang_hl='markdown'
+	local item option_debug='no' option_trim_fn_body='no' option_use_colors='no' option_func_name_as_title='no' option_lang_hl='markdown'
 	while [[ $# -ne 0 ]]; do
 		item="$1"
 		shift
 		case "$item" in
 		'--help' | '-h') help ;;
-		# '--format='*) option_format="${item#*=}" ;;
 		# trim if you want to only show code contents
-		'--trim') option_trim='yes' ;;
+		'--trim') option_trim_fn_body='yes' ;;
 		'--colors') option_use_colors='yes' ;;
 		'--func-header') option_func_name_as_title='yes' ;;
 		# specify what syntax highliht to use for the descriptionn
 		'--desc-hl='*) option_lang_hl="${item#*=}" ;;
 		'--only-func-names') ;; # Only list function-names-formatted
+		'--debug') option_debug='yes' ;;
 		*) help "An unrecognised arg/flag was provided: $item" ;;
 		esac
 	done
@@ -100,28 +112,35 @@ function doc_helper() {
 	# =====================================================================
 	# =====================================================================
 	# =====================================================================
+	#
+
+	local choose_title_prefix="DOC HELPER"
 
 	# =======================================================
 	# UI HELPERS
-
-	# WARN: will these be picked up by declare -f.
 
 	function run__refresh_test_cases {
 		# setup background watcher that checks current targets for changes and
 		# updates the content variables??
 		todo try refresh test cases.
 	}
+
 	function run__doc_browser_main {
-		echo todo doc browser main
-		#
-		local doc_test_commands=()
+		# NOTE: Using get-definitions and declare -f in subsequent runs of a dot test
+		# seems to work. QUESTION: Does this increase memory load for each run?
+		# Should we use `exec` or `env` to reset the environment?
+
+		local doc_test_commands=() selected_test_doc
+		local title="DOC HELPER | MAIN BROWSER: Select which [doc test]"
 		mapfile -t doc_test_commands < <(find "$DIR_DOC_TESTS" -type f -maxdepth 1)
-		# __print_lines "${doc_test_commands[@]}"
-		choose-path --required --question="Select which [doc test]" -- "${doc_test_commands[@]}"
+		selected_test_doc="$(choose-path --required --question="$title" -- "${doc_test_commands[@]}")"
+		"$selected_test_doc"
 	}
+
 	function run__all_current {
 		echo todo run all current
 	}
+
 	function run__print_all_and_exit {
 		echo todo print all and exit
 	}
@@ -132,8 +151,6 @@ function doc_helper() {
 
 	# =======================================================
 	# SETUP SPECIAL UI ALTERNATIVES
-
-	# TODO: handle this when computing indices??
 
 	local results_mapped=(
 		_refresh "[Reload alternatives - Is this possible somehow?]"
@@ -149,7 +166,19 @@ function doc_helper() {
 		parsed_function_IDs=() \
 		finalized_function_labels=() \
 		code_funcs_count=0 \
-		code_func_names=()
+		code_func_names=() \
+		doc_test_caller_path \
+		doc_test_name=''
+
+	# BASH_SOURCE
+	#       An array variable whose members are the source filenames where the corresponding shell function
+	#       names in the FUNCNAME array variable are defined.  The shell function ${FUNCNAME[$i]} is
+	#       defined in the file ${BASH_SOURCE[$i]} and called from ${BASH_SOURCE[$i+1]}.
+
+	# # This does not obtain the correct/intended paths
+	# doc_test_caller_path=$(ps -o command= -p "$PPID" | echo-split ' ' | tail -n 1)
+	doc_test_caller_path="${BASH_SOURCE[1]}"
+	doc_test_name="$(basename "$(dirname "$doc_test_caller_path")")/$(basename "$doc_test_caller_path")" # move this into primitive?
 
 	mapfile -t parsed_function_IDs < <(get-definitions)
 	# __print_lines "${parsed_function_IDs[@]}"
@@ -159,7 +188,9 @@ function doc_helper() {
 		local fn_name fn_body fn_code fn_descr
 		local result_fn_code result_fn_desc result_final result_fn_formatted
 
-		# echo ============================================
+		if [[ "$option_debug" == 'yes' ]]; then
+			echo ============================================
+		fi
 
 		# ---------
 		# prepare names and description
@@ -177,14 +208,21 @@ function doc_helper() {
 		code_funcs_count=$((code_funcs_count + 1))
 		code_func_names+=("$fn_name")
 
+		if [[ "$option_debug" == 'yes' ]]; then
+			echo "fn_name: [$fn_name], "
+		fi
+
+		# set default code
+		result_fn_code=$(__print_lines "$fn_body")
+
 		# ---------
 		# process results code
 		# TODO: Options to transform [CODE] contents
 		# [ ] xx
 
 		# results trim code
-		if [[ "$option_trim" == 'yes' ]]; then
-			result_fn_code="$(__print_lines "$fn_body" | sed '1,2d; $d')"
+		if [[ "$option_trim_fn_body" == 'yes' ]]; then
+			result_fn_code="$(__print_lines "$result_fn_code" | sed '1,2d; $d')"
 		fi
 		# results code colors
 		if [[ "$option_use_colors" == 'yes' ]]; then
@@ -253,17 +291,15 @@ function doc_helper() {
 	# [ ] ASK: how can we check if the function takes arguments?
 	#     - Parse the code chunk and check for `[ $N|--*|--|.. ]`
 
-	local sel is_meta='no' selected_fn_name
+	local sel='' is_meta='no' selected_fn_name=''
+	local choose_title="$choose_title_prefix: Select [$doc_test_name]"
 
 	while :; do
 
 		# =================
 		# setup choose
-		#
-		# ! If we use index, then we need to store all code chunks in an array so that
-		# and obtain in by the index output of choose.
 
-		sel="$(choose --required --linger 'Which function to execute?' --label -- "${results_mapped[@]}")"
+		sel="$(choose --required --linger "$choose_title" --label -- "${results_mapped[@]}")"
 		# 	# NOTE: match index is not on my local clone...
 		# 	# index="$(choose --linger 'Which code to execute?' --default="$index" --match='$INDEX' --index -- "${function_labels[@]}")"
 		# 	index="$(choose --linger 'Which code to execute?' --index -- "${function_labels[@]}")"
@@ -313,7 +349,7 @@ function doc_helper() {
 			_print_and_exit) run__print_all_and_exit ;;
 			_run_all_current) run__all_current ;; # NOTE: will this work with `ask`??
 			# '--format='*) option_format="${item#*=}" ;;
-			# '--trim') option_trim='yes' ;;
+			# '--trim') option_trim_fn_body='yes' ;;
 			# '--colors') option_use_colors='yes' ;;
 			# '--func-header') option_func_name_as_title='yes' ;;
 			# '--desc-hl='*) option_lang_hl="${item#*=}" ;;
@@ -322,7 +358,5 @@ function doc_helper() {
 		}
 		handle_meta_selections "$sel"
 	fi
-
-	# ============================================
 
 }

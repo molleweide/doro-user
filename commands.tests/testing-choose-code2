@@ -8,27 +8,27 @@ function two_fn {
     echo "two_fn function content:" "$@"
 }
 
-# ids
-function_names=()
-mapfile -t function_names < <(declare -F | awk '{print $3}') # [declare -f one_fn] to [one_fn]
-
-# bodies
-function_bodies=()
-for function_name in "${function_names[@]}"; do
-    function_bodies+=("$(declare -f "$function_name" | sed '1,2d; $d' | bat --style plain --color always --language bash --paging=never)")
-    # --file-name "${BASH_SOURCE[0]}:$function_name"
-    # --style numbers
-    # tail -n +2 | head -n -1
-done
-
-# prepare data
-function_names_with_bodies=()
-for index in "${!function_names[@]}"; do
-    function_names_with_bodies+=("${function_names[index]}" "${function_bodies[index]}")
-done
-
-# UI loop
-fn="$(choose --linger 'Which function to execute?' --label -- "${function_names_with_bodies[@]}")"
-args="$(ask --linger 'Arguments to pass to the function?')"
-$fn $args
-
+# # ids
+# function_names=()
+# mapfile -t function_names < <(declare -F | awk '{print $3}') # [declare -f one_fn] to [one_fn]
+#
+# # bodies
+# function_bodies=()
+# for function_name in "${function_names[@]}"; do
+#     function_bodies+=("$(declare -f "$function_name" | sed '1,2d; $d' | bat --style plain --color always --language bash --paging=never)")
+#     # --file-name "${BASH_SOURCE[0]}:$function_name"
+#     # --style numbers
+#     # tail -n +2 | head -n -1
+# done
+#
+# # prepare data
+# function_names_with_bodies=()
+# for index in "${!function_names[@]}"; do
+#     function_names_with_bodies+=("${function_names[index]}" "${function_bodies[index]}")
+# done
+#
+# # UI loop
+# fn="$(choose --linger 'Which function to execute?' --label -- "${function_names_with_bodies[@]}")"
+# args="$(ask --linger 'Arguments to pass to the function?')"
+# $fn $args
+source "$DOROTHY/user/sources/_doc_helper.bash" && doc_helper
