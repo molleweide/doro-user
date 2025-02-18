@@ -245,6 +245,9 @@ function get_definitions() (
 	# [ ] standard grep
 	# [ ] ripgrep
 
+  # TEST: If `nvim` exists or `treesitter` then we should be able to parse
+  # out identifiers efficiently with those.
+
 	local fn_regex='' supports_named_captures='no' func_ids_found=()
 	if [[ $option_echo_regexp == 'no' ]]; then
 		# TODO: since ripgrep is the fastest use it to find the func names.

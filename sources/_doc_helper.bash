@@ -1,13 +1,51 @@
+#
+#
+#
+#
+#
+#
+#
+
+# HACK: skiss on the call structure for the interactive UI
+# dochelper = *
+# ~ Run test file | sources *
+#   ~ Call doc_helper on executed script.
+#     ~ A. Play w test cases
+#     ---
+#     ~ B. Run main-browser
+#       ~ Call choose on DOC dir paths.
+#         ~ Select path and run
+#           ~ Calls doc_helper again.
+#                     ? Now what ids will get-definitions collect???
+#                     Options: Maybe use exec to replace the environment??
+#                     arst
+#
+#
+
+# Add neovim dorothy binds/utils for adding and running in a new term.
+# Eg. - run selected line/chunk in terminal and open it.
+# ---
+# Todo: Use doc_helper for the interactive bash man pages documentation file.
+#
 # TEST: [ ] move this to a standalone command where we avoid (subshell) syntax.
 #           In commands.test
 #       [ ] Run doc helper on multiple test files at once? All even?
 #
+# TODO: [*] jump back to main browser.
+#           - decide where to put test files
+#           -
+#       [ ] run all in seq
+#       [ ] run print all and close
+#       [ ] capture output fs-rm style.
+
+# FIX: capture commands that fail
+
 function doc_helper() {
 	source "$DOROTHY/sources/bash.bash"
 
 	local \
-		THIS_NAME="doc_helper"
-	DOCS_DIR="$DOROTHY/docs/tests"
+		THIS_NAME="doc_helper" \
+		DIR_DOC_TESTS="$DOROTHY/docs/tests"
 
 	# =======================================================
 	# Arguments
@@ -65,9 +103,20 @@ function doc_helper() {
 
 	# WARN: will these be picked up by declare -f.
 
-	# run__doc_browser_main
-	# run__all_current
-	# run__print_all_and_exit
+	run__refresh_test_cases(){
+	  # setup background watcher that checks current targets for changes and
+	  # updates the content variables??
+	  todo try refresh test cases.
+	}
+	run__doc_browser_main() {
+	  echo todo doc browser main
+	}
+	run__all_current() {
+	  echo todo run all current
+	}
+	run__print_all_and_exit(){
+	  echo todo print all and exit
+	}
 
 	# =====================================================================
 	# =====================================================================
@@ -79,6 +128,7 @@ function doc_helper() {
 	# TODO: handle this when computing indices??
 
 	local results_mapped=(
+		_refresh "[Reload alternatives - Is this possible somehow?]"
 		_browse_all "[Browse all test files]"
 		_run_all_current "[Run all tests sequentially]"
 		_print_and_exit "[Print all test contents to tty and close]"
@@ -192,11 +242,6 @@ function doc_helper() {
 	# [ ] Capture the output of selected function and display it above the choose
 	#       menu in the next iteration.
 	#       - see fs-rm . display on top
-	# [*] special menu options
-	#     `These should be added to the [results_mapped] array above before adding all functions.
-	#     - [ ] Go back to main menu | browse all test files.
-	#     - [ ] option_select: Add entry to run all tests if possible? in sequence?
-	#     - [ ] option_select: Simply print out all cases to stdout
 	# [ ] ASK: how can we check if the function takes arguments?
 	#     - Parse the code chunk and check for `[ $N|--*|--|.. ]`
 
@@ -204,18 +249,18 @@ function doc_helper() {
 
 	while :; do
 
-	  # =================
-	  # setup choose
-	  #
-	  # ! If we use index, then we need to store all code chunks in an array so that
-	  # and obtain in by the index output of choose.
+		# =================
+		# setup choose
+		#
+		# ! If we use index, then we need to store all code chunks in an array so that
+		# and obtain in by the index output of choose.
 
 		sel="$(choose --required --linger 'Which function to execute?' --label -- "${results_mapped[@]}")"
 		# 	# NOTE: match index is not on my local clone...
 		# 	# index="$(choose --linger 'Which code to execute?' --default="$index" --match='$INDEX' --index -- "${function_labels[@]}")"
 		# 	index="$(choose --linger 'Which code to execute?' --index -- "${function_labels[@]}")"
 
-    # Handle selections
+		# Handle selections
 
 		if [[ "$sel" == _* ]]; then
 			# meta option, eg. go-to-main; print-and-close; ..
@@ -252,8 +297,6 @@ function doc_helper() {
 	done
 
 	# =====
-	#
-	# TODO: define meta helpers
 
 	if [[ "$is_meta" == 'yes' ]]; then
 		function handle_meta_selections() {
