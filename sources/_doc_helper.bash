@@ -33,33 +33,40 @@
 #           In commands.test
 #       [ ] Run doc helper on multiple test files at once? All even?
 
-# TODO: (*) jump back to main browser.
-#           - (*) update all test files to use doc_helper
-#       [ ] run all in seq
+# TODO: [ ] pull latest dorothy.
+#       [ ] choose return --index
+#       [ ] capture output fs-rm style.
+#           - truncate the output to only take up a maximum of N lines
+#       ===
+#       [*] run all in seq
 #       [ ] run print all and close
 #       [ ] run doc-helper standalone -> fire up main browser.
-#       [ ] choose should return index - requires storing code bodies in an array.
-#           - option return index
-#           - store code bodies into array
-#           - trim the code for `evaling` just before evaling.
-#               If we use index, then we need to store all code chunks in an array so that
-#               and obtain in by the index output of choose.
+#       ===
+#       [ ] Run the meta selections in its own choose menu
+#           - allow for flipping back and forth between the menu and the test cases.
+#       ===
+#       ===
 #       [ ] code evaluation
 #           - trim func bodies if necessary
 #           - check if code accepts arguments.
-#       [ ] capture output fs-rm style.
+#       ===
 #       [ ] Load multiple doc tests at once.
-
-# FIX: Correctly obtain the path of the currently targeted test file.
-# FIX: Capture/wrap test cases that fail
 
 function doc_helper() {
 	source "$DOROTHY/sources/bash.bash"
 	__require_array 'mapfile'
 
 	local \
-		THIS_NAME="doc_helper" \
-		DIR_DOC_TESTS="$DOROTHY/user/commands.tests"
+		THIS_NAME="[doc_helper]" \
+		DIR_DOC_TESTS="$DOROTHY/user/commands.tests" \
+		doc_test_caller_path \
+		caller_path_dirname \
+		caller_basename \
+		doc_helper_title_prefix="DOC HELPER"
+
+	doc_test_caller_path="${BASH_SOURCE[1]}"
+	caller_path_dirname="$(basename "$(dirname "$doc_test_caller_path")")"
+	caller_basename="$(basename "$doc_test_caller_path")"
 
 	# =======================================================
 	# Arguments
@@ -71,6 +78,8 @@ function doc_helper() {
 			Optionally you can define a description function that returns a string
 			before its respective test function suffixed with $(__description)
 			Put all your doc tests in [commands.tests/*]
+
+			Can be run as a standalone command.
 
 			USAGE:
 			(inside my_doc_test file)
@@ -92,6 +101,8 @@ function doc_helper() {
 
 	# process
 	local item option_debug='no' option_trim_fn_body='no' option_use_colors='no' option_func_name_as_title='no' option_lang_hl='markdown'
+
+	# If no args supplied, then fallthrough to `main menu` below
 	while [[ $# -ne 0 ]]; do
 		item="$1"
 		shift
@@ -105,6 +116,7 @@ function doc_helper() {
 		'--desc-hl='*) option_lang_hl="${item#*=}" ;;
 		'--only-func-names') ;; # Only list function-names-formatted
 		'--debug') option_debug='yes' ;;
+		'--'*) help "An unrecognised arg/flag was provided: $item" ;;
 		*) help "An unrecognised arg/flag was provided: $item" ;;
 		esac
 	done
@@ -112,12 +124,16 @@ function doc_helper() {
 	# =====================================================================
 	# =====================================================================
 	# =====================================================================
-	#
+	# helpers
 
-	local choose_title_prefix="DOC HELPER"
+	function eval_code() {
+		# FIX: Capture/wrap test cases that fail
+		# TODO: evaluate if the code takes arguments.
+		:
+	}
 
 	# =======================================================
-	# UI HELPERS
+	# UI META FUNCTIONS
 
 	function run__refresh_test_cases {
 		# setup background watcher that checks current targets for changes and
@@ -131,7 +147,7 @@ function doc_helper() {
 		# Should we use `exec` or `env` to reset the environment?
 
 		local doc_test_commands=() selected_test_doc
-		local title="DOC HELPER | MAIN BROWSER: Select which [doc test]"
+		local title="$doc_helper_title_prefix | MAIN BROWSER: Select which [doc test]"
 		mapfile -t doc_test_commands < <(find "$DIR_DOC_TESTS" -type f -maxdepth 1)
 		selected_test_doc="$(choose-path --required --question="$title" -- "${doc_test_commands[@]}")"
 		"$selected_test_doc"
@@ -139,10 +155,17 @@ function doc_helper() {
 
 	function run__all_current {
 		echo todo run all current
+		for i in "${FUNCTION_BODIES[@]}"; do
+			eval_code "$i"
+		done
 	}
 
 	function run__print_all_and_exit {
 		echo todo print all and exit
+		for i in "${FUNCTION_BODIES[@]}"; do
+			eval_code "$i"
+		done
+		exit
 	}
 
 	# =====================================================================
@@ -152,6 +175,7 @@ function doc_helper() {
 	# =======================================================
 	# SETUP SPECIAL UI ALTERNATIVES
 
+  # TODO: How do we handle these menu entries when using choose index instead of labels.
 	local results_mapped=(
 		_refresh "[Reload alternatives - Is this possible somehow?]"
 		_browse_all "[Browse all test files]"
@@ -167,25 +191,25 @@ function doc_helper() {
 		finalized_function_labels=() \
 		code_funcs_count=0 \
 		code_func_names=() \
-		doc_test_caller_path \
-		doc_test_name=''
+		FUNCTION_BODIES=() \
+		FUNCTION_LABELS=() \
+		DOC_TEST_NAME="$caller_path_dirname/$caller_basename"
 
-	# BASH_SOURCE
-	#       An array variable whose members are the source filenames where the corresponding shell function
-	#       names in the FUNCNAME array variable are defined.  The shell function ${FUNCNAME[$i]} is
-	#       defined in the file ${BASH_SOURCE[$i]} and called from ${BASH_SOURCE[$i+1]}.
-
-	# # This does not obtain the correct/intended paths
-	# doc_test_caller_path=$(ps -o command= -p "$PPID" | echo-split ' ' | tail -n 1)
-	doc_test_caller_path="${BASH_SOURCE[1]}"
-	doc_test_name="$(basename "$(dirname "$doc_test_caller_path")")/$(basename "$doc_test_caller_path")" # move this into primitive?
+	if [[ "$option_debug" == 'yes' ]]; then
+		echo
+		echo
+		echo ============================================
+		echo "DEBUG START"
+		echo "CALLER PATH: $doc_test_caller_path"
+		echo
+	fi
 
 	mapfile -t parsed_function_IDs < <(get-definitions)
 	# __print_lines "${parsed_function_IDs[@]}"
 
 	local has_description='no'
 	for function_name in "${parsed_function_IDs[@]}"; do
-		local fn_name fn_body fn_code fn_descr
+		local fn_name fn_body fn_body_trimmed fn_code fn_descr
 		local result_fn_code result_fn_desc result_final result_fn_formatted
 
 		if [[ "$option_debug" == 'yes' ]]; then
@@ -212,28 +236,27 @@ function doc_helper() {
 			echo "fn_name: [$fn_name], "
 		fi
 
-		# set default code
-		result_fn_code=$(__print_lines "$fn_body")
-
 		# ---------
 		# process results code
-		# TODO: Options to transform [CODE] contents
-		# [ ] xx
 
-		# results trim code
+		result_fn_code=$(__print_lines "$fn_body")
+		fn_body_trimmed=$(__print_lines "$result_fn_code" | sed '1,2d; $d')
+		FUNCTION_BODIES+=("$fn_body_trimmed")
+
+		# Either display the full function or the trimmed version.
 		if [[ "$option_trim_fn_body" == 'yes' ]]; then
-			result_fn_code="$(__print_lines "$result_fn_code" | sed '1,2d; $d')"
+			result_fn_code="$fn_body_trimmed"
 		fi
-		# results code colors
+
+		# Apply code syntax highlight
 		if [[ "$option_use_colors" == 'yes' ]]; then
 			result_fn_code="$(__print_lines "$result_fn_code" | bat --style plain --color always --language bash --paging=never)"
 		fi
 
 		# ---------
-		# process results description
-		# TODO: Options to transform [DESCRIPTION] contents
-		# [ ] xx
+		# Process description
 
+		# If __desc func exists then use it, otherwise default to the func name.
 		if [[ "$option_func_name_as_title" == 'yes' || "$has_description" != 'yes' ]]; then
 			# no description
 			result_fn_desc="${function_name//_/ }"
@@ -248,24 +271,25 @@ function doc_helper() {
 		# ---------
 		# concat data
 
-		# TODO: Options to transform final results.
-		# [ ] add prefixes / suffixes?
+		result_final="$result_fn_desc"$'\n'"$result_fn_code"$'\n'
+		finalized_function_labels+=("$result_final")
+		FUNCTION_LABELS+=("$result_final")
 
-		result_final="$result_fn_desc"$'\n'"$result_fn_code"
-		finalized_function_labels+=("$result_final"$'\n')
-		# echo "$result_final"
+		if [[ "$option_debug" == 'yes' ]]; then
+			__print_lines "${result_final[@]}"
+		fi
 
 		has_description='no'
 	done
 
-	# echo ====
-	# echo "cound code funcs: $code_funcs_count"
-	# echo "#code_func_names: ${#code_func_names[@]}"
-	# echo =====
+	if [[ "$option_debug" == 'yes' ]]; then
+		echo ============================================
+		echo "DEBUG ENDED"
+	fi
 
+	# NOTE: This is only used currently when we dont use INDEX with choose.
+	# This should be removed.
 	for index in "${!code_func_names[@]}"; do
-		# echo "${code_func_names[index]}"
-		# echo ""
 		results_mapped+=("${code_func_names[index]}" "${finalized_function_labels[index]}")
 	done
 
@@ -292,8 +316,7 @@ function doc_helper() {
 	#     - Parse the code chunk and check for `[ $N|--*|--|.. ]`
 
 	local sel='' is_meta='no' selected_fn_name=''
-	local choose_title="$choose_title_prefix: Select [$doc_test_name]"
-
+	local choose_title="$doc_helper_title_prefix: Select [$DOC_TEST_NAME]"
 	while :; do
 
 		# =================
@@ -305,24 +328,30 @@ function doc_helper() {
 		# 	index="$(choose --linger 'Which code to execute?' --index -- "${function_labels[@]}")"
 
 		# Handle selections
-
 		if [[ "$sel" == _* ]]; then
-			# meta option, eg. go-to-main; print-and-close; ..
 			is_meta='yes'
 			break
-
 		else
 			# runnable code
 			selected_fn_name="$sel"
 
-			echo "selected_fn_name: $selected_fn_name"
+			# TODO: [ ] when getting func bodies by index, i need to subtrace the number
+			# of meta funcs from the selected index, since meta entries are listed first.
+			#
+			# WARN: code selections might call other test-case-setup funcs in the
+			# respective doc test file. This has to be considered when evaluating the
+			# code.
 
-			# TODO: [ ] check if takes args.
+			echo "selected_fn_name: $selected_fn_name"
 
 			# # args="$(ask --linger 'Arguments to pass to the function?')"
 			local output_header="output from [$selected_fn_name]"
 			echo-style --h1 "$output_header"
+
 			$selected_fn_name # $args
+
+			# eval_code $selected_code # handles args checking..
+
 			echo-style --g1 "${output_header//?/ }"
 
 		# # index=0 #

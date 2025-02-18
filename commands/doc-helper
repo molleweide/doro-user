@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+source "$DOROTHY/user/sources/_doc_helper.bash"
+doc_helper --trim --colors --debug
