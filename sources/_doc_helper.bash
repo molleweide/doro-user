@@ -174,7 +174,7 @@ function doc_helper() {
 		# 2. run the command
 	}
 
-	function run__doc_browser_main {
+	function run__doc_browser_main_menu {
 		local doc_test_commands=() selected_test_doc
 		local title="$doc_helper_title_prefix | MAIN BROWSER: Select which [doc test]"
 		mapfile -t doc_test_commands < <(find "$DIR_DOC_TESTS" -type f -maxdepth 1)
@@ -205,7 +205,7 @@ function doc_helper() {
 
 	local META_FUNCS=(
 		run__refresh_test_cases
-		run__doc_browser_main
+		run__doc_browser_main_menu
 		run__all_current
 		run__print_all_and_exit
 	)
@@ -218,6 +218,21 @@ function doc_helper() {
 	local META_FUNCS_COUNT="${#META_LABELS[@]}"
 
 	local RESULT_LABELS=()
+
+
+	if [[ "$option_debug" == 'yes' ]]; then
+		echo
+		echo
+		echo ============================================
+		echo "DEBUG START"
+		echo "CALLER PATH: $doc_test_caller_path"
+		echo
+	fi
+
+  # Standalone defaults to running the main menu.
+	if [[ "$caller_basename" == "doc-helper" ]] ; then
+	  run__doc_browser_main_menu
+	fi
 
 	# =======================================================
 	# COLLECT INFORMATION
@@ -232,21 +247,16 @@ function doc_helper() {
 
 	mapfile -t parsed_function_IDs < <(get-definitions)
 
-	if [[ "$option_debug" == 'yes' ]]; then
-		echo
-		echo
-		echo ============================================
-		echo "DEBUG START"
-		echo "CALLER PATH: $doc_test_caller_path"
-		echo
-		echo -- ids --
-		__print_lines "${parsed_function_IDs[@]}"
-	fi
-
 	# =======================================================
 	# CAPTURE _SETUP FUNCTIONS
 
 	local SETUP_FUNC_IDS=() FUNC_GET_IDS=() FUNC_NAMES=()
+
+	if [[ "$option_debug" == 'yes' ]]; then
+		echo -- ids --
+		__print_lines "${parsed_function_IDs[@]}"
+	fi
+
 
 	# TODO: try doing this in a one-liner by using echo-regex.
 	for item in "${parsed_function_IDs[@]}"; do
@@ -355,6 +365,8 @@ function doc_helper() {
 		for item in "${FUNCTION_LABELS[@]}"; do
 			RESULT_LABELS+=("$item")
 		done
+		# ...
+		# ...
 	fi
 
 	# # debug result labels
