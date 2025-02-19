@@ -2,8 +2,8 @@
 #
 #
 #
-#
-#
+# TEST: Re-use the same choose command loaded without having to re-initialize
+# it every time, since it takes a bit of time??
 #
 
 # HACK: skiss on the call structure for the interactive UI
@@ -33,8 +33,12 @@
 #           In commands.test
 #       [ ] Run doc helper on multiple test files at once? All even?
 
-# TODO: [ ] pull latest dorothy.
+# TODO:
 #       [ ] choose return --index
+#       [ ] collect _setup funcs.
+#       [ ] eval code.
+#           - pass code to debug-bash
+#           - capture output.
 #       [ ] capture output fs-rm style.
 #           - truncate the output to only take up a maximum of N lines
 #       ===
@@ -127,9 +131,22 @@ function doc_helper() {
 	# helpers
 
 	function eval_code() {
+		local target_code="$1"
+		# [ ] ASK: how can we check if the function takes arguments?
+		#     - Parse the code chunk and check for `[ $N|--*|--|.. ]`
 		# FIX: Capture/wrap test cases that fail
-		# TODO: evaluate if the code takes arguments.
-		:
+		local _setup_fn_bodies=()
+		local eval_string="# $doc_helper_title_prefix: eval string"$'\n'
+		for f in "${setup_ids[@]}"; do
+			local fn
+			fn="$(declare -f "$f")"
+			eval_string="$eval_string$fn"$'\n'
+		done
+		eval_string="$eval_string"$'\n'"$target_code"
+
+		__print_lines "$eval_string"
+
+		# debug-bash --
 	}
 
 	# =======================================================
@@ -175,12 +192,17 @@ function doc_helper() {
 	# =======================================================
 	# SETUP SPECIAL UI ALTERNATIVES
 
-  # TODO: How do we handle these menu entries when using choose index instead of labels.
-	local results_mapped=(
+	# TODO: How do we handle these menu entries when using choose index instead of labels.
+
+	local META_ENTRIES=(
 		_refresh "[Reload alternatives - Is this possible somehow?]"
 		_browse_all "[Browse all test files]"
 		_run_all_current "[Run all tests sequentially]"
 		_print_and_exit "[Print all test contents to tty and close]"
+	)
+
+	local RESULTS_MAPPED=(
+		"${META_ENTRIES[@]}"
 	)
 
 	# =======================================================
@@ -195,6 +217,8 @@ function doc_helper() {
 		FUNCTION_LABELS=() \
 		DOC_TEST_NAME="$caller_path_dirname/$caller_basename"
 
+	mapfile -t parsed_function_IDs < <(get-definitions)
+
 	if [[ "$option_debug" == 'yes' ]]; then
 		echo
 		echo
@@ -202,13 +226,30 @@ function doc_helper() {
 		echo "DEBUG START"
 		echo "CALLER PATH: $doc_test_caller_path"
 		echo
+		echo -- ids --
+		__print_lines "${parsed_function_IDs[@]}"
 	fi
 
-	mapfile -t parsed_function_IDs < <(get-definitions)
-	# __print_lines "${parsed_function_IDs[@]}"
+	# =======================================================
+	# CAPTURE _SETUP FUNCTIONS
+
+	local setup_ids=() real_ids=()
+
+	# filter out all _setup funcs and put the real funcs
+	# in a new array.
+	for item in "${parsed_function_IDs[@]}"; do
+		if [[ "$item" == _* ]]; then
+			setup_ids+=("$item")
+		else
+			real_ids+=("$item")
+		fi
+	done
+
+	# =======================================================
+	# PREPARE TEST CASE FUNCTIONS
 
 	local has_description='no'
-	for function_name in "${parsed_function_IDs[@]}"; do
+	for function_name in "${real_ids[@]}"; do
 		local fn_name fn_body fn_body_trimmed fn_code fn_descr
 		local result_fn_code result_fn_desc result_final result_fn_formatted
 
@@ -290,13 +331,22 @@ function doc_helper() {
 	# NOTE: This is only used currently when we dont use INDEX with choose.
 	# This should be removed.
 	for index in "${!code_func_names[@]}"; do
-		results_mapped+=("${code_func_names[index]}" "${finalized_function_labels[index]}")
+		RESULTS_MAPPED+=("${code_func_names[index]}" "${finalized_function_labels[index]}")
 	done
+
+ #  # Use this for choose index
+	# for item in "${META_ENTRIES[@]}"; do
+	#   RESULTS_MAPPED+=("$item")
+	# done
+	# for item in "${FUNCTION_LABELS[@]}"; do
+	#   RESULTS_MAPPED+=("$item")
+	# done
+
 
 	# exit
 
 	# # LOG DATA
-	# for elem in "${results_mapped[@]}"; do
+	# for elem in "${RESULTS_MAPPED[@]}"; do
 	# 	echo "$elem"
 	# done
 
@@ -306,51 +356,37 @@ function doc_helper() {
 
 	# =======================================================
 	# SETUP UI
-	#
-	# TODO: UI
-	# [ ] If choose is run once, then properly display the `code` above the output.
-	# [ ] Capture the output of selected function and display it above the choose
-	#       menu in the next iteration.
-	#       - see fs-rm . display on top
-	# [ ] ASK: how can we check if the function takes arguments?
-	#     - Parse the code chunk and check for `[ $N|--*|--|.. ]`
 
 	local sel='' is_meta='no' selected_fn_name=''
 	local choose_title="$doc_helper_title_prefix: Select [$DOC_TEST_NAME]"
 	while :; do
 
-		# =================
-		# setup choose
-
-		sel="$(choose --required --linger "$choose_title" --label -- "${results_mapped[@]}")"
+		sel="$(choose --required --linger "$choose_title" --label -- "${RESULTS_MAPPED[@]}")"
 		# 	# NOTE: match index is not on my local clone...
 		# 	# index="$(choose --linger 'Which code to execute?' --default="$index" --match='$INDEX' --index -- "${function_labels[@]}")"
 		# 	index="$(choose --linger 'Which code to execute?' --index -- "${function_labels[@]}")"
+
+
+		# FIX: check if index is within META_ENTRIES range or not.
 
 		# Handle selections
 		if [[ "$sel" == _* ]]; then
 			is_meta='yes'
 			break
 		else
-			# runnable code
+			# Run capture code
 			selected_fn_name="$sel"
 
 			# TODO: [ ] when getting func bodies by index, i need to subtrace the number
 			# of meta funcs from the selected index, since meta entries are listed first.
-			#
-			# WARN: code selections might call other test-case-setup funcs in the
-			# respective doc test file. This has to be considered when evaluating the
-			# code.
 
 			echo "selected_fn_name: $selected_fn_name"
 
-			# # args="$(ask --linger 'Arguments to pass to the function?')"
 			local output_header="output from [$selected_fn_name]"
 			echo-style --h1 "$output_header"
 
-			$selected_fn_name # $args
-
-			# eval_code $selected_code # handles args checking..
+			# $selected_fn_name # $args
+			eval_code "$selected_fn_name" # $selected_code # handles args checking..
 
 			echo-style --g1 "${output_header//?/ }"
 

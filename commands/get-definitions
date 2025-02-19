@@ -36,7 +36,7 @@ function get_definitions() (
 			Query code for bash definitions and identifiers.
 			If no path is supplied then query current env/shell.
 			Gets definitions in the order they occur. This is why
-			`declare -F` is not used, since it always sorts results.
+			$(declare -F) is not used, since it always sorts results.
 
 			USAGE:
 			get-definitions
@@ -76,6 +76,7 @@ function get_definitions() (
 
 	# process
 	local item option_flags='' no_args='no' option_args=() option_inputs=() option_echo_regexp='yes' option_get_func_contsents='no' option_target_func=''
+	local option_exclude_prefix=''
 	if [[ $# -eq 0 ]]; then
 		no_args='yes'
 	fi
@@ -91,6 +92,7 @@ function get_definitions() (
 		'--echo-regexp') option_echo_regexp='yes' ;;
 		'--contents') option_get_func_contsents='yes' ;;
 		'--target-func='*) option_target_func="${item#*=}" ;;
+		'--exclude-prefix='*) option_exclude_prefix="${item#*=}" ;;
 		'--')
 			option_inputs+=("$@")
 			shift $#
@@ -99,7 +101,6 @@ function get_definitions() (
 		*) option_args+=("$item") ;;
 		esac
 	done
-
 
 	# if no args were given at all, then assume that we want to collect names
 	# from executing script.
@@ -245,8 +246,8 @@ function get_definitions() (
 	# [ ] standard grep
 	# [ ] ripgrep
 
-  # TEST: If `nvim` exists or `treesitter` then we should be able to parse
-  # out identifiers efficiently with those.
+	# TEST: If `nvim` exists or `treesitter` then we should be able to parse
+	# out identifiers efficiently with those.
 
 	local fn_regex='' supports_named_captures='no' func_ids_found=()
 	if [[ $option_echo_regexp == 'no' ]]; then
@@ -292,7 +293,8 @@ function get_definitions() (
 		local add='yes'
 		local rm_id
 
-		if [[ "$id" == _* ]]; then
+		# if [[ "$id" == _* ]]; then
+		if [[ -n "$option_exclude_prefix" && "$id" == "$option_exclude_prefix" ]]; then
 			add='no'
 		else
 			for rm_id in "${remove_ids[@]}"; do

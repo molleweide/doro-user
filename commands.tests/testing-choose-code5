@@ -52,8 +52,8 @@ done
 # index=0
 while :; do
 	# NOTE: match index is not on my local clone...
-	# index="$(choose --linger 'Which code to execute?' --default="$index" --match='$INDEX' --index -- "${function_labels[@]}")"
-	index="$(choose --linger 'Which code to execute?' --index -- "${function_labels[@]}")"
+	index="$(choose --linger 'Which code to execute?' --default="$index" --match='$INDEX' --index -- "${function_labels[@]}")"
+	# index="$(choose --linger 'Which code to execute?' --index -- "${function_labels[@]}")"
 	args="$(ask --linger 'Arguments to pass to the code?')"
 	code="${function_codes[index]}"
 	# debug-bash -- -c "$code" -- $args # debug-bash needs to be updated to support the -c option, then this would run the code against all bash versions on this machine

@@ -53,61 +53,64 @@ function five {
 
 # ==================================================================
 
-# ids
-function_names=()
-# mapfile -t function_names < <(declare -F | awk '{print $3}') # [declare -f one_fn] to [one_fn]
-mapfile -t function_names < <(get-definitions) # [declare -f one_fn] to [one_fn]
+# # ids
+# function_names=()
+# # mapfile -t function_names < <(declare -F | awk '{print $3}') # [declare -f one_fn] to [one_fn]
+# mapfile -t function_names < <(get-definitions) # [declare -f one_fn] to [one_fn]
+#
+# # NOTE: in this func, i modified ben's script so that we get unsorted func names
+# # and then can ommit the description
+#
+# # bodies + prepare data
+# function_code_with_labels=()
+# has_description='no'
+# for function_name in "${function_names[@]}"; do
+#
+#   function_core_name="$function_name"
+#   if [[ "$function_name" == *__* ]]; then
+#     function_core_name="${function_name%__*}" # handle name__code case
+#   fi
+#
+# 	# check function is a __description
+# 	if [[ "$function_name" == *'__description' ]]; then
+# 		has_description='yes'
+# 		continue
+# 	fi
+#
+# 	# # validate description
+# 	# if [[ "$(type -t "${function_core_name}__description")" != 'function' ]]; then
+# 	# 	continue # has no description..
+# 	# fi
+#
+# 	function_code="$(declare -f "$function_name" | sed '1,2d; $d' | sed 's/^    //')" # declare -f converts tabs to spaces
+#
+# 	if [[ "$has_description" == 'yes' ]]; then
+# 		function_description="$("${function_core_name}__description")"
+# 	else
+# 	  # Format the function name instead..
+# 	  function_description=''
+# 	fi
+#
+# 	# function_description_label="$(bat --style plain --color always --language markdown --paging=never <<< "$function_description")"
+# 	# function_code_label="$(bat --style plain --color always --language bash --paging=never <<< "$function_code")"
+# 	# function_code_with_labels+=("$function_code" "$function_description_label"$'\n\n'"$function_code_label")
+#
+# 	function_label="$(bat --style plain --color always --language bash --paging=never <<<"$function_description"$'\n'"$function_code")"
+#
+# 	# NOTE: map `code` -> `label`
+#
+# 	function_code_with_labels+=("$function_code" "$function_label"$'\n')
+#
+# 	has_description='no'
+# done
+#
+# # ui loop
+# code="$(choose --linger 'Which code to execute?' --label -- "${function_code_with_labels[@]}")"
+# args="$(ask --linger 'Arguments to pass to the code?')"
+# bash -c "$code" -- $args
 
-# NOTE: in this func, i modified ben's script so that we get unsorted func names
-# and then can ommit the description
-
-# bodies + prepare data
-function_code_with_labels=()
-has_description='no'
-for function_name in "${function_names[@]}"; do
-
-  function_core_name="$function_name"
-  if [[ "$function_name" == *__* ]]; then
-    function_core_name="${function_name%__*}" # handle name__code case
-  fi
-
-	# check function is a __description
-	if [[ "$function_name" == *'__description' ]]; then
-		has_description='yes'
-		continue
-	fi
-
-	# # validate description
-	# if [[ "$(type -t "${function_core_name}__description")" != 'function' ]]; then
-	# 	continue # has no description..
-	# fi
-
-	function_code="$(declare -f "$function_name" | sed '1,2d; $d' | sed 's/^    //')" # declare -f converts tabs to spaces
-
-	if [[ "$has_description" == 'yes' ]]; then
-		function_description="$("${function_core_name}__description")"
-	else
-	  # Format the function name instead..
-	  function_description=''
-	fi
-
-	# function_description_label="$(bat --style plain --color always --language markdown --paging=never <<< "$function_description")"
-	# function_code_label="$(bat --style plain --color always --language bash --paging=never <<< "$function_code")"
-	# function_code_with_labels+=("$function_code" "$function_description_label"$'\n\n'"$function_code_label")
-
-	function_label="$(bat --style plain --color always --language bash --paging=never <<<"$function_description"$'\n'"$function_code")"
-
-	# NOTE: map `code` -> `label`
-
-	function_code_with_labels+=("$function_code" "$function_label"$'\n')
-
-	has_description='no'
-done
-
-# ui loop
-code="$(choose --linger 'Which code to execute?' --label -- "${function_code_with_labels[@]}")"
-args="$(ask --linger 'Arguments to pass to the code?')"
-bash -c "$code" -- $args
+	source "$DOROTHY/user/sources/_doc_helper.bash"
+	doc_helper --colors
 
 # =======================================================
 # notes
