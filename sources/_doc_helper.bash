@@ -146,6 +146,8 @@ function doc_helper() {
 
 		__print_lines "$eval_string"
 
+		# 	args="$(ask --linger 'Arguments to pass to the code?')"
+
 		# debug-bash --
 	}
 
@@ -194,15 +196,21 @@ function doc_helper() {
 
 	# TODO: How do we handle these menu entries when using choose index instead of labels.
 
-	local META_ENTRIES=(
-		_refresh "[Reload alternatives - Is this possible somehow?]"
-		_browse_all "[Browse all test files]"
-		_run_all_current "[Run all tests sequentially]"
-		_print_and_exit "[Print all test contents to tty and close]"
+	local META_FUNCS=(
+		run__refresh_test_cases
+		run__doc_browser_main
+		run__all_current
+		run__print_all_and_exit
 	)
+	local META_LABELS=(
+		"[Reload alternatives - Is this possible somehow?]"
+		"[Browse all test files]"
+		"[Run all tests sequentially]"
+		"[Print all test contents to tty and close]"
+	)
+	local META_FUNCS_COUNT="${#META_LABELS[@]}"
 
-	local RESULTS_MAPPED=(
-		"${META_ENTRIES[@]}"
+	local RESULT_LABELS=(
 	)
 
 	# =======================================================
@@ -233,7 +241,7 @@ function doc_helper() {
 	# =======================================================
 	# CAPTURE _SETUP FUNCTIONS
 
-	local setup_ids=() real_ids=()
+	local setup_ids=() FUNC_GET_IDS=() FUNC_NAMES=()
 
 	# filter out all _setup funcs and put the real funcs
 	# in a new array.
@@ -241,7 +249,7 @@ function doc_helper() {
 		if [[ "$item" == _* ]]; then
 			setup_ids+=("$item")
 		else
-			real_ids+=("$item")
+			FUNC_GET_IDS+=("$item")
 		fi
 	done
 
@@ -249,7 +257,7 @@ function doc_helper() {
 	# PREPARE TEST CASE FUNCTIONS
 
 	local has_description='no'
-	for function_name in "${real_ids[@]}"; do
+	for function_name in "${FUNC_GET_IDS[@]}"; do
 		local fn_name fn_body fn_body_trimmed fn_code fn_descr
 		local result_fn_code result_fn_desc result_final result_fn_formatted
 
@@ -269,6 +277,9 @@ function doc_helper() {
 			has_description='yes'
 			continue
 		fi
+
+		FUNC_NAMES+=("$fn_name")
+
 		fn_body="$(declare -f "$function_name")"
 		code_funcs_count=$((code_funcs_count + 1))
 		code_func_names+=("$fn_name")
@@ -328,27 +339,28 @@ function doc_helper() {
 		echo "DEBUG ENDED"
 	fi
 
-	# NOTE: This is only used currently when we dont use INDEX with choose.
-	# This should be removed.
-	for index in "${!code_func_names[@]}"; do
-		RESULTS_MAPPED+=("${code_func_names[index]}" "${finalized_function_labels[index]}")
+	# # NOTE: This is only used currently when we dont use INDEX with choose.
+	# # This should be removed.
+	# for index in "${!code_func_names[@]}"; do
+	# 	RESULT_LABELS+=("${code_func_names[index]}" "${finalized_function_labels[index]}")
+	# done
+
+	# Use this for choose index
+	for item in "${META_LABELS[@]}"; do
+		RESULT_LABELS+=("$item")
+	done
+	for item in "${FUNCTION_LABELS[@]}"; do
+		RESULT_LABELS+=("$item")
 	done
 
- #  # Use this for choose index
-	# for item in "${META_ENTRIES[@]}"; do
-	#   RESULTS_MAPPED+=("$item")
+	# # debug result labels
+	# for elem in "${RESULT_LABELS[@]}"; do
+	# 	__print_lines "$elem"
 	# done
-	# for item in "${FUNCTION_LABELS[@]}"; do
-	#   RESULTS_MAPPED+=("$item")
-	# done
-
-
 	# exit
 
-	# # LOG DATA
-	# for elem in "${RESULTS_MAPPED[@]}"; do
-	# 	echo "$elem"
-	# done
+	local RESULT_LABELS_COUNT="${#RESULT_LABELS[@]}"
+	local FUNCTION_BODIES_COUNT=${#FUNCTION_BODIES[@]}
 
 	# =====================================================================
 	# =====================================================================
@@ -357,71 +369,95 @@ function doc_helper() {
 	# =======================================================
 	# SETUP UI
 
-	local sel='' is_meta='no' selected_fn_name=''
+	local sel='' is_meta='no' selected_fn_name='' index="$((${#META_LABELS[@]}))"
 	local choose_title="$doc_helper_title_prefix: Select [$DOC_TEST_NAME]"
 	while :; do
 
-		sel="$(choose --required --linger "$choose_title" --label -- "${RESULTS_MAPPED[@]}")"
+		# sel="$(choose --required --linger "$choose_title" --label -- "${RESULT_LABELS[@]}")"
 		# 	# NOTE: match index is not on my local clone...
-		# 	# index="$(choose --linger 'Which code to execute?' --default="$index" --match='$INDEX' --index -- "${function_labels[@]}")"
+
+		# FIX: choose support start index without shifting tty
+		index="$(
+			choose --linger 'Which code to execute?' --default="$index" \
+				--match='$INDEX' --index -- "${RESULT_LABELS[@]}"
+		)"
 		# 	index="$(choose --linger 'Which code to execute?' --index -- "${function_labels[@]}")"
 
+		# __print_lines "Sel index -> $index" "# meta opts: ${#META_LABELS[@]}"
+		local index_pre=$index
 
-		# FIX: check if index is within META_ENTRIES range or not.
-
-		# Handle selections
-		if [[ "$sel" == _* ]]; then
-			is_meta='yes'
+		if [[ "$index" -lt "$META_FUNCS_COUNT" ]]; then
+			# echo "chose meta: $index -> ${META_FUNCS[$index]}"
 			break
 		else
+			index=$((index - (META_FUNCS_COUNT)))
+
+			echo "chose code: $index"
+			echo "# func names: ${#FUNC_NAMES[@]}"
+			echo "# func bodies: ${#FUNCTION_BODIES[@]}"
+
 			# Run capture code
-			selected_fn_name="$sel"
-
-			# TODO: [ ] when getting func bodies by index, i need to subtrace the number
-			# of meta funcs from the selected index, since meta entries are listed first.
-
-			echo "selected_fn_name: $selected_fn_name"
-
-			local output_header="output from [$selected_fn_name]"
+			local func_name="${FUNC_NAMES[$index]}"
+			echo "selected_fn_name: $func_name"
+			local output_header="output from [$func_name]"
 			echo-style --h1 "$output_header"
-
-			# $selected_fn_name # $args
-			eval_code "$selected_fn_name" # $selected_code # handles args checking..
-
+			eval_code "${FUNCTION_BODIES[$index]}"
 			echo-style --g1 "${output_header//?/ }"
 
-		# # index=0 #
-		# 	args="$(ask --linger 'Arguments to pass to the code?')"
-		# 	code="${function_codes[index]}"
-		# 	# debug-bash -- -c "$code" -- $args # debug-bash needs to be updated to support the -c option, then this would run the code against all bash versions on this machine
-		# 	if ! confirm --ppid=$$ --positive -- 'Prompt again?'; then
-		# 		break
-		# 	fi
-		# 	# if [[ $index -eq ${#function_labels[@]} ]]; then
-		# 	# 	index=0
-		# 	# else
-		# 	# 	index=$((index + 1))
-		# 	# fi
+			# # index=0 #
+			# 	code="${function_codes[index]}"
+			# 	# debug-bash -- -c "$code" -- $args # debug-bash needs to be updated to support the -c option, then this would run the code against all bash versions on this machine
+			if ! confirm --ppid=$$ --positive -- 'Prompt again?'; then
+				break
+			fi
+
+			echo " index | $((RESULT_LABELS_COUNT - 1))"
+
+			# if [[ $index -eq ${#RESULT_LABELS[@]} ]]; then
+			if (( index == FUNCTION_BODIES_COUNT - 1 )); then
+			  echo "!!!!"
+				index="$((${#META_LABELS[@]}))"
+			else
+				# 	index="$index"
+				# else
+				echo "???? $index"
+				index=$((index_pre + 1))
+			fi
 		fi
+
+		# 	# FIX: check if index is within META_ENTRIES range or not.
+		#
+		# 	# Handle selections
+		# 	if [[ "$sel" == _* ]]; then
+		# 		is_meta='yes'
+		# 		break
+		# 	else
+		# 	fi
 	done
 
-	# =====
+	# Broke out of while loop to call meta funcs
+	# !! For some meta funcs we might want to stay in the while loop
+	# >> check conditionally based on the meta func if we want to break or not
+	"${META_FUNCS[$index]}"
 
-	if [[ "$is_meta" == 'yes' ]]; then
-		function handle_meta_selections() {
-			case "$1" in
-			_browse_all) run__doc_browser_main ;;
-			_print_and_exit) run__print_all_and_exit ;;
-			_run_all_current) run__all_current ;; # NOTE: will this work with `ask`??
-			# '--format='*) option_format="${item#*=}" ;;
-			# '--trim') option_trim_fn_body='yes' ;;
-			# '--colors') option_use_colors='yes' ;;
-			# '--func-header') option_func_name_as_title='yes' ;;
-			# '--desc-hl='*) option_lang_hl="${item#*=}" ;;
-			# '--only-func-names') ;; # Only list function-names-formatted
-			esac
-		}
-		handle_meta_selections "$sel"
-	fi
+	#
+	# # =====
+	#
+	# if [[ "$is_meta" == 'yes' ]]; then
+	# 	function handle_meta_selections() {
+	# 		case "$1" in
+	# 		_browse_all) run__doc_browser_main ;;
+	# 		_print_and_exit) run__print_all_and_exit ;;
+	# 		_run_all_current) run__all_current ;; # NOTE: will this work with `ask`??
+	# 		# '--format='*) option_format="${item#*=}" ;;
+	# 		# '--trim') option_trim_fn_body='yes' ;;
+	# 		# '--colors') option_use_colors='yes' ;;
+	# 		# '--func-header') option_func_name_as_title='yes' ;;
+	# 		# '--desc-hl='*) option_lang_hl="${item#*=}" ;;
+	# 		# '--only-func-names') ;; # Only list function-names-formatted
+	# 		esac
+	# 	}
+	# 	handle_meta_selections "$sel"
+	# fi
 
 }
