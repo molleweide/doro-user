@@ -8,12 +8,12 @@
 
 # TODO:
 #       ===
-#       options:
-#         - only print capture output
-#         - only concat to next title
-#         - both
+#       ( ) options:
+#           - ( ) only print capture output
+#           - (x) only concat to next title
+#           - ( ) both
 #       ===
-#       [ ] prefix description with the FUNC_BODY indices, so that you can
+#       ( ) prefix description with the FUNC_BODY indices, so that you can
 #            visually see which number you were running.
 #            - This requires injecting the index intelligently into:
 #               ~ handle if func_name_format
@@ -31,6 +31,11 @@
 #       ===
 #       [ ] Load multiple doc tests at once. Create a large choosee menu.
 #           This could be nice to do with --fzf.
+#       ====
+#       support chunking up the test file instead of having to define func names
+#       and description.
+#       >> this could make some things a lot easier.
+#       >>>>> will need to check if the target file hosts FUNCS or CHUNKS
 
 function doc_helper() {
 	source "$DOROTHY/sources/bash.bash"
@@ -131,12 +136,22 @@ function doc_helper() {
 		# 	    args="$(ask --linger 'Arguments to pass to the code?')"
 
 		function get_output() {
-			local capture_results="$(bash -c "$eval_string")"
+			local capture_status capture_results
+
+			# # direct eval
+			# capture_results="$(bash -c "$eval_string")"
+			# capture_status=$?
+
+			# eval capture
+			eval_capture --statusvar=capture_status --stdoutvar=capture_results -- bash -c "$eval_string"
+
+			# local capture_results="$(eval_capture -- bash -c "$eval_string")"
+
 			local output_header="PREVIOUS OUTPUT: ($func_name)"
 			echo-style --h1 "$output_header"
-			echo "last status: $?"
+			echo "Capture status: $capture_status, capture stdout:"
 			__print_lines "${capture_results[@]}"
-			echo "-------------------------------------------------------"
+			# echo "-------------------------------------------------------"
 			# echo-style --g1 "${output_header//?/ }"
 		}
 
@@ -348,6 +363,9 @@ function doc_helper() {
 
 	# - (*) Move choose options to its own array
 	# - ( ) use BOTH underline AND overline for choose main title, so that it is
+	#       - specifically underline LAST TWO lines.
+	#         Is it possible to disable underline across the whole title?
+	# ===
 	#       clearly separated from the previous code output.
 	# - ( ) choose support start index without shifting tty?
 	# - ( ) --truncate-body???
