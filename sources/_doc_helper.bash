@@ -7,9 +7,6 @@
 # Todo: Use doc_helper for the interactive bash man pages documentation file.
 
 # TODO:
-#       [ ] Put eval output above result entries in next choose iteration
-#           - concat output to the next title.
-#           - use --truncate-body
 #       ===
 #       options:
 #         - only print capture output
@@ -114,7 +111,7 @@ function doc_helper() {
 		local func_name="$1" target_code="$2" _setup_fn_bodies=() capture_results=()
 		local eval_string divider="# ============================================"
 		eval_string="$divider"$'\n'"# $doc_helper_title_prefix: eval string [$func_name]"$'\n'
-		for f in "${setup_ids[@]}"; do
+		for f in "${SETUP_FUNC_IDS[@]}"; do
 			local fn
 			fn="$(declare -f "$f")"
 			eval_string="$eval_string$fn"$'\n'
@@ -159,13 +156,11 @@ function doc_helper() {
 
 		# TODO:
 		# re-run current executing command..
+		# 1. obtain the command name
+		# 2. run the command
 	}
 
 	function run__doc_browser_main {
-		# NOTE: Using get-definitions and declare -f in subsequent runs of a dot test
-		# seems to work. QUESTION: Does this increase memory load for each run?
-		# Should we use `exec` or `env` to reset the environment?
-
 		local doc_test_commands=() selected_test_doc
 		local title="$doc_helper_title_prefix | MAIN BROWSER: Select which [doc test]"
 		mapfile -t doc_test_commands < <(find "$DIR_DOC_TESTS" -type f -maxdepth 1)
@@ -190,12 +185,9 @@ function doc_helper() {
 
 	# =====================================================================
 	# =====================================================================
-	# =====================================================================
 
 	# =======================================================
-	# SETUP SPECIAL UI ALTERNATIVES
-
-	# TODO: How do we handle these menu entries when using choose index instead of labels.
+	# SETUP META UI ALTERNATIVES
 
 	local META_FUNCS=(
 		run__refresh_test_cases
@@ -219,7 +211,6 @@ function doc_helper() {
 
 	local \
 		parsed_function_IDs=() \
-		finalized_function_labels=() \
 		code_funcs_count=0 \
 		code_func_names=() \
 		FUNCTION_BODIES=() \
@@ -242,13 +233,13 @@ function doc_helper() {
 	# =======================================================
 	# CAPTURE _SETUP FUNCTIONS
 
-	local setup_ids=() FUNC_GET_IDS=() FUNC_NAMES=()
+	local SETUP_FUNC_IDS=() FUNC_GET_IDS=() FUNC_NAMES=()
 
 	# filter out all _setup funcs and put the real funcs
 	# in a new array.
 	for item in "${parsed_function_IDs[@]}"; do
 		if [[ "$item" == _* ]]; then
-			setup_ids+=("$item")
+			SETUP_FUNC_IDS+=("$item")
 		else
 			FUNC_GET_IDS+=("$item")
 		fi
@@ -259,15 +250,15 @@ function doc_helper() {
 
 	local has_description='no'
 	for function_name in "${FUNC_GET_IDS[@]}"; do
-		local fn_name fn_body fn_body_trimmed fn_code fn_descr
-		local result_fn_code result_fn_desc result_final result_fn_formatted
+		local fn_name fn_body fn_body_trimmed
+		local result_fn_code result_fn_desc result_final
 
 		if [[ "$option_debug" == 'yes' ]]; then
 			echo ============================================
 		fi
 
 		# ---------
-		# prepare names and description
+		# Prepare names and description
 
 		fn_name="$function_name"
 		if [[ "$function_name" == *__* ]]; then
@@ -290,7 +281,7 @@ function doc_helper() {
 		fi
 
 		# ---------
-		# process results code
+		# Process results code
 
 		result_fn_code=$(__print_lines "$fn_body")
 		fn_body_trimmed=$(__print_lines "$result_fn_code" | sed '1,2d; $d')
@@ -309,7 +300,7 @@ function doc_helper() {
 		# ---------
 		# Process description
 
-		# If __desc func exists then use it, otherwise default to the func name.
+		# DESCRIPTION: If __desc func exists then use it, otherwise default to the func name.
 		if [[ "$option_func_name_as_title" == 'yes' || "$has_description" != 'yes' ]]; then
 			# no description
 			result_fn_desc="${function_name//_/ }"
@@ -321,11 +312,8 @@ function doc_helper() {
 			fi
 		fi
 
-		# ---------
 		# concat data
-
 		result_final="$result_fn_desc"$'\n'"$result_fn_code"$'\n'
-		# finalized_function_labels+=("$result_final")
 		FUNCTION_LABELS+=("$result_final")
 
 		if [[ "$option_debug" == 'yes' ]]; then
@@ -339,12 +327,6 @@ function doc_helper() {
 		echo ============================================
 		echo "DEBUG ENDED"
 	fi
-
-	# # NOTE: This is only used currently when we dont use INDEX with choose.
-	# # This should be removed.
-	# for index in "${!code_func_names[@]}"; do
-	# 	RESULT_LABELS+=("${code_func_names[index]}" "${finalized_function_labels[index]}")
-	# done
 
 	# Use this for choose index
 	for item in "${META_LABELS[@]}"; do
@@ -360,24 +342,17 @@ function doc_helper() {
 	# done
 	# exit
 
-	# local RESULT_LABELS_COUNT="${#RESULT_LABELS[@]}"
-	# local FUNCTION_BODIES_COUNT=${#FUNCTION_BODIES[@]}
-
 	# =====================================================================
-	# =====================================================================
-	# =====================================================================
-
 	# =======================================================
 	# SETUP UI
 
-	# TODO:
-	# - use BOTH underline AND overline for choose main title, so that it is
+	# - (*) Move choose options to its own array
+	# - ( ) use BOTH underline AND overline for choose main title, so that it is
 	#       clearly separated from the previous code output.
-	# - choose support start index without shifting tty?
-	# - --truncate-body???
+	# - ( ) choose support start index without shifting tty?
+	# - ( ) --truncate-body???
 
-	local sel='' is_meta='no' selected_fn_name='' index="$((${#META_LABELS[@]}))" choose_title=''
-
+	local index="$((${#META_LABELS[@]}))" choose_title='' index_before_shifting
 	while :; do
 
 		if [[ -z "$PREV_EVAL_OUTPUT" ]]; then
@@ -385,33 +360,28 @@ function doc_helper() {
 		else
 			choose_title="$PREV_EVAL_OUTPUT"$'\n'"$doc_helper_title_prefix: Select [$DOC_TEST_NAME]"
 		fi
-
 		index="$(
 			choose "$choose_title" --default="$index" \
 				--match='$INDEX' --index -- "${RESULT_LABELS[@]}"
 		)"
 
-		local index_pre=$index
-
+		index_before_shifting=$index
 		if [[ "$index" -lt "$META_FUNCS_COUNT" ]]; then
 			break
 		else
 			index=$((index - (META_FUNCS_COUNT)))
 			eval_code "${FUNC_NAMES[$index]}" "${FUNCTION_BODIES[$index]}"
-			if ! confirm --ppid=$$ --positive -- 'Prompt again?'; then
-				break
-			fi
+			# if ! confirm --ppid=$$ --positive -- 'Prompt again?'; then
+			# 	break
+			# fi
 			if ((index == ${#FUNCTION_BODIES[@]} - 1)); then
 				index="$((${#META_LABELS[@]}))"
 			else
-				index=$((index_pre + 1))
+				index=$((index_before_shifting + 1))
 			fi
 		fi
 	done
 
-	# Broke out of while loop to call meta funcs
-	# !! For some meta funcs we might want to stay in the while loop
-	# >> check conditionally based on the meta func if we want to break or not
 	"${META_FUNCS[$index]}"
 
 }
