@@ -217,8 +217,7 @@ function doc_helper() {
 	)
 	local META_FUNCS_COUNT="${#META_LABELS[@]}"
 
-	local RESULT_LABELS=(
-	)
+	local RESULT_LABELS=()
 
 	# =======================================================
 	# COLLECT INFORMATION
@@ -249,8 +248,7 @@ function doc_helper() {
 
 	local SETUP_FUNC_IDS=() FUNC_GET_IDS=() FUNC_NAMES=()
 
-	# filter out all _setup funcs and put the real funcs
-	# in a new array.
+	# TODO: try doing this in a one-liner by using echo-regex.
 	for item in "${parsed_function_IDs[@]}"; do
 		if [[ "$item" == _* ]]; then
 			SETUP_FUNC_IDS+=("$item")
@@ -342,13 +340,22 @@ function doc_helper() {
 		echo "DEBUG ENDED"
 	fi
 
-	# Use this for choose index
-	for item in "${META_LABELS[@]}"; do
-		RESULT_LABELS+=("$item")
-	done
-	for item in "${FUNCTION_LABELS[@]}"; do
-		RESULT_LABELS+=("$item")
-	done
+	# =======================================================
+	# Merge all labels
+
+	local use_merge_arrays='yes'
+
+	if [[ "$use_merge_arrays" == 'yes' ]]; then
+		# NOTE: This seems to work properly to merge arrays including multiline strings.
+		mapfile -d '' RESULT_LABELS < <(echo-merge -- "${META_LABELS[@]}" "${FUNCTION_LABELS[@]}")
+	else
+		for item in "${META_LABELS[@]}"; do
+			RESULT_LABELS+=("$item")
+		done
+		for item in "${FUNCTION_LABELS[@]}"; do
+			RESULT_LABELS+=("$item")
+		done
+	fi
 
 	# # debug result labels
 	# for elem in "${RESULT_LABELS[@]}"; do

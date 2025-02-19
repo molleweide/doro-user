@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+
+function echo_merge() (
+	source "$DOROTHY/sources/bash.bash"
+	# source "$DOROTHY/sources/stdinargs.bash"
+
+	# =====================================
+	# Arguments
+
+	function help {
+		cat <<-EOF >/dev/stderr
+			ABOUT:
+			Combine input of multiple arrays into one output.
+
+			!!! This command is only warranted if echo-lines happen to destroy
+			multiline strings.
+
+			USAGE:
+			echo-merge
+
+			OPTIONS:
+			..
+
+			FLAGS:
+			--sort
+			    Sort outputs. This wouldn't work with multiline strings?!
+		EOF
+		if [[ $# -ne 0 ]]; then
+			echo-error "$@"
+		fi
+		return 22 # EINVAL 22 Invalid argument
+	}
+
+	# local option_args=()
+	while [[ $# -ne 0 ]]; do
+		item="$1"
+		shift
+		case "$item" in
+		'--help' | '-h') help ;;
+		'--')
+			# 	option_args+=("$item" "$@")
+			break
+			;;
+			# *) option_args+=("$item") ;;
+		esac
+	done
+
+	# https://unix.stackexchange.com/questions/259690/bash-split-multi-line-input-into-array
+	# https://unix.stackexchange.com/questions/259690/bash-split-multi-line-input-into-array
+	# https://unix.stackexchange.com/questions/491481/is-there-a-character-as-delim-of-read-so-that-read-reads-the-entire-of-a
+	# https://unix.stackexchange.com/questions/693090/splitting-a-null-separated-string
+
+	# -----------------------------------------------------------------------------
+  # merge files.
+
+	# # combine the parts
+	# cat -- "$custom_file" "$content_file" >"$combined_file"
+
+	# -----------------------------------------------------------------------------
+
+	#  # test output
+	# for item in "$@"; do
+	# 	echo ===== >/dev/tty
+	# 	printf "%s\0" "$item" >/dev/tty
+	# done
+
+	# for item in "$@"; do
+	# 	printf "%s\0" "$item"
+	# done
+
+	printf "%s\0" "$@"
+)
+
+# fire if invoked standalone
+if [[ $0 == "${BASH_SOURCE[0]}" ]]; then
+	if [[ $* == '--test' ]]; then
+		echo_merge_test
+	else
+		echo_merge "$@"
+	fi
+fi
