@@ -16,7 +16,10 @@ function echo_merge() (
 			multiline strings.
 
 			USAGE:
-			echo-merge
+			echo-merge [...options] -- ...<item>
+
+			EXAMPLE:
+			mapfile -d '' RESULT_LABELS < <(echo-merge -- "${META_LABELS[@]}" "${FUNCTION_LABELS[@]}")
 
 			OPTIONS:
 			..
@@ -42,6 +45,7 @@ function echo_merge() (
 			break
 			;;
 			# *) option_args+=("$item") ;;
+		*) help "An unrecognized argument was provided"
 		esac
 	done
 
