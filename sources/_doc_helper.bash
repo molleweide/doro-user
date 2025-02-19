@@ -6,11 +6,15 @@
 # ---
 # Todo: Use doc_helper for the interactive bash man pages documentation file.
 
-
 # TODO:
 #       [ ] Put eval output above result entries in next choose iteration
 #           - concat output to the next title.
 #           - use --truncate-body
+#       ===
+#       options:
+#         - only print capture output
+#         - only concat to next title
+#         - both
 #       ===
 #       [ ] prefix description with the FUNC_BODY indices, so that you can
 #            visually see which number you were running.
@@ -38,6 +42,7 @@ function doc_helper() {
 	local \
 		THIS_NAME="[doc_helper]" \
 		DIR_DOC_TESTS="$DOROTHY/user/commands.tests" \
+		PREV_EVAL_OUTPUT='' \
 		doc_test_caller_path \
 		caller_path_dirname \
 		caller_basename \
@@ -127,13 +132,18 @@ function doc_helper() {
 		# 2. Need to use eval_capture so that we can obtain the exit status.
 		# 3. Evaluate whether the code accepts arguments.
 		# 	    args="$(ask --linger 'Arguments to pass to the code?')"
-		local capture_results="$(bash -c "$eval_string")"
 
-		local output_header="CAPTURED OUTPUT: ($func_name)"
-		echo-style --h1 "$output_header"
-		echo "last status: $?"
-		__print_lines "${capture_results[@]}"
-		echo-style --g1 "${output_header//?/ }"
+		function get_output() {
+			local capture_results="$(bash -c "$eval_string")"
+			local output_header="PREVIOUS OUTPUT: ($func_name)"
+			echo-style --h1 "$output_header"
+			echo "last status: $?"
+			__print_lines "${capture_results[@]}"
+			echo "-------------------------------------------------------"
+			# echo-style --g1 "${output_header//?/ }"
+		}
+
+		PREV_EVAL_OUTPUT="$(get_output)"
 
 		# debug-bash --
 	}
@@ -360,11 +370,22 @@ function doc_helper() {
 	# =======================================================
 	# SETUP UI
 
-	# FIX: choose support start index without shifting tty?
+	# TODO:
+	# - use BOTH underline AND overline for choose main title, so that it is
+	#       clearly separated from the previous code output.
+	# - choose support start index without shifting tty?
+	# - --truncate-body???
 
-	local sel='' is_meta='no' selected_fn_name='' index="$((${#META_LABELS[@]}))"
-	local choose_title="$doc_helper_title_prefix: Select [$DOC_TEST_NAME]"
+	local sel='' is_meta='no' selected_fn_name='' index="$((${#META_LABELS[@]}))" choose_title=''
+
 	while :; do
+
+		if [[ -z "$PREV_EVAL_OUTPUT" ]]; then
+			choose_title="$doc_helper_title_prefix: Select [$DOC_TEST_NAME]"
+		else
+			choose_title="$PREV_EVAL_OUTPUT"$'\n'"$doc_helper_title_prefix: Select [$DOC_TEST_NAME]"
+		fi
+
 		index="$(
 			choose "$choose_title" --default="$index" \
 				--match='$INDEX' --index -- "${RESULT_LABELS[@]}"
