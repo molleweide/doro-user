@@ -1,46 +1,25 @@
-#
-#
-#
-#
 # TEST: Re-use the same choose command loaded without having to re-initialize
 # it every time, since it takes a bit of time??
-#
-
-# HACK: skiss on the call structure for the interactive UI
-# dochelper = *
-# ~ Run test file | sources *
-#   ~ Call doc_helper on executed script.
-#     ~ A. Play w test cases
-#     ---
-#     ~ B. Run main-browser (**)
-#       ~ Call choose on DOC dir paths.
-#         ~ Select path and run
-#           ~ Calls doc_helper again.
-#                     ? Now what ids will get-definitions collect???
-#                     Options: Maybe use exec to replace the environment??
-#                     arst
-# ~ doc-helper standalone
-#   ~ call (**)
-#
-#
 
 # Add neovim dorothy binds/utils for adding and running in a new term.
 # Eg. - run selected line/chunk in terminal and open it.
 # ---
 # Todo: Use doc_helper for the interactive bash man pages documentation file.
 
-# TEST: [ ] move this to a standalone command where we avoid (subshell) syntax.
-#           In commands.test
-#       [ ] Run doc helper on multiple test files at once? All even?
 
 # TODO:
-#       [ ] choose return --index
-#       [ ] collect _setup funcs.
-#       [ ] eval code.
-#           - pass code to debug-bash
-#           - capture output.
-#       [ ] capture output fs-rm style.
-#           - truncate the output to only take up a maximum of N lines
+#       [ ] Put eval output above result entries in next choose iteration
+#           - concat output to the next title.
+#           - use --truncate-body
+#       ===
+#       [ ] prefix description with the FUNC_BODY indices, so that you can
+#            visually see which number you were running.
+#            - This requires injecting the index intelligently into:
+#               ~ handle if func_name_format
+#               ~ handle if has_description
+#               ~~ alt 1: maybe if func_name_format -> prefix with # and add index after??
+#               ~~ alt 2: put index before and indend the desc.
+#               ~~ easiest: ( ) just inject index before
 #       ===
 #       [*] run all in seq
 #       [ ] run print all and close
@@ -49,12 +28,8 @@
 #       [ ] Run the meta selections in its own choose menu
 #           - allow for flipping back and forth between the menu and the test cases.
 #       ===
-#       ===
-#       [ ] code evaluation
-#           - trim func bodies if necessary
-#           - check if code accepts arguments.
-#       ===
-#       [ ] Load multiple doc tests at once.
+#       [ ] Load multiple doc tests at once. Create a large choosee menu.
+#           This could be nice to do with --fzf.
 
 function doc_helper() {
 	source "$DOROTHY/sources/bash.bash"
@@ -131,22 +106,34 @@ function doc_helper() {
 	# helpers
 
 	function eval_code() {
-		local target_code="$1"
-		# [ ] ASK: how can we check if the function takes arguments?
-		#     - Parse the code chunk and check for `[ $N|--*|--|.. ]`
-		# FIX: Capture/wrap test cases that fail
-		local _setup_fn_bodies=()
-		local eval_string="# $doc_helper_title_prefix: eval string"$'\n'
+		local func_name="$1" target_code="$2" _setup_fn_bodies=() capture_results=()
+		local eval_string divider="# ============================================"
+		eval_string="$divider"$'\n'"# $doc_helper_title_prefix: eval string [$func_name]"$'\n'
 		for f in "${setup_ids[@]}"; do
 			local fn
 			fn="$(declare -f "$f")"
 			eval_string="$eval_string$fn"$'\n'
 		done
-		eval_string="$eval_string"$'\n'"$target_code"
+		eval_string="$eval_string# FUNC NAME = [$func_name]"$'\n'
+		eval_string="$eval_string"$'\n'"$target_code"$'\n'"$divider"
+		# __print_lines "$eval_string"
 
-		__print_lines "$eval_string"
+		# NOTE:
+		# 1. Need to pull latest w/support for -c
+		#     debug-bash -- -c "$eval_string"
+		#     debug-bash -- -c "$code" -- $args # debug-bash needs to be updated to
+		#     support the -c option, then this would run the code against all bash
+		#     versions on this machine
+		# 2. Need to use eval_capture so that we can obtain the exit status.
+		# 3. Evaluate whether the code accepts arguments.
+		# 	    args="$(ask --linger 'Arguments to pass to the code?')"
+		local capture_results="$(bash -c "$eval_string")"
 
-		# 	args="$(ask --linger 'Arguments to pass to the code?')"
+		local output_header="CAPTURED OUTPUT: ($func_name)"
+		echo-style --h1 "$output_header"
+		echo "last status: $?"
+		__print_lines "${capture_results[@]}"
+		echo-style --g1 "${output_header//?/ }"
 
 		# debug-bash --
 	}
@@ -158,6 +145,10 @@ function doc_helper() {
 		# setup background watcher that checks current targets for changes and
 		# updates the content variables??
 		todo try refresh test cases.
+		# Shouldn't this be possible if i just resource??
+
+		# TODO:
+		# re-run current executing command..
 	}
 
 	function run__doc_browser_main {
@@ -324,7 +315,7 @@ function doc_helper() {
 		# concat data
 
 		result_final="$result_fn_desc"$'\n'"$result_fn_code"$'\n'
-		finalized_function_labels+=("$result_final")
+		# finalized_function_labels+=("$result_final")
 		FUNCTION_LABELS+=("$result_final")
 
 		if [[ "$option_debug" == 'yes' ]]; then
@@ -359,8 +350,8 @@ function doc_helper() {
 	# done
 	# exit
 
-	local RESULT_LABELS_COUNT="${#RESULT_LABELS[@]}"
-	local FUNCTION_BODIES_COUNT=${#FUNCTION_BODIES[@]}
+	# local RESULT_LABELS_COUNT="${#RESULT_LABELS[@]}"
+	# local FUNCTION_BODIES_COUNT=${#FUNCTION_BODIES[@]}
 
 	# =====================================================================
 	# =====================================================================
@@ -369,95 +360,37 @@ function doc_helper() {
 	# =======================================================
 	# SETUP UI
 
+	# FIX: choose support start index without shifting tty?
+
 	local sel='' is_meta='no' selected_fn_name='' index="$((${#META_LABELS[@]}))"
 	local choose_title="$doc_helper_title_prefix: Select [$DOC_TEST_NAME]"
 	while :; do
-
-		# sel="$(choose --required --linger "$choose_title" --label -- "${RESULT_LABELS[@]}")"
-		# 	# NOTE: match index is not on my local clone...
-
-		# FIX: choose support start index without shifting tty
 		index="$(
-			choose --linger 'Which code to execute?' --default="$index" \
+			choose "$choose_title" --default="$index" \
 				--match='$INDEX' --index -- "${RESULT_LABELS[@]}"
 		)"
-		# 	index="$(choose --linger 'Which code to execute?' --index -- "${function_labels[@]}")"
 
-		# __print_lines "Sel index -> $index" "# meta opts: ${#META_LABELS[@]}"
 		local index_pre=$index
 
 		if [[ "$index" -lt "$META_FUNCS_COUNT" ]]; then
-			# echo "chose meta: $index -> ${META_FUNCS[$index]}"
 			break
 		else
 			index=$((index - (META_FUNCS_COUNT)))
-
-			echo "chose code: $index"
-			echo "# func names: ${#FUNC_NAMES[@]}"
-			echo "# func bodies: ${#FUNCTION_BODIES[@]}"
-
-			# Run capture code
-			local func_name="${FUNC_NAMES[$index]}"
-			echo "selected_fn_name: $func_name"
-			local output_header="output from [$func_name]"
-			echo-style --h1 "$output_header"
-			eval_code "${FUNCTION_BODIES[$index]}"
-			echo-style --g1 "${output_header//?/ }"
-
-			# # index=0 #
-			# 	code="${function_codes[index]}"
-			# 	# debug-bash -- -c "$code" -- $args # debug-bash needs to be updated to support the -c option, then this would run the code against all bash versions on this machine
+			eval_code "${FUNC_NAMES[$index]}" "${FUNCTION_BODIES[$index]}"
 			if ! confirm --ppid=$$ --positive -- 'Prompt again?'; then
 				break
 			fi
-
-			echo " index | $((RESULT_LABELS_COUNT - 1))"
-
-			# if [[ $index -eq ${#RESULT_LABELS[@]} ]]; then
-			if (( index == FUNCTION_BODIES_COUNT - 1 )); then
-			  echo "!!!!"
+			if ((index == ${#FUNCTION_BODIES[@]} - 1)); then
 				index="$((${#META_LABELS[@]}))"
 			else
-				# 	index="$index"
-				# else
-				echo "???? $index"
 				index=$((index_pre + 1))
 			fi
 		fi
-
-		# 	# FIX: check if index is within META_ENTRIES range or not.
-		#
-		# 	# Handle selections
-		# 	if [[ "$sel" == _* ]]; then
-		# 		is_meta='yes'
-		# 		break
-		# 	else
-		# 	fi
 	done
 
 	# Broke out of while loop to call meta funcs
 	# !! For some meta funcs we might want to stay in the while loop
 	# >> check conditionally based on the meta func if we want to break or not
 	"${META_FUNCS[$index]}"
-
-	#
-	# # =====
-	#
-	# if [[ "$is_meta" == 'yes' ]]; then
-	# 	function handle_meta_selections() {
-	# 		case "$1" in
-	# 		_browse_all) run__doc_browser_main ;;
-	# 		_print_and_exit) run__print_all_and_exit ;;
-	# 		_run_all_current) run__all_current ;; # NOTE: will this work with `ask`??
-	# 		# '--format='*) option_format="${item#*=}" ;;
-	# 		# '--trim') option_trim_fn_body='yes' ;;
-	# 		# '--colors') option_use_colors='yes' ;;
-	# 		# '--func-header') option_func_name_as_title='yes' ;;
-	# 		# '--desc-hl='*) option_lang_hl="${item#*=}" ;;
-	# 		# '--only-func-names') ;; # Only list function-names-formatted
-	# 		esac
-	# 	}
-	# 	handle_meta_selections "$sel"
-	# fi
 
 }

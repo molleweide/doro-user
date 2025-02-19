@@ -189,7 +189,7 @@ function bash_error_testing() (
 	}
 
 	source "$DOROTHY/user/sources/_doc_helper.bash"
-	doc_helper --trim --colors --debug
+	doc_helper --trim --colors
 )
 
 # Fire if invoked standalone
