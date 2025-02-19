@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+
+# TEST: WOULD THIS BE POSSIBLE??
+# --
+# ````
+# Re-use the same choose command loaded without having to re-initialize
+# it every time, since init takes a bit of time, which makes connecting
+# multiple choose menus feel slow.
+# ````
+# ---
+# :::IDEA:::
+# ---
+# local choose_pid
+# choose --process-map=choose_pid ...options -- ...<initial_item>
+# export CHOOSE_PROCESS__<some_unique_id??>
+# ---
+# Now, feed the process with new inputs??
+# Check if it recieves stdin, and then refresh the menu with new
+# items.
+# ---
+# Export the process id so that we can easilly optain it and update the
+# menu from subshells or from where ever.
+#
+# =============================================================================
+# == CHAT GPT DISCUSSION ======================================================
+# =============================================================================
+#
+# HACK:: QUESTION
+# In bash i have created a very elaborate UI menu called `choose [...options]`
+# If I initialize this menu with items, and export the process id as CHOOSE_MENU_PID.
+# Will i then be able to feed it with data from subsequent subshells i spin up.
+# Eg. if I press enter on the "go to main menu" item, then refresh the UI by
+#       feeding it the "main menu items" to its stdin?
+#
+###############################################################################
+###############################################################################
+###############################################################################
+# NOTE: SUGGESTION (A)
+# Yes, **you can feed data to your `choose` menu from subshells**, but there are some key considerations to ensure it works correctly.
+# ### ✅ **How It Could Work**
+# 1. **Start `choose` in the background** and capture its **PID** (`CHOOSE_MENU_PID`).
+# 2. **Keep its `stdin` open** so it can receive new menu data.
+# 3. **Use a FIFO (named pipe)** or a direct process substitution to send updates to `choose` from a subshell.
+# -------------------------------------------------------
+# ### **🚀 Example: Implementing This Setup**
+# #### **1️⃣ Start `choose` and Capture Its PID**
+# ```bash
+# choose "Main Menu Item 1" "Main Menu Item 2" &  # Start `choose` in the background
+# CHOOSE_MENU_PID=$!
+# echo "CHOOSE_MENU_PID=$CHOOSE_MENU_PID"
+# ```
+# 🚀 Now `choose` is running, and we saved its **PID**.
+# -------------------------------------------------------
+# #### **2️⃣ Send Updates to `choose`**
+# You need a way to send updates to `choose`.
+# ✅ **Using a Named Pipe (FIFO) is the best approach**:
+# ```bash
+# mkfifo /tmp/choose_input  # Create a named pipe
+# choose < /tmp/choose_input &  # Start `choose`, reading from the pipe
+# CHOOSE_MENU_PID=$!
+# ```
+# 🚀 Now, you can **send new menu items from any subshell**:
+# ```bash
+# echo "New Item 1" > /tmp/choose_input
+# echo "New Item 2" > /tmp/choose_input
+# ```
+# 🎯 **Result:** When you press "Go to Main Menu," the UI updates!
+# -------------------------------------------------------
+# #### **3️⃣ Feeding Data from Subshells**
+# From a subshell, you can now write to the named pipe:
+# ```bash
+# bash -c 'echo "Main Menu Item 3" > /tmp/choose_input'
+# ```
+# ✅ **The main `choose` process updates dynamically!**
+###############################################################################
+###############################################################################
+###############################################################################
+# NOTE: SUGGESTION (B)
+# ### **🚀 Alternative: Using File Descriptors**
+# Another way is to **keep a file descriptor open** for `choose`:
+# ```bash
+# exec 3> >(choose)  # Open file descriptor 3 for `choose`
+# echo "Option 1" >&3  # Send options dynamically
+# echo "Option 2" >&3
+# ```
+# 🚀 Now, any subshell can update the menu by writing to **FD 3**:
+# ```bash
+# bash -c 'echo "Back to Main Menu" >&3'
+# ```
+# ✅ This avoids needing a FIFO.
+# ---
+# WARN: ### **🔴 Key Considerations**
+# 1. `choose` **must support reading from stdin** dynamically.
+# 2. Using a **named pipe (`mkfifo`)** ensures `choose` can **read continuously**.
+# 3. If `choose` **closes stdin** after startup, then this method won't work.
+# 4. If `choose` needs a full re-execution, then you'll need to **kill and restart it** instead.
+# ---
+#
+# ### **🎯 Final Answer**
+# Yes, **you can update `choose` dynamically from subshells** **IF**:
+# - ✅ `choose` reads from **a named pipe or file descriptor**.
+# - ✅ You **send data dynamically** from subshells.
+# - ✅ `choose` doesn’t **close stdin after the first read**.
+#
+# 🚀 **Best method:** Use `mkfifo /tmp/choose_input` and feed new items via `echo "Item" > /tmp/choose_input`.
+# Let me know if you need more details! 🚀🔥

@@ -1,6 +1,3 @@
-# TEST: Re-use the same choose command loaded without having to re-initialize
-# it every time, since it takes a bit of time??
-
 # Add neovim dorothy binds/utils for adding and running in a new term.
 # Eg. - run selected line/chunk in terminal and open it.
 # ---
@@ -36,6 +33,8 @@
 #       and description.
 #       >> this could make some things a lot easier.
 #       >>>>> will need to check if the target file hosts FUNCS or CHUNKS
+#       ====
+#       ( ) CONTINUOUS CHOOSE MENU - VERY ADVANCED
 
 function doc_helper() {
 	source "$DOROTHY/sources/bash.bash"
@@ -138,12 +137,12 @@ function doc_helper() {
 		function get_output() {
 			local capture_status capture_results
 
-			# # direct eval
-			# capture_results="$(bash -c "$eval_string")"
-			# capture_status=$?
+			# direct eval
+			capture_results="$(bash -c "$eval_string")"
+			capture_status=$?
 
-			# eval capture
-			eval_capture --statusvar=capture_status --stdoutvar=capture_results -- bash -c "$eval_string"
+			# # eval capture
+			# eval_capture --statusvar=capture_status --stdoutvar=capture_results -- bash -c "$eval_string"
 
 			# local capture_results="$(eval_capture -- bash -c "$eval_string")"
 
