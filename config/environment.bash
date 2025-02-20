@@ -29,7 +29,6 @@ GHQ_GITHUB="$GHQ_ROOT/github.com"
 # HOMEBREW_ARCH='x86_64' # 'arm64e'
 
 BROWSER="brave"
-PAGER='less'         # alt. `most`
 TERMINAL="Alacritty" # or kitty | linux >> "st"
 
 # timezone
@@ -113,7 +112,7 @@ PATH="$HOME/.rvm/bin:$PATH"
 # OH MY ZSH
 # https://github.com/ohmyzsh/ohmyzsh/wiki/Settings
 ZSH="$XDG_DATA_HOME/oh-my-zsh"
-ZSH_CACHE_DIR="$XDG_CACHE_HOME/cache"
+ZSH_CACHE_DIR="$XDG_CACHE_HOME/oh-my-zsh"
 DISABLE_AUTO_TITLE="true" # apparently this is a thing pertaining to ohmyzsh
 
 # =======================================================
@@ -151,4 +150,20 @@ REAPER_PROJECTS_DIR="$REAPER_DIR/projects"
 REAPER_TMP_DIR="$REAPER_DIR/tmp"
 REAPER_BACKUP_DIR="$REAPER_DIR/backup"
 REAPER_SAMPLES_DIR="$REAPER_DIR/samples"
+
+
+# =======================================================
+# PAGER
+
+PAGER='less'         # alt. `most`
+# # Set the default Less options.
+# # Mouse-wheel scrolling has been disabled by -X (disable screen clearing).
+# # Remove -X to enable it.
+# export LESS='-g -i -M -R -S -w -X -z-4'
+
+# # Set the Less input preprocessor.
+# # Try both `lesspipe` and `lesspipe.sh` as either might exist on a system.
+# if (( $#commands[(i)lesspipe(|.sh)] )); then
+#   export LESSOPEN="| /usr/bin/env $commands[(i)lesspipe(|.sh)] %s 2>&-"
+# fi
 

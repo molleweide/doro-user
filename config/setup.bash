@@ -47,7 +47,6 @@ GO_INSTALL=(
 # zsh-completions
 HOMEBREW_FORMULAS=(
   ack
-  asdf
   blueutil
   cabal-install
   calcurse
