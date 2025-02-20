@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+# https://github.com/ohmyzsh/ohmyzsh
+
+# NOTE: Oh my zsh installer does not exist in core.
+
+function setup_util_ohmyzsh() (
+	source "$DOROTHY/sources/bash.bash"
+
+	# # https://github.com/ohmyzsh/ohmyzsh/wiki/Installing-ZSH
+	# local options=(
+	# 	--name='zsh'
+	# 	--cli='zsh'
+	# 	"$@"
+	# 	APK='zsh' # ALPINE
+	# 	APT='zsh' # UBUNTU
+	# 	AUR='zsh' # ARCH
+	# 	BREW='zsh'
+	# 	BSD='zsh'
+	# 	EMERGE='zsh' # GENTOO
+	# 	EOPKG='zsh'  # SOLUS
+	# 	PORT='zsh'
+	# 	RPM='zsh'    # FEDORA
+	# 	XBPS='zsh'   # VOID
+	# 	ZYPPER='zsh' # SUSE
+	# )
+	# setup-util "${options[@]}"
+
+	# make oh-my-zsh a separate installer if desired
+)
+
+# fire if invoked standalone
+if [[ $0 == "${BASH_SOURCE[0]}" ]]; then
+	setup_util_ohmyzsh "$@"
+fi

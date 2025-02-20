@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+function health_() (
+  source "$DOROTHY/sources/bash.bash"
+  # source "$DOROTHY/sources/stdinargs.bash"
+
+  # =====================================
+  # Arguments
+
+  function help {
+    cat <<-EOF >/dev/stderr
+			ABOUT:
+			Diagnose the health status of your shell environment.
+
+			USAGE:
+			health <action>
+
+			ACTIONS:
+			env|environment
+
+		EOF
+    if [[ $# -ne 0 ]]; then
+      echo-error "$@"
+    fi
+    return 22 # EINVAL 22 Invalid argument
+  }
+
+  local action=''
+  while [[ $# -ne 0 ]]; do
+    item="$1"
+    shift
+    case "$item" in
+    '--help' | '-h') help ;;
+    'env' | 'environment')
+      action='diagnose_environment'
+      break
+      ;;
+    *) help "An unrecognized argument was provided" ;;
+    esac
+  done
+
+
+	function act_diagnose_environment {
+	  :
+	}
+
+)
+
+# fire if invoked standalone
+if [[ $0 == "${BASH_SOURCE[0]}" ]]; then
+  health_ "$@"
+fi
