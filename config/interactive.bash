@@ -2,6 +2,8 @@
 # shellcheck disable=2034,1091
 # use inline `export VAR=...` statements, for fish compatibility`
 
+export DOROTHY_THEME="starship"
+
 # load defaults
 source "$DOROTHY/config/interactive.bash"
 
