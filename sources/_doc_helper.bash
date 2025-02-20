@@ -29,12 +29,15 @@
 #       [ ] Load multiple doc tests at once. Create a large choosee menu.
 #           This could be nice to do with --fzf.
 #       ====
-#       support chunking up the test file instead of having to define func names
+#       ( ) support chunking up the test file instead of having to define func names
 #       and description.
 #       >> this could make some things a lot easier.
 #       >>>>> will need to check if the target file hosts FUNCS or CHUNKS
+#             Use: IFS="========" read -ra sections <<< "$input"
+#             ^ each chunk will now be a multiline string.
 #       ====
 #       ( ) CONTINUOUS CHOOSE MENU - VERY ADVANCED
+#
 
 function doc_helper() {
 	source "$DOROTHY/sources/bash.bash"
@@ -219,7 +222,6 @@ function doc_helper() {
 
 	local RESULT_LABELS=()
 
-
 	if [[ "$option_debug" == 'yes' ]]; then
 		echo
 		echo
@@ -229,9 +231,9 @@ function doc_helper() {
 		echo
 	fi
 
-  # Standalone defaults to running the main menu.
-	if [[ "$caller_basename" == "doc-helper" ]] ; then
-	  run__doc_browser_main_menu
+	# Standalone defaults to running the main menu.
+	if [[ "$caller_basename" == "doc-helper" ]]; then
+		run__doc_browser_main_menu
 	fi
 
 	# =======================================================
@@ -256,7 +258,6 @@ function doc_helper() {
 		echo -- ids --
 		__print_lines "${parsed_function_IDs[@]}"
 	fi
-
 
 	# TODO: try doing this in a one-liner by using echo-regex.
 	for item in "${parsed_function_IDs[@]}"; do
@@ -353,29 +354,12 @@ function doc_helper() {
 	# =======================================================
 	# Merge all labels
 
-	local use_merge_arrays='yes'
-
-	if [[ "$use_merge_arrays" == 'yes' ]]; then
-		# NOTE: This seems to work properly to merge arrays including multiline strings.
-		mapfile -d '' RESULT_LABELS < <(echo-merge -- "${META_LABELS[@]}" "${FUNCTION_LABELS[@]}")
+	if [[ "${#FUNCTION_LABELS}" -gt 0 ]]; then
+		mapfile -t -d '' RESULT_LABELS < <(printf "%s\0" "${META_LABELS[@]}" "${FUNCTION_LABELS[@]}")
 	else
-		for item in "${META_LABELS[@]}"; do
-			RESULT_LABELS+=("$item")
-		done
-		for item in "${FUNCTION_LABELS[@]}"; do
-			RESULT_LABELS+=("$item")
-		done
-		# ...
-		# ...
+	  __print_lines "No test functions were found. Exiting.."
 	fi
 
-	# # debug result labels
-	# for elem in "${RESULT_LABELS[@]}"; do
-	# 	__print_lines "$elem"
-	# done
-	# exit
-
-	# =====================================================================
 	# =======================================================
 	# SETUP UI
 
@@ -390,17 +374,12 @@ function doc_helper() {
 
 	local index="$((${#META_LABELS[@]}))" choose_title='' index_before_shifting
 	while :; do
-
 		if [[ -z "$PREV_EVAL_OUTPUT" ]]; then
 			choose_title="$doc_helper_title_prefix: Select [$DOC_TEST_NAME]"
 		else
 			choose_title="$PREV_EVAL_OUTPUT"$'\n'"$doc_helper_title_prefix: Select [$DOC_TEST_NAME]"
 		fi
-		index="$(
-			choose "$choose_title" --default="$index" \
-				--match='$INDEX' --index -- "${RESULT_LABELS[@]}"
-		)"
-
+		index="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${RESULT_LABELS[@]}")"
 		index_before_shifting=$index
 		if [[ "$index" -lt "$META_FUNCS_COUNT" ]]; then
 			break
@@ -419,5 +398,4 @@ function doc_helper() {
 	done
 
 	"${META_FUNCS[$index]}"
-
 }

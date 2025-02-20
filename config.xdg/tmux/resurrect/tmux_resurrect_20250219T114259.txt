@@ -1,0 +1,18 @@
+pane	bevry	1	1	:##*	1	:/Users/hjalmarjakobsson/code/repos/github.com/bevry/boundation	1	zsh	:
+pane	doro	1	1	:*Z	1	:/Users/hjalmarjakobsson/.config/dorothy	1	nvim	:/Users/hjalmarjakobsson/.local/share/bob/nvim-bin/nvim
+pane	doro	1	1	:*Z	2	:/Users/hjalmarjakobsson/.config/dorothy	0	bash	:/bin/sh /usr/bin/man bash
+pane	main	1	1	:*	1	:/Users/hjalmarjakobsson/code/repos/github.com/molleweide/doom-nvim	1	zsh	:
+pane	pm	1	1	:##*	1	:/Users/hjalmarjakobsson/code/repos/github.com/molleweide/pitch-machine	1	zsh	:
+pane	rpp	1	0	:	1	:/Users/hjalmarjakobsson/reaper/packages/reaper-keys	1	zsh	:
+pane	rpp	2	1	:*Z	1	:/Users/hjalmarjakobsson/neorg	1	nvim	:/Users/hjalmarjakobsson/.local/share/bob/nvim-bin/nvim
+pane	rpp	2	1	:*Z	2	:/Users/hjalmarjakobsson/neorg	0	zsh	:
+pane	rpp	3	0	:-Z	1	:/Users/hjalmarjakobsson/code/repos/github.com/molleweide/doom-nvim	1	zsh	:
+pane	rpp	3	0	:-Z	2	:/Users/hjalmarjakobsson/code/repos/github.com/molleweide/doom-nvim	0	zsh	:
+window	bevry	1	:boundation	1	:##*	ae5e,213x50,0,0,1	off
+window	doro	1	:doro	1	:*Z	a7fd,240x55,0,0{120x55,0,0,3,119x55,121,0,15}	off
+window	main	1	:zsh	1	:*	ae61,213x50,0,0,4	:
+window	pm	1	:pitch-machine	1	:##*	ae62,213x50,0,0,5	off
+window	rpp	1	:rk	0	:	ae63,213x50,0,0,6	off
+window	rpp	2	:reaper	1	:*Z	f980,240x55,0,0{125x55,0,0,7,114x55,126,0,8}	off
+window	rpp	3	:doom	0	:-Z	cc22,213x53,0,0{126x53,0,0,9,86x53,127,0,10}	off
+state	rpp	doro

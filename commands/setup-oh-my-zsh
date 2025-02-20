@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# WARN: deprecated. already exists within dorothy..
+
 function setup_util_oh_my_zsh() (
 	source "$DOROTHY/sources/bash.bash"
 
