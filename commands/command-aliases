@@ -2,7 +2,7 @@
 
 function command_aliases() (
   source "$DOROTHY/sources/bash.bash"
-  # source "$DOROTHY/sources/stdinargs.bash"
+  __require_array 'mapfile'
 
   # short DCA = dorothy command aliases
   # migrate aliases to dorothy
@@ -83,57 +83,88 @@ function command_aliases() (
     :
   }
 
+  local supported=(
+    sh
+    bash
+    zsh
+    fish
+  )
+  local supported_posix=(
+    sh
+    bash
+    zsh
+    fish
+  )
+  local supported_non_posix=(
+    nu
+    elvish
+    xonsh
+  )
+
   function act_migrate() {
     local test_file="$DOROTHY/user/sources/aliases.sh"
 
-    local supported=(
-      sh
-      bash
-      zsh
-      fish
-    )
-    local supported_posix=(
-      sh
-      bash
-      zsh
-      fish
-    )
-    local supported_non_posix=(
-      nu
-      elvish
-      xonsh
-    )
-
     local interpreter=''
 
-    echo "interpreter = $interpreter"
-
-    # TODO: ( ) parse supported
+    # TODO: (*) parse supported
+    #           (x) get fn names and bodies
+    #           (x) get aliases
+    #       ( )
+    #
     interpreter="$(get-interpreter --name -- "$test_file")"
     if is-needle "$interpreter" -- "${supported[@]}"; then
+
       if is-needle "$interpreter" -- "${supported_posix[@]}"; then
-        # ( ) Parse ids
-
-        local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
-
         local aliases=() function_names=() function_bodies=()
 
-        mapfile -t aliases < <(grep -E "$aliases" myscript.sh)
+        # =======================================================
+        # HANDLE POSIX
+        # =======================================================
 
-        function_names=($(bash -c 'source myscript.sh; declare -F | awk "{print \$3}"'))
+        # ----
+        # HANDLE POSIX ALIASES
+        #
+        # loop
+        # ( ) split by [alias <name>=<body>]
 
-        # look at how i do it in _doc_helper.
-        function_bodies=($(bash -c 'source myscript.sh; declare -f | awk "{print \$3}"'))
+        local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
+        mapfile -t aliases < <(grep -E "$alias_regex" "$test_file")
+
+        # ----
+        # HANDLE POSIX FUNCTIONS
+        #
+        # loop
+        # ( ) take <name> and <body_trimmed>
+
+        mapfile -t function_names < <(bash -c 'source '"$test_file"'; declare -F | awk "{print \$3}"')
+        local body=''
+        for function_name in "${function_names[@]}"; do
+          body="$(bash -c 'source '"$test_file"'; declare -f '"$function_name")"
+          function_bodies+=("$body")
+        done
 
       elif is-needle "$interpreter" -- "${supported_non_posix[@]}"; then
+        # OTHER SHELLS #
         if [[ "$interpreter" == "nu" ]]; then
+          # =======================================================
+          # HANDLE NUSHELL
+          # =======================================================
+          :
+        elif [[ "$interpreter" == "elvish" ]]; then
+          # =======================================================
+          # HANDLE ELVISH
+          # =======================================================
+          :
+        elif [[ "$interpreter" == "xonsh" ]]; then
+          # =======================================================
+          # HANDLE XONSH
+          # =======================================================
           :
         fi
       else
         echo "Interpreter [$interpreter] not supported"
       fi
     fi
-
 
     # TODO: ( ) Create new file for $item in (*)
     # TODO: ( ) Inject body into file.
