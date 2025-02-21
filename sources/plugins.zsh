@@ -3,6 +3,12 @@
 # NOTE: rename this file to zsh-plugins, because it deals with adding
 # plugins to the zsh.
 
+# FIX: Many of these things should be made compatible with multiple shells
+# so that I can use all of th aliases from any shell.
+# https://superuser.com/questions/826333/is-there-a-way-to-source-a-sh-script-from-the-fish-shell
+# >>> create subdir where i migrate aliases to commands so that they become
+# available in any shell.
+
 # https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins
 # https://travis.media/top-10-oh-my-zsh-plugins-for-productive-developers/
 
@@ -20,8 +26,11 @@
 
 # TODO: put together some functions to make life easier
 #
-# TODO: maybe migrate to new plugin manager:
+# TODO: Maybe migrate to new plugin manager:
+# Antidote is the successor to antigen. It should be much fastern
 # https://github.com/mattmc3/antidote
+# ...
+# Or even just pull all of the oh-my-zsh plugins into my own dotfiles??
 
 source "$ADOTDIR/antigen.zsh"
 
@@ -62,7 +71,13 @@ source "$ADOTDIR/antigen.zsh"
 # antigen reset
 
 # echo "zsh cache before bundle OMZ: $ZSH_CACHE_DIR"
+
+
+# https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/git
+# source code: https://github.com/ohmyzsh/ohmyzsh/blob/master/plugins/git/git.plugin.zsh
+# patch alias to list all aliases.
 antigen bundle git
+
 antigen bundle nvm
 antigen bundle pyenv
 antigen bundle rvm

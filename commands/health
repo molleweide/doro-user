@@ -12,11 +12,19 @@ function health_() (
 			ABOUT:
 			Diagnose the health status of your shell environment.
 
+			ABBREVIATIONS:
+			SEC: setup-environment-commands
+
 			USAGE:
 			health <action>
 
 			ACTIONS:
 			env|environment
+
+			    Analyzes which env vars in the users config can be purged and offloaded to dorothy.
+			    Solution: In SEC the users env is loaded before dorothy tries to add additional
+			    env vars. Take the users env, and parse all env vars and check which
+			    can be found in the SEC command.
 
 		EOF
     if [[ $# -ne 0 ]]; then

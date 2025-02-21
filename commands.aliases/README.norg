@@ -1,0 +1,14 @@
+@document.meta
+title: README
+description:
+authors: hjalmarjakobsson
+categories:
+created: 2025-02-21T08:54:28-0500
+updated: 2025-02-21T08:55:23-0500
+version: 1.1.1
+@end
+
+In order to make aliases cross compat across terminals they need to be defined
+as aliases.
+
+Add some support to dorothy core that also respects and checks this.

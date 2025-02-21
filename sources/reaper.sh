@@ -1,8 +1,0 @@
-
-export REAPER_DIR="$HOME/reaper"
-export REAPER_APP_DIR="$REAPER_DIR/app"
-export REAPER_PACKAGES_DIR="$REAPER_DIR/packages"
-export REAPER_PROJECTS_DIR="$REAPER_DIR/projects"
-export REAPER_TMP_DIR="$REAPER_DIR/tmp"
-export REAPER_BACKUP_DIR="$REAPER_DIR/backup"
-export REAPER_SAMPLES_DIR="$REAPER_DIR/samples"
