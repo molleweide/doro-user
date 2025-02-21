@@ -127,16 +127,16 @@ function command_aliases() (
 
         # ----
         # HANDLE POSIX ALIASES
-        #
-        # loop
-        # (x) capture if a comment is at the end of the line
-        # (x) split by [alias <name>=<body>]
         # ( ) handle comments above??
+
+        output+=$'\n###############################'
+        output+=$'\n# ALIASES'
+        output+=$'\n###############################'
 
         local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
         mapfile -t aliases < <(grep -E "$alias_regex" "$test_file" | echo-trim-each-line)
         for line_alias in "${aliases[@]}"; do
-          local name='' value='' code='' trailing_comment=''
+          local name='' value='' trailing_comment=''
           # handle trim trailing comment
           if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
             line_alias="${BASH_REMATCH[1]}"
@@ -150,27 +150,33 @@ function command_aliases() (
             name="${BASH_REMATCH[1]}"
             value="${BASH_REMATCH[2]}"
           fi
-          output+=$'\n-------------------'
+          output+=$'\n#------------------------------'
           output+=$'\n'"$shebang_bash"
           output+=$'\n'"# Name: $name"
           output+=$'\n'"# Desc: $trailing_comment"
           output+=$'\n'"$value"
         done
 
-        echo "$output"
-
         # ----
         # HANDLE POSIX FUNCTIONS
-        #
-        # loop
-        # ( ) take <name> and <body_trimmed>
 
+        output+=$'\n###############################'
+        output+=$'\n# FUNCTIONS'
+        output+=$'\n###############################'
         mapfile -t function_names < <(bash -c 'source '"$test_file"'; declare -F | awk "{print \$3}"')
         local body=''
         for function_name in "${function_names[@]}"; do
           body="$(bash -c 'source '"$test_file"'; declare -f '"$function_name")"
           function_bodies+=("$body")
+          output+=$'\n#------------------------------'
+          output+=$'\n'"$shebang_bash"
+          output+=$'\n'"# Name: $function_name"
+          output+=$'\n'"# Desc: ..."
+          output+=$'\n'"$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
         done
+
+        # test print output
+        bat --style plain --color always --language bash --paging=never <<<"$output"
 
       elif is-needle "$interpreter" -- "${supported_non_posix[@]}"; then
         # OTHER SHELLS #
