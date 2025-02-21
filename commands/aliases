@@ -1,5 +1,23 @@
 #!/usr/bin/env bash
 
+# TODO:
+# ( ) browse
+#       reuse doc_helper
+
+# TODO: validate paths
+
+# TODO: MOVE TO CORE
+#       - ( ) get-interpreter
+#       - ( ) command-aliases
+# TODO: CORE
+#       ( ) Update permissions on DCA dirs
+#           - recursively
+#       ( ) Handle environment
+#           ( ) SEC: Add DCA dirs to path
+#               - recursively get all sub dirs
+#               - add to path
+#               ?? Can we set permissions so all subdirs are executable??
+
 function command_aliases() (
   source "$DOROTHY/sources/bash.bash"
   __require_array 'mapfile'
@@ -8,6 +26,7 @@ function command_aliases() (
   # migrate aliases to dorothy
 
   local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
+  local SHEBANG_BASH="#!/usr/bin/env bash"
 
   local supported=(
     sh
@@ -42,7 +61,7 @@ function command_aliases() (
 			any aliases that you are acustomed to.
 
 			USAGE:
-			command-aliases [<action>] [-- [...<input>]]
+			command-aliases [...<options] [<action>] [-- [...<input>]]
 
 			ACTIONS:
 
@@ -51,10 +70,11 @@ function command_aliases() (
 			    Browse aliases in a convenient manner, eg. show/list/edit/remove/dupl/etc.
 			    This is default if run standalone.
 
-			      command-aliases migrate -- [...<alias_file>]
+			command-aliases migrate -- [...<alias_file>]
 
 			    Parse old aliases/functions from <source> and move them into standalone
-			       DCAs under "user/commands.aliases/*" (*)
+			    DCAs under "user/commands.aliases/*". Migrate can take multiple files
+			    at once.
 
 			command-aliases new
 			command-aliases create
@@ -66,6 +86,14 @@ function command_aliases() (
 			    Iterate all DCAs and check which ones do not contain initial
 			    descriptive comments.
 
+			OPTIONS:
+
+			--to=<path>
+			    If you are migrating a aliases of a specific type, eg. git aliases,
+			    then you can specify path == "git/log", and then aliases will be
+			    migrated into [commands.aliases/git/log*], so that all your logging
+			    aliases are nicely put in a semantic location.
+
 		EOF
     if [[ $# -ne 0 ]]; then
       echo-error "$@"
@@ -74,19 +102,68 @@ function command_aliases() (
   }
 
   # local option_args=()
+  local option_action='' option_migrate_to='' option_args=()
   while [[ $# -ne 0 ]]; do
     item="$1"
     shift
     case "$item" in
     '--help' | '-h') help ;;
+    '--to='*) option_migrate_to="${item#*=}" ;;
+    'browse') option_action="browse" ;;
+    'new' | 'create') option_action="create" ;;
+    'migrate') option_action="migrate" ;;
+      # '--')
+      #   # 	option_args+=("$item" "$@")
+      #   break
+      #   ;;
+      #   # *) option_args+=("$item") ;;
     '--')
-      # 	option_args+=("$item" "$@")
+      option_args+=("$@")
+      shift $#
       break
       ;;
-      # *) option_args+=("$item") ;;
-    *) help "An unrecognized argument was provided" ;;
+    # *)
+    #   if [[ ${#option_needles[@]} -eq 0 ]]; then
+    #     option_needles+=("$item")
+    #   else
+    #     option_args+=("$item")
+    #   fi
+    #   ;;
+
     esac
   done
+
+  if [[ -z "$option_action" ]]; then
+    help "No action provided"
+  fi
+
+  # =======================================================
+  # HELPER
+
+  function make_destination() {
+    if [[ -n "$option_migrate_to" ]]; then
+      echo "$USER_COMMAND_ALIASES_DIR/$option_migrate_to"
+    elif [[ -n "${1-}" ]]; then
+      echo "$USER_COMMAND_ALIASES_DIR/$1"
+    else
+      echo "$USER_COMMAND_ALIASES_DIR"
+    fi
+
+  }
+
+  function create_file() {
+    local data=$1 destination=$2
+    # TODO: uncomment creation
+    if [[ ! -f "$destination" ]]; then
+      :
+    # echo "$data" >"$destination"
+    else
+      echo "Alias at [$(basename "$USER_COMMAND_ALIASES_DIR")/"$(basename "$destination")"] already exists!"
+    fi
+  }
+
+  # =======================================================
+  # ACTIONS
 
   # ( ) choose
   # ( ) fuzzy-helper
@@ -100,151 +177,179 @@ function command_aliases() (
   # ( ) check if name already exists. confirm...
   # ( ) if you specify a path then create sub dirs under (*)
   function act_create() {
-    :
+    local name='' value=''desc='' sub_path='' confirm_final=''
+    name="$(ask --linger 'Aliases create | What will the NAME be?')"
+    value="$(ask --linger 'Aliases create | What will the VALUE be?')"
+    desc="$(ask --linger 'Aliases create | What will the DESC be?')"
+    if confirm --ppid=$$ --positive -- 'Aliases create | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?'; then
+      sub_path="$(ask --linger 'Aliases create | What will the SUB PATH be?')"
+    fi
+    local final=''
+    final+="$SHEBANG_BASH"
+    final+=$'\n'"# Name: $name"
+    final+=$'\n'"# Desc: $desc"
+    final+=$'\n'"$value"
+
+    create_alias_at="$(make_destination "$sub_path")"
+
+    local sub_path_question=''
+    if [[ -n "$sub_path" ]] ; then
+      sub_path_question="/$sub_path"
+    fi
+
+    confirm_final="Aliases create | Proceed and create alias at ["$(basename "$USER_COMMAND_ALIASES_DIR")"$sub_path_question/$name]?"$'\n'
+    confirm_final+="$(bat --style numbers --color always --language bash --paging=never <<<"$final")"
+
+    # TODO: while loop -> select new name if path already exists.
+    if confirm --ppid=$$ --positive -- "$confirm_final"; then
+      create_file "$final" "$create_alias_at/$name"
+    fi
   }
 
   function act_migrate() {
-    local test_file="$DOROTHY/user/sources/aliases.sh"
-    local shebang_bash="#!/usr/bin/env bash"
+    local migrate_aliases_to
 
-    # TODO: THIS COMMAND
-    #       ( ) move to core
-    #       - get-interpreter
-    #       - command-aliases
-    # TODO: CORE
-    #       ( ) Update permissions on DCA dirs
-    #           - recursively
-    #       ( ) Handle environment
-    #           ( ) SEC: Add DCA dirs to path
-    #               - recursively get all sub dirs
-    #               - add to path
-    #               ?? Can we set permissions so all subdirs are executable??
+    migrate_aliases_to="$(make_destination)"
 
-    local output_test_string=''
-    local output_name_body_mapping=()
+    function migrate_single_file() {
+      local input_file=$1
 
-    local interpreter=''
+      local output_test_string=''
+      local output_name_body_mapping=()
 
-    interpreter="$(get-interpreter --name -- "$test_file")"
-    if is-needle "$interpreter" -- "${supported[@]}"; then
+      local interpreter=''
 
-      # =======================================================
-      # HANDLE POSIX
-      # =======================================================
-
-      if is-needle "$interpreter" -- "${supported_posix[@]}"; then
-        local aliases=() function_names=() function_bodies=()
-
-        # ----
-        # HANDLE POSIX ALIASES
-
-        output_test_string+=$'\n###############################'
-        output_test_string+=$'\n# ALIASES'
-        output_test_string+=$'\n###############################'
-
-        local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
-        mapfile -t aliases < <(grep -E "$alias_regex" "$test_file" | echo-trim-each-line)
-        for line_alias in "${aliases[@]}"; do
-          local name='' value='' trailing_comment='' final=''
-          # handle trim trailing comment
-          if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
-            line_alias="${BASH_REMATCH[1]}"
-            trailing_comment="${BASH_REMATCH[2]}"
-          fi
-          # handle split alias
-          if [[ "$line_alias" =~ alias\ ([^=]+)=\"(.*)\" ]]; then
-            name="${BASH_REMATCH[1]}"
-            value="${BASH_REMATCH[2]}"
-          elif [[ "$line_alias" =~ alias\ ([^=]+)=\'(.*)\' ]]; then
-            name="${BASH_REMATCH[1]}"
-            value="${BASH_REMATCH[2]}"
-          fi
-          output_name_body_mapping+=("$name")
-          final+="$shebang_bash"
-          final+=$'\n'"# Name: $name"
-          final+=$'\n'"# Desc: $trailing_comment"
-          final+=$'\n'"$value"
-          output_name_body_mapping+=("$final")
-        done
-
-        # ----
-        # HANDLE POSIX FUNCTIONS
-
-        output_test_string+=$'\n###############################'
-        output_test_string+=$'\n# FUNCTIONS'
-        output_test_string+=$'\n###############################'
-        mapfile -t function_names < <(bash -c 'source '"$test_file"'; declare -F | awk "{print \$3}"')
-        for function_name in "${function_names[@]}"; do
-          local final='' body body_trimmed
-          body="$(bash -c 'source '"$test_file"'; declare -f '"$function_name")"
-          body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
-          # Capture how many arguments each func snippets takes
-          # This is not perfect but at least it gives some indication.
-          local arguments=()
-          local count=0
-          while read -r line; do
-            local line="$line"
-            while [[ "$line" =~ (\$[0-9]+) ]]; do
-              local match="${BASH_REMATCH[0]}"
-              if ! is-needle "$match" -- "${arguments[@]}"; then
-                arguments+=("$match")
-              fi
-              line="${line/"$match"/}" # Remove the matched part from the line
-              # echo "trim: [$line]"
-              if [[ "$count" == 10 ]]; then
-                break
-              fi
-            done
-          done <<<"$body_trimmed"
-          output_name_body_mapping+=("$function_name")
-          final+="$shebang_bash"
-          final+=$'\n'"# Name: $function_name"
-          final+=$'\n'"# Desc: ..."
-          final+=$'\n'"# Args: ${arguments[*]}"
-          final+=$'\n'"$body_trimmed"
-          output_name_body_mapping+=("$final")
-        done
-
-        # ----
-        # loop each <name> <alias> pair
-        local target_path=''
-        for ((i = 0; i < "${#output_name_body_mapping[@]}"; i += 2)); do
-          target_path="$USER_COMMAND_ALIASES_DIR/${output_name_body_mapping[i]}"
-          echo "$target_path"
-          bat --style numbers --color always --language bash --paging=never <<<"${output_name_body_mapping[i + 1]}"
-          # if [[ ! -f "$target_path" ]]; then
-          #   echo "create"
-          #   # echo "${output_name_body_mapping[i + 1]}" >"$target_path"
-          # else
-          #   echo "Path [$(basename "$USER_COMMAND_ALIASES_DIR")/$(basename "$target_path")] already exists!"
-          # fi
-        done
+      interpreter="$(get-interpreter --name -- "$input_file")"
+      if is-needle "$interpreter" -- "${supported[@]}"; then
 
         # =======================================================
-        # HANDLE OTHER SHELLS BELOW
+        # HANDLE POSIX
         # =======================================================
 
-      elif is-needle "$interpreter" -- "${supported_non_posix[@]}"; then
+        if is-needle "$interpreter" -- "${supported_posix[@]}"; then
+          local aliases=() function_names=() function_bodies=()
 
-        if [[ "$interpreter" == "nu" ]]; then
-          # HANDLE NUSHELL
-          :
-        elif [[ "$interpreter" == "elvish" ]]; then
-          # HANDLE ELVISH
-          :
-        elif [[ "$interpreter" == "xonsh" ]]; then
-          # HANDLE XONSH
-          :
+          # ----
+          # HANDLE POSIX ALIASES
+
+          output_test_string+=$'\n###############################'
+          output_test_string+=$'\n# ALIASES'
+          output_test_string+=$'\n###############################'
+
+          local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
+          mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
+          for line_alias in "${aliases[@]}"; do
+            local name='' value='' trailing_comment='' final=''
+            # handle trim trailing comment
+            if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
+              line_alias="${BASH_REMATCH[1]}"
+              trailing_comment="${BASH_REMATCH[2]}"
+            fi
+            # handle split alias
+            if [[ "$line_alias" =~ alias\ ([^=]+)=\"(.*)\" ]]; then
+              name="${BASH_REMATCH[1]}"
+              value="${BASH_REMATCH[2]}"
+            elif [[ "$line_alias" =~ alias\ ([^=]+)=\'(.*)\' ]]; then
+              name="${BASH_REMATCH[1]}"
+              value="${BASH_REMATCH[2]}"
+            fi
+            output_name_body_mapping+=("$name")
+            final+="$SHEBANG_BASH"
+            final+=$'\n'"# Name: $name"
+            final+=$'\n'"# Desc: $trailing_comment"
+            final+=$'\n'"$value"
+            output_name_body_mapping+=("$final")
+          done
+
+          # ----
+          # HANDLE POSIX FUNCTIONS
+
+          output_test_string+=$'\n###############################'
+          output_test_string+=$'\n# FUNCTIONS'
+          output_test_string+=$'\n###############################'
+          mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
+          for function_name in "${function_names[@]}"; do
+            local final='' body body_trimmed
+            body="$(bash -c 'source '"$input_file"'; declare -f '"$function_name")"
+            body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
+            # Capture how many arguments each func snippets takes
+            # This is not perfect but at least it gives some indication.
+            local arguments=()
+            local count=0
+            while read -r line; do
+              local line="$line"
+              while [[ "$line" =~ (\$[0-9]+) ]]; do
+                local match="${BASH_REMATCH[0]}"
+                if ! is-needle "$match" -- "${arguments[@]}"; then
+                  arguments+=("$match")
+                fi
+                line="${line/"$match"/}" # Remove the matched part from the line
+                # echo "trim: [$line]"
+                if [[ "$count" == 10 ]]; then
+                  break
+                fi
+              done
+            done <<<"$body_trimmed"
+            output_name_body_mapping+=("$function_name")
+            final+="$SHEBANG_BASH"
+            final+=$'\n'"# Name: $function_name"
+            final+=$'\n'"# Desc: ..."
+            final+=$'\n'"# Args: ${arguments[*]}"
+            final+=$'\n'"$body_trimmed"
+            output_name_body_mapping+=("$final")
+          done
+
+          # ----
+          # loop each <name> <alias> pair
+          local target_path=''
+          for ((i = 0; i < "${#output_name_body_mapping[@]}"; i += 2)); do
+            target_path="$migrate_aliases_to/${output_name_body_mapping[i]}"
+            echo "$target_path"
+            bat --style numbers --color always --language bash --paging=never <<<"${output_name_body_mapping[i + 1]}"
+            create_file "${output_name_body_mapping[i + 1]}"  "$target_path"
+          done
+
+          # =======================================================
+          # HANDLE OTHER SHELLS BELOW
+          # =======================================================
+
+        elif is-needle "$interpreter" -- "${supported_non_posix[@]}"; then
+
+          if [[ "$interpreter" == "nu" ]]; then
+            # HANDLE NUSHELL
+            :
+          elif [[ "$interpreter" == "elvish" ]]; then
+            # HANDLE ELVISH
+            :
+          elif [[ "$interpreter" == "xonsh" ]]; then
+            # HANDLE XONSH
+            :
+          fi
+        else
+          echo "Interpreter [$interpreter] not supported"
         fi
-      else
-        echo "Interpreter [$interpreter] not supported"
       fi
-    fi
+    }
 
+    # remove this to make the <action> go live.
+    # option_args=("$DOROTHY/user/sources/aliases.sh")
+    for migrate_file in "${option_args[@]}"; do
+      migrate_single_file "$migrate_file"
+    done
   }
 
-  act_migrate
+  # =======================================================
+  # Act
 
+  # This is a better one liner but my linter complains too much about
+  # funcs being unreachable so for now i go with the switch case.
+  # "act_$option_action"
+
+  case "$option_action" in
+  browse) act_browse ;;
+  create) act_create ;;
+  migrate) act_migrate ;;
+  esac
 )
 
 # fire if invoked standalone
