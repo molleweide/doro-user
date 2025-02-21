@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 
 function command_aliases() (
-	source "$DOROTHY/sources/bash.bash"
-	# source "$DOROTHY/sources/stdinargs.bash"
+  source "$DOROTHY/sources/bash.bash"
+  # source "$DOROTHY/sources/stdinargs.bash"
 
   # short DCA = dorothy command aliases
   # migrate aliases to dorothy
 
-	# =====================================
-	# Arguments
+  # =====================================
+  # Arguments
 
-	function help {
-		cat <<-EOF >/dev/stderr
+  function help {
+    cat <<-EOF >/dev/stderr
 			ABOUT:
 			Helper command for managing "dorothy command aliases" (DCA), which are
 			small executable files that functionally are treated and acts like aliases
@@ -31,7 +31,7 @@ function command_aliases() (
 			    Browse aliases in a convenient manner, eg. show/list/edit/remove/dupl/etc.
 			    This is default if run standalone.
 
-      command-aliases migrate -- [...<alias_file>]
+			      command-aliases migrate -- [...<alias_file>]
 
 			    Parse old aliases/functions from <source> and move them into standalone
 			       DCAs under "user/commands.aliases/*" (*)
@@ -41,48 +41,115 @@ function command_aliases() (
 
 			    Prompt to create new aliase, and put them under (*)
 
+			command-aliases ensure annotated
+
+			    Iterate all DCAs and check which ones do not contain initial
+			    descriptive comments.
 
 		EOF
-		if [[ $# -ne 0 ]]; then
-			echo-error "$@"
-		fi
-		return 22 # EINVAL 22 Invalid argument
-	}
+    if [[ $# -ne 0 ]]; then
+      echo-error "$@"
+    fi
+    return 22 # EINVAL 22 Invalid argument
+  }
 
-	# local option_args=()
-	while [[ $# -ne 0 ]]; do
-		item="$1"
-		shift
-		case "$item" in
-		'--help' | '-h') help ;;
-		'--')
-			# 	option_args+=("$item" "$@")
-			break
-			;;
-			# *) option_args+=("$item") ;;
-		*) help "An unrecognized argument was provided"
-		esac
-	done
+  # local option_args=()
+  while [[ $# -ne 0 ]]; do
+    item="$1"
+    shift
+    case "$item" in
+    '--help' | '-h') help ;;
+    '--')
+      # 	option_args+=("$item" "$@")
+      break
+      ;;
+      # *) option_args+=("$item") ;;
+    *) help "An unrecognized argument was provided" ;;
+    esac
+  done
 
   # ( ) choose
   # ( ) fuzzy-helper
   # BINDINGS
   #   ( ) create new DCA from selection.
-	function act_browse() {
-	  :
-	}
+  function act_browse() {
+    :
+  }
 
   # Use `dorothy-new` command here later when it is finished.
   # ( ) check if name already exists. confirm...
   # ( ) if you specify a path then create sub dirs under (*)
-	function act_create() {
-	  :
-	}
+  function act_create() {
+    :
+  }
 
-  # ( ) use declare -f version to parse aliases
-  # ( ) use complete regexes to capture code chunks
-	function act_migrate() {
-	  :
-	}
+  function act_migrate() {
+    local test_file="$DOROTHY/user/sources/aliases.sh"
+
+    local supported=(
+      sh
+      bash
+      zsh
+      fish
+    )
+    local supported_posix=(
+      sh
+      bash
+      zsh
+      fish
+    )
+    local supported_non_posix=(
+      nu
+      elvish
+      xonsh
+    )
+
+    local interpreter=''
+
+    echo "interpreter = $interpreter"
+
+    # TODO: ( ) parse supported
+    interpreter="$(get-interpreter --name -- "$test_file")"
+    if is-needle "$interpreter" -- "${supported[@]}"; then
+      if is-needle "$interpreter" -- "${supported_posix[@]}"; then
+        # ( ) Parse ids
+
+        local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
+
+        local aliases=() function_names=() function_bodies=()
+
+        mapfile -t aliases < <(grep -E "$aliases" myscript.sh)
+
+        function_names=($(bash -c 'source myscript.sh; declare -F | awk "{print \$3}"'))
+
+        # look at how i do it in _doc_helper.
+        function_bodies=($(bash -c 'source myscript.sh; declare -f | awk "{print \$3}"'))
+
+      elif is-needle "$interpreter" -- "${supported_non_posix[@]}"; then
+        if [[ "$interpreter" == "nu" ]]; then
+          :
+        fi
+      else
+        echo "Interpreter [$interpreter] not supported"
+      fi
+    fi
+
+
+    # TODO: ( ) Create new file for $item in (*)
+    # TODO: ( ) Inject body into file.
+    # TODO: ( ) Update permissions
+    # TODO: ( ) Reload environment
+  }
+
+  act_migrate
 
 )
+
+# fire if invoked standalone
+if [[ $0 == "${BASH_SOURCE[0]}" ]]; then
+  if [[ $* == '--test' ]]; then
+    command_aliases_test
+  else
+    command_aliases "$@"
+  fi
+fi
