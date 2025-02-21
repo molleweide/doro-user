@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+function command_aliases() (
+	source "$DOROTHY/sources/bash.bash"
+	# source "$DOROTHY/sources/stdinargs.bash"
+
+  # short DCA = dorothy command aliases
+  # migrate aliases to dorothy
+
+	# =====================================
+	# Arguments
+
+	function help {
+		cat <<-EOF >/dev/stderr
+			ABOUT:
+			Helper command for managing "dorothy command aliases" (DCA), which are
+			small executable files that functionally are treated and acts like aliases
+			but are much easier to handle. Aliases are stupid and difficult to handle.
+			Therefore using executable files instead for each alias makes them much
+			easier to manage and it comes with the extra benefit that they are
+			cross shell compatible which allows you to switch shell and still use
+			any aliases that you are acustomed to.
+
+			USAGE:
+			command-aliases [<action>] [-- [...<input>]]
+
+			ACTIONS:
+
+			command-aliases browse
+
+			    Browse aliases in a convenient manner, eg. show/list/edit/remove/dupl/etc.
+			    This is default if run standalone.
+
+      command-aliases migrate -- [...<alias_file>]
+
+			    Parse old aliases/functions from <source> and move them into standalone
+			       DCAs under "user/commands.aliases/*" (*)
+
+			command-aliases new
+			command-aliases create
+
+			    Prompt to create new aliase, and put them under (*)
+
+
+		EOF
+		if [[ $# -ne 0 ]]; then
+			echo-error "$@"
+		fi
+		return 22 # EINVAL 22 Invalid argument
+	}
+
+	# local option_args=()
+	while [[ $# -ne 0 ]]; do
+		item="$1"
+		shift
+		case "$item" in
+		'--help' | '-h') help ;;
+		'--')
+			# 	option_args+=("$item" "$@")
+			break
+			;;
+			# *) option_args+=("$item") ;;
+		*) help "An unrecognized argument was provided"
+		esac
+	done
+
+  # ( ) choose
+  # ( ) fuzzy-helper
+  # BINDINGS
+  #   ( ) create new DCA from selection.
+	function act_browse() {
+	  :
+	}
+
+  # Use `dorothy-new` command here later when it is finished.
+  # ( ) check if name already exists. confirm...
+  # ( ) if you specify a path then create sub dirs under (*)
+	function act_create() {
+	  :
+	}
+
+  # ( ) use declare -f version to parse aliases
+  # ( ) use complete regexes to capture code chunks
+	function act_migrate() {
+	  :
+	}
+
+)

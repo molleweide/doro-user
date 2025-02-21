@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 
 function reveal_() (
-	source "$DOROTHY/sources/bash.bash"
+  source "$DOROTHY/sources/bash.bash"
+
+  # reveal as much info about a specific command as possible.
 
   echo "== REVEAL ============================================="
   for cmd in "$@"; do
-    echo "name: $cmd"
-    which "$cmd"
-    type "$cmd"
+    echo "Name: $cmd"
+    echo "Which: $(which "$cmd")"
+    echo-style --dim "$(which -a "$cmd")"
+    echo-style "type: $(type "$cmd")"
+    echo-style "type -p: $(type -p "$cmd")"
+    echo "---------------------------------"
   done
 )
 
 # fire if invoked standalone
 if test "$0" = "${BASH_SOURCE[0]}"; then
-	reveal_ "$@"
+  reveal_ "$@"
 fi
-
