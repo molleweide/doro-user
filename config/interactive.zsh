@@ -7,6 +7,7 @@
 # prompt off
 
 export DOROTHY_THEME="oz"
+# export DOROTHY_THEME="starship"
 
 # load defaults
 # source "$DOROTHY/config/interactive.zsh"
