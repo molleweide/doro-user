@@ -107,12 +107,19 @@ function command_aliases() (
     local test_file="$DOROTHY/user/sources/aliases.sh"
     local shebang_bash="#!/usr/bin/env bash"
 
-    # TODO: ( ) Put all <name> <content> pairs into array.
-    # TODO: ( ) loop
+    # TODO: THIS COMMAND
+    #       ( ) Put all <name> <content> pairs into array.
+    #       ( ) loop
     #           - check if DCA already exists
-    #           - direct output into file
-    # TODO: ( ) Update permissions on DCA dir
-    # TODO: ( ) Reload environment
+    #           - direct output into target location
+    # TODO: CORE
+    #       ( ) Update permissions on DCA dirs
+    #           - recursively
+    #       ( ) Handle environment
+    #           ( ) SEC: Add DCA dirs to path
+    #               - recursively get all sub dirs
+    #               - add to path
+    #               ?? Can we set permissions so all subdirs are executable??
 
     local output_test_string=''
     local output_name_body_mapping=()
