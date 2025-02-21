@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+function mergu_mult_string_arrays() (
+		cat <<-EOF >/dev/stderr
+		This is just for documentation purposes:
+
+			```
+					# mapfile -d '' RESULT_LABELS < <(printf "%s\0" "${META_LABELS[@]}" "${FUNCTION_LABELS[@]}")
+			```
+		EOF
+
+)
