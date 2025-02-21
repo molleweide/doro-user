@@ -4,6 +4,11 @@ function reveal_() (
   source "$DOROTHY/sources/bash.bash"
 
   # reveal as much info about a specific command as possible.
+  # ow
+
+  # TODO: if the file is located in `commands.aliases` then
+  # also print the description of the file!!
+  # or even cat/bat the contents.
 
   echo "== REVEAL ============================================="
   for cmd in "$@"; do
