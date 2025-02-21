@@ -7,6 +7,26 @@ function command_aliases() (
   # short DCA = dorothy command aliases
   # migrate aliases to dorothy
 
+  local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
+
+  local supported=(
+    sh
+    bash
+    zsh
+    fish
+  )
+  local supported_posix=(
+    sh
+    bash
+    zsh
+    fish
+  )
+  local supported_non_posix=(
+    nu
+    elvish
+    xonsh
+  )
+
   # =====================================
   # Arguments
 
@@ -83,55 +103,39 @@ function command_aliases() (
     :
   }
 
-  local supported=(
-    sh
-    bash
-    zsh
-    fish
-  )
-  local supported_posix=(
-    sh
-    bash
-    zsh
-    fish
-  )
-  local supported_non_posix=(
-    nu
-    elvish
-    xonsh
-  )
-
   function act_migrate() {
     local test_file="$DOROTHY/user/sources/aliases.sh"
-
     local shebang_bash="#!/usr/bin/env bash"
 
-    local output=''
+    # TODO: ( ) Put all <name> <content> pairs into array.
+    # TODO: ( ) loop
+    #           - check if DCA already exists
+    #           - direct output into file
+    # TODO: ( ) Update permissions on DCA dir
+    # TODO: ( ) Reload environment
+
+    local output_test_string=''
+    local output_name_body_mapping=()
 
     local interpreter=''
 
-    # TODO: (*) parse supported
-    #           (x) get fn names and bodies
-    #           (x) get aliases
-    #       ( )
-    #
     interpreter="$(get-interpreter --name -- "$test_file")"
     if is-needle "$interpreter" -- "${supported[@]}"; then
 
+      # =======================================================
+      # HANDLE POSIX
+      # =======================================================
+
       if is-needle "$interpreter" -- "${supported_posix[@]}"; then
         local aliases=() function_names=() function_bodies=()
-
-        # =======================================================
-        # HANDLE POSIX
-        # =======================================================
 
         # ----
         # HANDLE POSIX ALIASES
         # ( ) handle comments above??
 
-        output+=$'\n###############################'
-        output+=$'\n# ALIASES'
-        output+=$'\n###############################'
+        output_test_string+=$'\n###############################'
+        output_test_string+=$'\n# ALIASES'
+        output_test_string+=$'\n###############################'
 
         local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
         mapfile -t aliases < <(grep -E "$alias_regex" "$test_file" | echo-trim-each-line)
@@ -150,50 +154,48 @@ function command_aliases() (
             name="${BASH_REMATCH[1]}"
             value="${BASH_REMATCH[2]}"
           fi
-          output+=$'\n#------------------------------'
-          output+=$'\n'"$shebang_bash"
-          output+=$'\n'"# Name: $name"
-          output+=$'\n'"# Desc: $trailing_comment"
-          output+=$'\n'"$value"
+          output_test_string+=$'\n#------------------------------'
+          output_test_string+=$'\n'"$shebang_bash"
+          output_test_string+=$'\n'"# Name: $name"
+          output_test_string+=$'\n'"# Desc: $trailing_comment"
+          output_test_string+=$'\n'"$value"
         done
 
         # ----
         # HANDLE POSIX FUNCTIONS
 
-        output+=$'\n###############################'
-        output+=$'\n# FUNCTIONS'
-        output+=$'\n###############################'
+        output_test_string+=$'\n###############################'
+        output_test_string+=$'\n# FUNCTIONS'
+        output_test_string+=$'\n###############################'
         mapfile -t function_names < <(bash -c 'source '"$test_file"'; declare -F | awk "{print \$3}"')
         local body=''
         for function_name in "${function_names[@]}"; do
           body="$(bash -c 'source '"$test_file"'; declare -f '"$function_name")"
           function_bodies+=("$body")
-          output+=$'\n#------------------------------'
-          output+=$'\n'"$shebang_bash"
-          output+=$'\n'"# Name: $function_name"
-          output+=$'\n'"# Desc: ..."
-          output+=$'\n'"$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
+          output_test_string+=$'\n#------------------------------'
+          output_test_string+=$'\n'"$shebang_bash"
+          output_test_string+=$'\n'"# Name: $function_name"
+          output_test_string+=$'\n'"# Desc: ..."
+          output_test_string+=$'\n'"$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
         done
 
-        # test print output
-        bat --style plain --color always --language bash --paging=never <<<"$output"
+        # test print output_test_string.
+        bat --style plain --color always --language bash --paging=never <<<"$output_test_string"
+
+        # =======================================================
+        # HANDLE OTHER SHELLS BELOW
+        # =======================================================
 
       elif is-needle "$interpreter" -- "${supported_non_posix[@]}"; then
-        # OTHER SHELLS #
+
         if [[ "$interpreter" == "nu" ]]; then
-          # =======================================================
           # HANDLE NUSHELL
-          # =======================================================
           :
         elif [[ "$interpreter" == "elvish" ]]; then
-          # =======================================================
           # HANDLE ELVISH
-          # =======================================================
           :
         elif [[ "$interpreter" == "xonsh" ]]; then
-          # =======================================================
           # HANDLE XONSH
-          # =======================================================
           :
         fi
       else
@@ -201,10 +203,6 @@ function command_aliases() (
       fi
     fi
 
-    # TODO: ( ) Create new file for $item in (*)
-    # TODO: ( ) Inject body into file.
-    # TODO: ( ) Update permissions
-    # TODO: ( ) Reload environment
   }
 
   act_migrate
