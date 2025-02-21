@@ -108,10 +108,7 @@ function command_aliases() (
     local shebang_bash="#!/usr/bin/env bash"
 
     # TODO: THIS COMMAND
-    #       ( ) Put all <name> <content> pairs into array.
-    #       ( ) loop
-    #           - check if DCA already exists
-    #           - direct output into target location
+    #       ( ) fix functions <<
     # TODO: CORE
     #       ( ) Update permissions on DCA dirs
     #           - recursively
@@ -147,7 +144,7 @@ function command_aliases() (
         local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
         mapfile -t aliases < <(grep -E "$alias_regex" "$test_file" | echo-trim-each-line)
         for line_alias in "${aliases[@]}"; do
-          local name='' value='' trailing_comment=''
+          local name='' value='' trailing_comment='' final=''
           # handle trim trailing comment
           if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
             line_alias="${BASH_REMATCH[1]}"
@@ -161,11 +158,13 @@ function command_aliases() (
             name="${BASH_REMATCH[1]}"
             value="${BASH_REMATCH[2]}"
           fi
-          output_test_string+=$'\n#------------------------------'
-          output_test_string+=$'\n'"$shebang_bash"
-          output_test_string+=$'\n'"# Name: $name"
-          output_test_string+=$'\n'"# Desc: $trailing_comment"
-          output_test_string+=$'\n'"$value"
+
+          output_name_body_mapping+=("$name")
+          final+="$shebang_bash"
+          final+=$'\n'"# Name: $name"
+          final+=$'\n'"# Desc: $trailing_comment"
+          final+=$'\n'"$value"
+          output_name_body_mapping+=("$final")
         done
 
         # ----
@@ -186,8 +185,20 @@ function command_aliases() (
           output_test_string+=$'\n'"$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
         done
 
-        # test print output_test_string.
-        bat --style plain --color always --language bash --paging=never <<<"$output_test_string"
+        # ----
+        # loop each <name> <alias> pair
+        local target_path=''
+        for ((i = 0; i < "${#output_name_body_mapping[@]}"; i += 2)); do
+          target_path="$USER_COMMAND_ALIASES_DIR/${output_name_body_mapping[i]}"
+          echo "$target_path"
+          bat --style numbers --color always --language bash --paging=never <<<"${output_name_body_mapping[i + 1]}"
+          # if [[ ! -f "$target_path" ]]; then
+          #   echo "create"
+          #   # echo "${output_name_body_mapping[i + 1]}" >"$target_path"
+          # else
+          #   echo "Path [$(basename "$USER_COMMAND_ALIASES_DIR")/$(basename "$target_path")] already exists!"
+          # fi
+        done
 
         # =======================================================
         # HANDLE OTHER SHELLS BELOW
