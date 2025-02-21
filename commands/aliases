@@ -108,7 +108,9 @@ function command_aliases() (
     local shebang_bash="#!/usr/bin/env bash"
 
     # TODO: THIS COMMAND
-    #       ( ) fix functions <<
+    #       ( ) move to core
+    #       - get-interpreter
+    #       - command-aliases
     # TODO: CORE
     #       ( ) Update permissions on DCA dirs
     #           - recursively
@@ -135,7 +137,6 @@ function command_aliases() (
 
         # ----
         # HANDLE POSIX ALIASES
-        # ( ) handle comments above??
 
         output_test_string+=$'\n###############################'
         output_test_string+=$'\n# ALIASES'
@@ -158,7 +159,6 @@ function command_aliases() (
             name="${BASH_REMATCH[1]}"
             value="${BASH_REMATCH[2]}"
           fi
-
           output_name_body_mapping+=("$name")
           final+="$shebang_bash"
           final+=$'\n'"# Name: $name"
@@ -174,15 +174,35 @@ function command_aliases() (
         output_test_string+=$'\n# FUNCTIONS'
         output_test_string+=$'\n###############################'
         mapfile -t function_names < <(bash -c 'source '"$test_file"'; declare -F | awk "{print \$3}"')
-        local body=''
         for function_name in "${function_names[@]}"; do
+          local final='' body body_trimmed
           body="$(bash -c 'source '"$test_file"'; declare -f '"$function_name")"
-          function_bodies+=("$body")
-          output_test_string+=$'\n#------------------------------'
-          output_test_string+=$'\n'"$shebang_bash"
-          output_test_string+=$'\n'"# Name: $function_name"
-          output_test_string+=$'\n'"# Desc: ..."
-          output_test_string+=$'\n'"$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
+          body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
+          # Capture how many arguments each func snippets takes
+          # This is not perfect but at least it gives some indication.
+          local arguments=()
+          local count=0
+          while read -r line; do
+            local line="$line"
+            while [[ "$line" =~ (\$[0-9]+) ]]; do
+              local match="${BASH_REMATCH[0]}"
+              if ! is-needle "$match" -- "${arguments[@]}"; then
+                arguments+=("$match")
+              fi
+              line="${line/"$match"/}" # Remove the matched part from the line
+              # echo "trim: [$line]"
+              if [[ "$count" == 10 ]]; then
+                break
+              fi
+            done
+          done <<<"$body_trimmed"
+          output_name_body_mapping+=("$function_name")
+          final+="$shebang_bash"
+          final+=$'\n'"# Name: $function_name"
+          final+=$'\n'"# Desc: ..."
+          final+=$'\n'"# Args: ${arguments[*]}"
+          final+=$'\n'"$body_trimmed"
+          output_name_body_mapping+=("$final")
         done
 
         # ----
