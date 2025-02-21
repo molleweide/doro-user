@@ -11,6 +11,12 @@
 
 # echo "user -> sources/ >> load antigen"
 
+echo "zsh cache before antigen: $ZSH_CACHE_DIR"
+
+# TODO: put together some functions to make life easier
+#
+# TODO: maybe migrate to new plugin manager:
+# https://github.com/mattmc3/antidote
 
 source "$ADOTDIR/antigen.zsh"
 
@@ -39,11 +45,24 @@ source "$ADOTDIR/antigen.zsh"
 #   antigen apply
 # }
 
+# antigen cleanup
+
+# omz_plugins=(git nvm pyenv rvm vi-mode)
+# for p in "${omz_plugins[@]}"; do
+#   echo "purge plugin: $p"
+#   antigen purge "$p" --force
+# done
+
+# antigen purge robbyrussell/oh-my-zsh --force
+# antigen reset
+
+echo "zsh cache before bundle OMZ: $ZSH_CACHE_DIR"
 antigen bundle git
 antigen bundle nvm
 antigen bundle pyenv
 antigen bundle rvm
 antigen bundle vi-mode
+echo "zsh cache after bundle OMZ: $ZSH_CACHE_DIR"
 
 # NOTE: replace with https://github.com/Aloxaf/fzf-tab
 # antigen bundle dbalatero/fzf-git
@@ -68,11 +87,14 @@ antigen bundle zsh-users/zsh-completions
 
 antigen bundle hlissner/zsh-autopair
 
+echo "zsh cache before antigen apply: $ZSH_CACHE_DIR"
 antigen apply
+echo "zsh cache after antigen apply: $ZSH_CACHE_DIR"
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
 eval "$(direnv hook zsh)"
 eval "$(fasd --init auto)"
 
+echo "zsh cache after antigen: $ZSH_CACHE_DIR"
 # fi

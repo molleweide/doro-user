@@ -1,21 +1,32 @@
 # reload aliases
 function reload_aliases() {
-	echo "[RELOADING SHELL]"
-	source "$DOROTHY/sources/environment.sh"
-	source "$DOROTHY/sources/interactive.sh"
-	# source "$DOROTHY/user/sources/aliases.sh"
-	# source "$DOROTHY/user/sources/nvim.sh"
-	# source $DOROTHY/user/sources/asdf.bash
-	# source $XDG_CONFIG_HOME/dorothy/sources/aliases.sh
-	# source $XDG_CONFIG_HOME/dorothy/sources/nvim.sh
+  echo "[RELOADING SHELL]"
+  source "$DOROTHY/sources/environment.sh"
+  source "$DOROTHY/sources/interactive.sh"
+  # source "$DOROTHY/user/sources/aliases.sh"
+  # source "$DOROTHY/user/sources/nvim.sh"
+  # source $DOROTHY/user/sources/asdf.bash
+  # source $XDG_CONFIG_HOME/dorothy/sources/aliases.sh
+  # source $XDG_CONFIG_HOME/dorothy/sources/nvim.sh
 }
 alias ralias="reload_aliases"
 alias rl="reload_aliases"
 
 alias il="zsh -il"
 
+# TEST: -----
 
-alias XDH="$XDG_DATA_HOME"
+# function oz() {
+#   source "$DOROTHY/themes/oz"
+#   echo "Load oz prompt"
+#   oztheme zsh "$last_command_exit_status"
+# }
+#
+# # set starship prompt
+# function ss() {
+#   echo "Load starshit prompt"
+#   eval "$(starship init zsh)"
+# }
 
 #------------------------
 #---       TODO       ---
@@ -150,9 +161,9 @@ alias suc="setup-user-configs"
 #--------------------------
 
 function reload_tiling() {
-	brew services restart yabai
-	brew services restart skhd
-	limelight # there is a wierd err msg but it works...
+  brew services restart yabai
+  brew services restart skhd
+  limelight # there is a wierd err msg but it works...
 }
 
 alias rtile="reload_tiling"
@@ -163,7 +174,7 @@ alias rtile="reload_tiling"
 
 # https://egeek.me/2020/04/18/enabling-locate-on-osx/
 if which glocate >/dev/null; then
-	alias locate="glocate -d $HOME/locatedb"
+  alias locate="glocate -d $HOME/locatedb"
 fi
 alias loaddb="locatedb-load"
 
@@ -182,26 +193,26 @@ alias scml="~/.local/bin/sc-im"
 #   - Bypass fuzzy finder if there's only one match (--select-1)
 #   - Exit if there's no match (--exit-0)
 fo() {
-	local files
-	IFS=$'\n' files=($(fzf-tmux --query="$1" --multi --select-1 --exit-0))
-	[[ -n "$files" ]] && ${EDITOR:-vim} "${files[@]}"
+  local files
+  IFS=$'\n' files=($(fzf-tmux --query="$1" --multi --select-1 --exit-0))
+  [[ -n "$files" ]] && ${EDITOR:-vim} "${files[@]}"
 }
 
 # fh [FUZZY PATTERN] - Search in command history
 fz() {
-	print -z $( ([ -n "$ZSH_NAME" ] && fc -l 1 || history) | fzf +s --tac | sed 's/ *[0-9]* *//')
+  print -z $( ([ -n "$ZSH_NAME" ] && fc -l 1 || history) | fzf +s --tac | sed 's/ *[0-9]* *//')
 }
 
 # fuzzy grep via rg and open in vim with line number
 fgr() {
-	local file
-	local line
+  local file
+  local line
 
-	read -r file line <<<"$(rg --no-heading --line-number $@ | fzf -0 -1 | awk -F: '{print $1, $2}')"
+  read -r file line <<<"$(rg --no-heading --line-number $@ | fzf -0 -1 | awk -F: '{print $1, $2}')"
 
-	if [[ -n $file ]]; then
-		vim $file +$line
-	fi
+  if [[ -n $file ]]; then
+    vim $file +$line
+  fi
 }
 
 # ------------------------
@@ -245,26 +256,26 @@ fgr() {
 
 # tmux new session
 tns() {
-	[[ -n "$TMUX" ]] && change="switch-client" || change="attach-session"
-	if [ $1 ]; then
-		tmux $change -t "$1" 2>/dev/null ||
-			(tmux new-session -d -s $1 && tmux $change -t "$1")
-		return
-	fi
-	session=$(tmux list-sessions -F "#{session_name}" 2>/dev/null | fzf --exit-0) &&
-		tmux $change -t "$session" || echo "No sessions found."
+  [[ -n "$TMUX" ]] && change="switch-client" || change="attach-session"
+  if [ $1 ]; then
+    tmux $change -t "$1" 2>/dev/null ||
+      (tmux new-session -d -s $1 && tmux $change -t "$1")
+    return
+  fi
+  session=$(tmux list-sessions -F "#{session_name}" 2>/dev/null | fzf --exit-0) &&
+    tmux $change -t "$session" || echo "No sessions found."
 }
 
 # tm [SESSION_NAME | FUZZY PATTERN] - delete tmux session
 # Running `tm` will let you fuzzy-find a session mame to delete
 # Passing an argument to `ftm` will delete that session if it exists
 tks() {
-	if [ $1 ]; then
-		tmux kill-session -t "$1"
-		return
-	fi
-	session=$(tmux list-sessions -F "#{session_name}" 2>/dev/null | fzf --exit-0) &&
-		tmux kill-session -t "$session" || echo "No session found to delete."
+  if [ $1 ]; then
+    tmux kill-session -t "$1"
+    return
+  fi
+  session=$(tmux list-sessions -F "#{session_name}" 2>/dev/null | fzf --exit-0) &&
+    tmux kill-session -t "$session" || echo "No session found to delete."
 }
 
 # tm [window name | fuzzy pattern]
@@ -297,19 +308,19 @@ alias fn="nnn"
 
 # switch cwd on exit
 function ranger {
-	local IFS=$'\t\n'
-	local tempfile="$(mktemp -t tmp.XXXXXX)"
-	local ranger_cmd=(
-		command
-		ranger
-		--cmd="map Q chain shell echo %d > "$tempfile"; quitall"
-	)
+  local IFS=$'\t\n'
+  local tempfile="$(mktemp -t tmp.XXXXXX)"
+  local ranger_cmd=(
+    command
+    ranger
+    --cmd="map Q chain shell echo %d > "$tempfile"; quitall"
+  )
 
-	${ranger_cmd[@]} "$@"
-	if [[ -f "$tempfile" ]] && [[ "$(cat -- "$tempfile")" != "$(echo -n $(pwd))" ]]; then
-		cd -- "$(cat "$tempfile")" || return
-	fi
-	command rm -f -- "$tempfile" 2>/dev/null
+  ${ranger_cmd[@]} "$@"
+  if [[ -f "$tempfile" ]] && [[ "$(cat -- "$tempfile")" != "$(echo -n $(pwd))" ]]; then
+    cd -- "$(cat "$tempfile")" || return
+  fi
+  command rm -f -- "$tempfile" 2>/dev/null
 }
 
 # #-----------------------
@@ -335,23 +346,23 @@ function ranger {
 #-----------------------
 
 function fco() {
-	git checkout $(git branch -a --sort=-committerdate |
-		cut -c 3- |
-		sed 's/^remotes\/[^/]*\///' |
-		sort |
-		uniq |
-		grep -v HEAD |
-		fzf-tmux -d 20)
+  git checkout $(git branch -a --sort=-committerdate |
+    cut -c 3- |
+    sed 's/^remotes\/[^/]*\///' |
+    sort |
+    uniq |
+    grep -v HEAD |
+    fzf-tmux -d 20)
 }
 
 # fbr [FUZZY PATTERN] - Checkout specified branch
 # Include remote branches, sorted by most recent commit and limited to 30
 fgb() {
-	local branches branch
-	branches=$(git for-each-ref --count=30 --sort=-committerdate refs/heads/ --format="%(refname:short)") &&
-		branch=$(echo "$branches" |
-			fzf-tmux -d $((2 + $(wc -l <<<"$branches"))) +m) &&
-		git checkout $(echo "$branch" | sed "s/.* //" | sed "s#remotes/[^/]*/##")
+  local branches branch
+  branches=$(git for-each-ref --count=30 --sort=-committerdate refs/heads/ --format="%(refname:short)") &&
+    branch=$(echo "$branches" |
+      fzf-tmux -d $((2 + $(wc -l <<<"$branches"))) +m) &&
+    git checkout $(echo "$branch" | sed "s/.* //" | sed "s#remotes/[^/]*/##")
 }
 
 alias gs='git status -sb'
@@ -386,10 +397,10 @@ alias ghprmst="gh pr create --base master"
 # @param repo name
 # @param description
 function ghrc() {
-	gh repo create $1 --public
+  gh repo create $1 --public
 }
 function ghrcc() {
-	gh repo create $1 --public -c
+  gh repo create $1 --public -c
 }
 
 # -----------------------
@@ -425,10 +436,10 @@ alias qmkflash="cd $HOME/code/firmware/qmk-firmware/ && tfl"
 #----------------------------
 
 function krbcp() {
-	# this works but if can take a while before the settings update.
-	# force update by deselecting and then selecting the mod again.
-	make
-	cp public/json/molleweide.json ~/.config/karabiner/assets/complex_modifications
+  # this works but if can take a while before the settings update.
+  # force update by deselecting and then selecting the mod again.
+  make
+  cp public/json/molleweide.json ~/.config/karabiner/assets/complex_modifications
 }
 
 alias karb="/Library/Application\ Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
@@ -485,7 +496,7 @@ alias rh="runhaskell"
 # https://itectec.com/askdifferent/macos-how-to-change-mission-control-shortcuts-from-the-command-line/
 # https://apple.stackexchange.com/questions/398561/how-to-set-system-keyboard-shortcuts-via-command-line
 
-alias ss="screenshot"
+alias g="screenshot" # this does not capture applications ?! only background image?!
 alias sl="computer-sleep"
 
 alias defd="defaults domains | tr ',' '\n'"
@@ -516,24 +527,24 @@ alias md="open -a Markoff $@"
 #-------------------------
 
 function pgrefresh() {
-	rm -fr /usr/local/var/postgres/postmaster.pid
-	brew services restart postgresql
+  rm -fr /usr/local/var/postgres/postmaster.pid
+  brew services restart postgresql
 }
 
 function sslcert() {
-	echo |
-		openssl s_client -showcerts -servername $1 -connect $1:443 2>/dev/null |
-		openssl x509 -inform pem -noout -text
+  echo |
+    openssl s_client -showcerts -servername $1 -connect $1:443 2>/dev/null |
+    openssl x509 -inform pem -noout -text
 }
 
 function cheat() {
-	curl cht.sh/$1
+  curl cht.sh/$1
 }
 
 function opendir() {
-	local file="$1"
-	local dir=$(dirname "$file")
-	open "$dir"
+  local file="$1"
+  local dir=$(dirname "$file")
+  open "$dir"
 }
 
 #---------------------------------
@@ -549,39 +560,39 @@ function opendir() {
 #----------------------------
 
 if [[ -n ${ZSH_VERSION-} ]]; then
-	alias -- -='cd -'
-	alias 1='cd -'
-	alias 2='cd -2'
-	alias 3='cd -3'
-	alias 4='cd -4'
-	alias 5='cd -5'
-	alias 6='cd -6'
-	alias 7='cd -7'
-	alias 8='cd -8'
-	alias 9='cd -9'
+  alias -- -='cd -'
+  alias 1='cd -'
+  alias 2='cd -2'
+  alias 3='cd -3'
+  alias 4='cd -4'
+  alias 5='cd -5'
+  alias 6='cd -6'
+  alias 7='cd -7'
+  alias 8='cd -8'
+  alias 9='cd -9'
 
-	alias ..='cd ..'
-	alias -g ..2='../..'
-	alias -g ..3='../../..'
-	alias -g ..4='../../../..'
-	alias -g ..5='../../../../..'
-	alias -g ...='../..'
-	alias -g ....='../../..'
-	alias -g .....='../../../..'
-	alias -g ......='../../../../..'
+  alias ..='cd ..'
+  alias -g ..2='../..'
+  alias -g ..3='../../..'
+  alias -g ..4='../../../..'
+  alias -g ..5='../../../../..'
+  alias -g ...='../..'
+  alias -g ....='../../..'
+  alias -g .....='../../../..'
+  alias -g ......='../../../../..'
 
-	# alias zshrc='$VISUAL "${ZDOTDIR:-$HOME}"/.zshrc'
-	alias reload='source "${ZDOTDIR:-$HOME}"/.zshrc'
-	alias zbench='export LAZY_PROMPT=false; for i in $(seq 1 10); do; /usr/bin/time zsh -i -c exit; done; unset LAZY_PROMPT'
-	alias zdot='cd $ZDOTDIR'
+  # alias zshrc='$VISUAL "${ZDOTDIR:-$HOME}"/.zshrc'
+  alias reload='source "${ZDOTDIR:-$HOME}"/.zshrc'
+  alias zbench='export LAZY_PROMPT=false; for i in $(seq 1 10); do; /usr/bin/time zsh -i -c exit; done; unset LAZY_PROMPT'
+  alias zdot='cd $ZDOTDIR'
 
-	# zsh pipes
-	alias -g H='| head'
-	alias -g T='| tail'
-	alias -g G='| grep -E'
-	alias -g S='| sort'
-	alias -g L='| less'
-	alias -g M='| more'
+  # zsh pipes
+  alias -g H='| head'
+  alias -g T='| tail'
+  alias -g G='| grep -E'
+  alias -g S='| sort'
+  alias -g L='| less'
+  alias -g M='| more'
 fi
 
 # # mask built-ins with better defaults
@@ -823,21 +834,21 @@ alias herl="heroku local web"
 
 # linux equivalents on macos
 if is-mac; then
-	# display free memory / linux `free` equiv https://superuser.com/questions/521681/what-is-the-mac-osx-equivalent-of-free-m
-	function freem() {
-		echo $(($(sysctl -a | awk '/memsize/{print $2}') / 2 ** 30))
-	}
+  # display free memory / linux `free` equiv https://superuser.com/questions/521681/what-is-the-mac-osx-equivalent-of-free-m
+  function freem() {
+    echo $(($(sysctl -a | awk '/memsize/{print $2}') / 2 ** 30))
+  }
 
-	# dmidecode
+  # dmidecode
 
-	# lshw
+  # lshw
 
-	# hwinfo
+  # hwinfo
 
-	# lscpu
+  # lscpu
 
-	# lspci
+  # lspci
 
-	# /proc/cpuinfo
+  # /proc/cpuinfo
 
 fi

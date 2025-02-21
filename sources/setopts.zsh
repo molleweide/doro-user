@@ -1,4 +1,4 @@
-unsetopt PROMPT_SP # i believe this removes ^% sign in prompt
+# unsetopt PROMPT_SP # i believe this removes ^% sign in prompt
 
 # Maintain a stack of cd directory traversals for `popd`
 # setopt AUTO_PUSHD
