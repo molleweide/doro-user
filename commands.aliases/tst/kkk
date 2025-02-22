@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Name: kkk
+# Desc: testing ???
+ls df -f "$@"

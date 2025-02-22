@@ -3,8 +3,6 @@
 # FIX: ( ) Apply correct return/exit statuses wherever something returns
 #
 # TODO:
-# (*) create_aliases
-#       Put handle (file creation) and (permission correction) in the same func
 # ( ) Only allow N alias subdir depth
 # MOVE TO CORE
 # - ( ) aliases
@@ -33,6 +31,8 @@ function command_aliases() (
 	local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
 	local SHEBANG_BASH="#!/usr/bin/env bash"
 	local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
+
+	local ALLOW_MAX_SUB_DIRS=2
 
 	local ALL_EXISTING_ALIAS_PATHS=()
 	local ALL_EXISTING_ALIAS_BASENAMES=()
@@ -149,11 +149,6 @@ function command_aliases() (
 		esac
 	done
 
-	if [[ -z "$option_action" ]]; then
-		# help "No action provided"
-		option_action="browse"
-	fi
-
 	# =======================================================
 	# HELPER
 
@@ -162,6 +157,9 @@ function command_aliases() (
 	}
 
 	function reset_failure_arrays() {
+		NEW_ALIAS_NAMES=()
+		NEW_ALIAS_PATHS=()
+		NEW_ALIAS_CONTENTS=()
 		FAILING_ALIAS_NAMES=()
 		FAILING_ALIAS_PATHS=()
 		FAILING_ALIAS_CONTENTS=()
@@ -197,6 +195,14 @@ function command_aliases() (
 		fi
 	}
 
+	function is_valid_subdir_depth() {
+		local check_str="$1" parts=()
+		IFS='/' read -ra parts <<<"$check_str"
+		if [[ "${#parts[@]}" -gt $ALLOW_MAX_SUB_DIRS ]]; then
+			return 1
+		fi
+	}
+
 	# get paths of existing aliases
 	function get_all_command_aliases() {
 		local regex_rm_paths_with_files_extension='\.[^/]+$'
@@ -205,6 +211,7 @@ function command_aliases() (
 
 	function collect_existing_alias_info() {
 		ALL_EXISTING_ALIAS_BASENAMES=()
+		ALL_EXISTING_ALIAS_PATHS=()
 		while read -r line; do
 			ALL_EXISTING_ALIAS_PATHS+=("$line")
 			ALL_EXISTING_ALIAS_BASENAMES+=("$(basename "$line")")
@@ -266,7 +273,7 @@ function command_aliases() (
 	}
 
 	function try_create_alias_file() {
-		local content=$1 path=$2 status
+		local content=$1 path=$2 status=0
 		__mkdirp "$(dirname "$path")"
 		echo "$content" >"$path" || status=$?
 		return "$status"
@@ -299,6 +306,12 @@ function command_aliases() (
 				reason="Failure creating alias [$(short_name_from_path "$path")]!"
 				successful_paths+=("$path")
 				echo-style --error "$reason"
+			else
+				echo-style --success "Successfully created alias [$(short_name_from_path "$path")]"
+				# add to existing here so the unique checks will work correctly in the
+				# act_create loop
+				ALL_EXISTING_ALIAS_BASENAMES+=("$name")
+				ALL_EXISTING_ALIAS_PATHS+=("$path")
 			fi
 
 			if [[ "$failure" == 'yes' ]]; then
@@ -322,14 +335,14 @@ function command_aliases() (
 
 		# 1 complete failure
 		# 2 partial failure. some paths succeeded
-		if [[ "$failure" == 'yes' ]]; then
+		if [[ "$failure" == 'no' ]]; then
+			return 0
+		else
 			if [[ "$complete_failure" == 'yes' ]]; then
 				return 1
 			else
 				return 2
 			fi
-		else
-			return 0
 		fi
 
 	}
@@ -375,6 +388,7 @@ function command_aliases() (
 	# ( ) check if name already exists. confirm...
 	# ( ) if you specify a path then create sub dirs under (*)
 	function act_create() {
+		reset_failure_arrays
 		local new_alias_name='' new_alias_path='' value=''desc='' sub_path='' confirm_final='' new_alias_content=''
 		new_alias_name="$(ask --linger 'Aliases create | What will the NAME be?')"
 		value="$(ask --linger 'Aliases create | What will the VALUE be?')"
@@ -383,6 +397,9 @@ function command_aliases() (
 		# validate and confirm
 		if confirm --ppid=$$ --negative -- 'Aliases create | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?'; then
 			sub_path="$(ask --linger 'Aliases create | What will the SUB PATH be?')"
+
+			# TODO: only allow ALLOW_MAX_SUB_DIRS
+
 			# ensure valid subpath
 			while :; do
 				if ! is_valid_path "$sub_path"; then
@@ -400,7 +417,8 @@ function command_aliases() (
 		new_alias_content+="$SHEBANG_BASH"
 		new_alias_content+=$'\n'"# Name: $new_alias_name"
 		new_alias_content+=$'\n'"# Desc: $desc"
-		new_alias_content+=$'\n'"$value"'"$@"'
+		new_alias_content+=$'\n'"$value"
+		new_alias_content+=' "$@"'
 
 		create_alias_at="$(make_destination "$sub_path")"
 
@@ -418,14 +436,32 @@ function command_aliases() (
 		NEW_ALIAS_PATHS+=("$new_alias_path")
 		NEW_ALIAS_CONTENTS+=("$new_alias_content")
 
+		# TODO: prompt choose select which part of the new alias you want to
+		# change/redo.
+
 		if confirm --ppid=$$ --positive -- "$confirm_final"; then
-			if try_create_alias_files; then
-				correct_permissions "$create_alias_at/$new_alias_name"
-			else
-				: # Failure, prompt redo process..
+
+			# NOTE: I need to check the err tests to understand why this exists
+			# without eval_capture
+
+			local status
+			eval_capture --statusvar=status -- try_create_alias_files
+			# echo "status: $status"
+			# if try_create_alias_files; then
+			if [[ "$status" -ne 0 ]]; then
+				local label
+				label="[$status] Creating alias [$(short_name_from_path "$new_alias_path")] failed with reason:"$'\n'
+				label+="REASON: ${FAILING_ALIAS_REASON[0]}"
+				if confirm --ppid=$$ --positive -- "$label"; then
+
+					# TODO: only prompt to redo the variable that causes the failure,
+					# eg. the name / invalid value / desc.
+					act_create
+				fi
 			fi
-		else
-			: # Failure, prompt redo process..
+
+			# TODO: Prompt continue add another alias??
+
 		fi
 	}
 
@@ -553,21 +589,9 @@ function command_aliases() (
 
 					try_create_alias_files
 
-					# # ----
-					# # loop each <name> <alias> pair
-					# local new_alias_paths=()
-					# local target_path='' target_paths=()
-					# for ((i = 0; i < "${#output_name_body_mapping[@]}"; i += 2)); do
-					# 	target_path="$destination_sub_dir/${output_name_body_mapping[i]}"
-					# 	# echo "$target_path"
-					# 	new_alias_paths+=("$target_path")
-					# 	# try_create_alias_file "${output_name_body_mapping[i + 1]}" "$target_path"
-					# done
-					#
-					# # ensure permissions
-					# if [[ "${#new_alias_paths[@]}" -gt 0 ]]; then
-					# 	correct_permissions "${new_alias_paths[@]}"
-					# fi
+					# TODO: If any failures, prompt do you want to discard them or
+					# edit them?
+					# Reuse the logic from act_create here.
 
 					# =======================================================
 					# HANDLE OTHER SHELLS BELOW
@@ -601,7 +625,19 @@ function command_aliases() (
 	# =======================================================
 	# PREPARE
 
-	# because we collect things here, I can clean up some redundancy below.
+	if [[ -z "$option_action" ]]; then
+		# help "No action provided"
+		option_action="browse"
+	fi
+
+	if [[ -n "$option_migrate_to_subdir" ]]; then
+		if ! is_valid_subdir_depth "$option_migrate_to_subdir"; then
+			echo-style --error "Maximum sub dir depth allowed is [$ALLOW_MAX_SUB_DIRS]"
+			exit
+		fi
+	fi
+
+	# Because we collect things here, I can clean up some redundancy below.
 	collect_existing_alias_info
 
 	# =======================================================
