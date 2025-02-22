@@ -4,7 +4,7 @@
 #
 # TODO:
 # (*) Handle conflicts with nested aliases eg. [gs, sub/gs,...]
-#       ensure_unique()
+#       is_unique_alias()
 # (*) create_aliases
 #       Put handle (file creation) and (permission correction) in the same func
 # ( ) Only allow N alias subdir depth
@@ -31,7 +31,9 @@ function command_aliases() (
 	local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
 	local SHEBANG_BASH="#!/usr/bin/env bash"
 	local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
-	local ALL_ALIAS_BASENAMES=()
+
+	local ALL_EXISTING_ALIAS_PATHS=()
+	local ALL_EXISTING_ALIAS_BASENAMES=()
 
 	local supported=(
 		sh
@@ -165,9 +167,18 @@ function command_aliases() (
 
 	}
 
+	# get paths of existing aliases
 	function get_all_command_aliases() {
 		local regex_rm_paths_with_files_extension='\.[^/]+$'
 		find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
+	}
+
+	function collect_existing_alias_info() {
+		ALL_EXISTING_ALIAS_BASENAMES=()
+		while read -r line; do
+			ALL_EXISTING_ALIAS_PATHS+=("$line")
+			ALL_EXISTING_ALIAS_BASENAMES+=("$(basename "$line")")
+		done < <(echo-lines -- "$(get_all_command_aliases)" | echo-trim-empty-lines --stdin)
 	}
 
 	function add_command_aliases_dirs_to_path() {
@@ -207,6 +218,12 @@ function command_aliases() (
 
 	function try_create_alias_file() {
 		local data=$1 destination=$2
+
+		if ! is_unique_alias "$(basename "$destination")"; then
+			echo "???"
+			return 1
+		fi
+
 		if [[ ! -f "$destination" ]]; then
 			: # echo "$data" >"$destination"
 		else
@@ -234,16 +251,19 @@ function command_aliases() (
 	}
 
 	# with nested alias subdirs we have to check for uniqueness
-	function ensure_unique() {
-		:
-		# - collect all alias basenames in a global array
-		#   ALL_ALIAS_BASENAMES
-		# - is-needle
-		#     if is-needle "$alias" -- "${ALL_ALIAS_BASENAMES[@]}"; then
-		#       return 1
-		#     fi
+	function is_unique_alias() {
+		local alias=$1
+		if is-needle "$alias" -- "${ALL_EXISTING_ALIAS_BASENAMES[@]}"; then
+			echo-style --error "Alias with this name alriady exists" >/dev/tty
+			return 1
+		fi
+		#
 		#     >> [is-needle --all ...] can be used to process multiple needles.
 		#     >>>>>>> use this when migrating files
+		#       if is-needle --all "$@" -- "${ALL_EXISTING_ALIAS_BASENAMES[@]}"; then
+		#       	return 1
+		#       fi
+		#     >>> but this is not good because it makes all aliases fail
 	}
 
 	# =======================================================
@@ -477,6 +497,12 @@ function command_aliases() (
 			migrate_single_file "$migrate_file"
 		done
 	}
+
+	# =======================================================
+	# PREPARE
+
+	# because we collect things here, I can clean up some redundancy below.
+	collect_existing_alias_info
 
 	# =======================================================
 	# Act
