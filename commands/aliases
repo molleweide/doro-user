@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
-# TODO: validate paths
+# FIX: ( ) Apply correct return/exit statuses wherever something returns
 
 # TODO: MOVE TO CORE
 #       - ( ) get-interpreter
 #       - ( ) command-aliases
+#       - ( ) is-valid-path
 # TODO: CORE
 #       ( ) Update permissions on DCA dirs
 #           - recursively
@@ -13,6 +14,12 @@
 #               - recursively get all sub dirs
 #               - add to path
 #               ?? Can we set permissions so all subdirs are executable??
+function command_aliases_test() (
+  # Test that aliases are migrated and parsed correctly. Handle:
+  # - surrounding comments properly.
+  # - collect arguments order and naming?
+  :
+)
 
 function command_aliases() (
   source "$DOROTHY/sources/bash.bash"
@@ -119,23 +126,44 @@ function command_aliases() (
       shift $#
       break
       ;;
-    # *)
-    #   if [[ ${#option_needles[@]} -eq 0 ]]; then
-    #     option_needles+=("$item")
-    #   else
-    #     option_args+=("$item")
-    #   fi
-    #   ;;
-
+    *)
+      help "Unknown argument was provided"
+      ;;
     esac
   done
 
   if [[ -z "$option_action" ]]; then
-    help "No action provided"
+    # help "No action provided"
+    option_action="browse"
   fi
 
   # =======================================================
   # HELPER
+
+  # Ensure the path contains only valid characters
+  # ( ) make standalone w/[--subpath --absolute --relative]
+  function is_valid_path() {
+    local input=$1
+    local initial_slash="/?"
+    local trailing_slash="/?"
+    local special_chars_last="._-"
+    # local char_classes="A-Za-z0-9"
+    local char_classes="[:alpha:][:digit:]"
+    local valid_chars="([$char_classes/]+)"
+    local start='^'
+    local end='$'
+    # local regex='^(/)?([^/\0]+(/)?)+$'
+    # local regex='^/?([A-Za-z0-9._-]+/?)*$'
+    local regex="$start$valid_chars$end"
+
+    if [[ ! "$input" =~ $regex ]]; then
+      echo "invalid path" >/dev/tty
+      return 1
+    else
+      echo "valid path" >/dev/tty
+    fi
+
+  }
 
   function make_destination() {
     if [[ -n "$option_migrate_to" ]]; then
@@ -205,9 +233,24 @@ function command_aliases() (
     name="$(ask --linger 'Aliases create | What will the NAME be?')"
     value="$(ask --linger 'Aliases create | What will the VALUE be?')"
     desc="$(ask --linger 'Aliases create | What will the DESC be?')"
+
+    # validate and confirm
     if confirm --ppid=$$ --positive -- 'Aliases create | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?'; then
       sub_path="$(ask --linger 'Aliases create | What will the SUB PATH be?')"
+      # ensure valid subpath
+      while :; do
+        if ! is_valid_path "$sub_path"; then
+          echo "Enter invalid"
+          sub_path="$(ask --linger "[$sub_path] is not valid | Input sub path again:")"
+        elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
+          sub_path="$(ask --linger "Input subpath again:")"
+        else
+          echo "OK"
+          break
+        fi
+      done
     fi
+
     local final=''
     final+="$SHEBANG_BASH"
     final+=$'\n'"# Name: $name"
@@ -224,9 +267,11 @@ function command_aliases() (
     confirm_final="Aliases create | Proceed and create alias at ["$(basename "$USER_COMMAND_ALIASES_DIR")"$sub_path_question/$name]?"$'\n'
     confirm_final+="$(bat --style numbers --color always --language bash --paging=never <<<"$final")"
 
-    # TODO: while loop -> select new name if path already exists.
     if confirm --ppid=$$ --positive -- "$confirm_final"; then
       create_file "$final" "$create_alias_at/$name"
+    else
+      # Redo process
+      :
     fi
   }
 
@@ -234,6 +279,10 @@ function command_aliases() (
     local migrate_aliases_to
 
     migrate_aliases_to="$(make_destination)"
+
+    if ! is_valid_path "$migrate_aliases_to"; then
+      exit 1
+    fi
 
     function migrate_single_file() {
       local input_file=$1
