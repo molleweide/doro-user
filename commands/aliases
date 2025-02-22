@@ -3,8 +3,6 @@
 # FIX: ( ) Apply correct return/exit statuses wherever something returns
 #
 # TODO:
-# (*) Handle conflicts with nested aliases eg. [gs, sub/gs,...]
-#       is_unique_alias()
 # (*) create_aliases
 #       Put handle (file creation) and (permission correction) in the same func
 # ( ) Only allow N alias subdir depth
