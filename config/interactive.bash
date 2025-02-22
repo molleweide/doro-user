@@ -4,7 +4,7 @@
 
 export DOROTHY_THEME="starship"
 
-# load defaults
+# load defaultn
 source "$DOROTHY/config/interactive.bash"
 
 # load cross shell `sh` files

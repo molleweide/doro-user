@@ -1,19 +1,14 @@
 #!/usr/bin/env bash
 
 # FIX: ( ) Apply correct return/exit statuses wherever something returns
+#
+# TODO: (*) handle permissions
+#       (*) add aliases to path
 
 # TODO: MOVE TO CORE
 #       - ( ) get-interpreter
 #       - ( ) command-aliases
 #       - ( ) is-valid-path
-# TODO: CORE
-#       ( ) Update permissions on DCA dirs
-#           - recursively
-#       ( ) Handle environment
-#           ( ) SEC: Add DCA dirs to path
-#               - recursively get all sub dirs
-#               - add to path
-#               ?? Can we set permissions so all subdirs are executable??
 function command_aliases_test() (
   # Test that aliases are migrated and parsed correctly. Handle:
   # - surrounding comments properly.
@@ -165,6 +160,35 @@ function command_aliases() (
 
   }
 
+  function get_all_command_aliases() {
+    local regex_rm_paths_with_files_extension='\.[^/]+$'
+    find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
+  }
+
+  function add_command_aliases_dirs_to_path() {
+    local path='' alias_dirs=()
+    mapfile -t alias_dirs < <(find "$USER_COMMAND_ALIASES_DIR" -type d)
+    # __print_lines "${alias_dirs[@]}"
+    local path=''
+    for p in "${alias_dirs[@]}" ; do
+      path+="$p:"
+    done
+    echo "$path$PATH"
+    # export PATH
+  }
+
+  function correct_permissions() {
+    if [[ $# -eq 0 ]]; then
+      # correct permissions for all aliases
+      local alias_paths=()
+      mapfile -t alias_paths < <(get_all_command_aliases)
+      fs-own --x -- "${alias_paths[@]}"
+    else
+      # correct permissions for inpus only
+      fs-own --x -- "$@"
+    fi
+  }
+
   function make_destination() {
     if [[ -n "$option_migrate_to" ]]; then
       echo "$USER_COMMAND_ALIASES_DIR/$option_migrate_to"
@@ -176,7 +200,7 @@ function command_aliases() (
 
   }
 
-  function create_file() {
+  function try_create_alias_file() {
     local data=$1 destination=$2
     # TODO: uncomment creation
     if [[ ! -f "$destination" ]]; then
@@ -184,6 +208,7 @@ function command_aliases() (
     # echo "$data" >"$destination"
     else
       echo "Alias at [$(basename "$USER_COMMAND_ALIASES_DIR")/"$(basename "$destination")"] already exists!"
+      return 1
     fi
   }
 
@@ -195,14 +220,13 @@ function command_aliases() (
   # BINDINGS
   #   ( ) create new DCA from selection.
   function act_browse() {
-
     local regex_rm_paths_with_files_extension='\.[^/]+$'
     local alias_paths=()
     local alias_names=()
     local alias_labels=()
 
     # -maxdepth 1
-    mapfile -t alias_paths < <(find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension")
+    mapfile -t alias_paths < <(get_all_command_aliases)
     for path in "${alias_paths[@]}"; do
       local header contents
       # ${path#*"commands.aliases"} does not work for trimming everything before
@@ -268,10 +292,13 @@ function command_aliases() (
     confirm_final+="$(bat --style numbers --color always --language bash --paging=never <<<"$final")"
 
     if confirm --ppid=$$ --positive -- "$confirm_final"; then
-      create_file "$final" "$create_alias_at/$name"
+      if try_create_alias_file "$final" "$create_alias_at/$name"; then
+        correct_permissions "$create_alias_at/$name"
+      else
+        : # Failure, prompt redo process..
+      fi
     else
-      # Redo process
-      :
+      : # Failure, prompt redo process..
     fi
   }
 
@@ -374,13 +401,18 @@ function command_aliases() (
 
           # ----
           # loop each <name> <alias> pair
-          local target_path=''
+          local target_path='' target_paths=()
           for ((i = 0; i < "${#output_name_body_mapping[@]}"; i += 2)); do
             target_path="$migrate_aliases_to/${output_name_body_mapping[i]}"
             echo "$target_path"
             bat --style numbers --color always --language bash --paging=never <<<"${output_name_body_mapping[i + 1]}"
-            create_file "${output_name_body_mapping[i + 1]}" "$target_path"
+            try_create_alias_file "${output_name_body_mapping[i + 1]}" "$target_path"
           done
+
+          # ensure permissions
+          if [[ "${#new_alias_paths}" -gt 0 ]]; then
+            correct_permissions "${new_alias_paths[@]}"
+          fi
 
           # =======================================================
           # HANDLE OTHER SHELLS BELOW

@@ -72,7 +72,6 @@ source "$ADOTDIR/antigen.zsh"
 
 # echo "zsh cache before bundle OMZ: $ZSH_CACHE_DIR"
 
-
 # https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/git
 # source code: https://github.com/ohmyzsh/ohmyzsh/blob/master/plugins/git/git.plugin.zsh
 # patch alias to list all aliases.
