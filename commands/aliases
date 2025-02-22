@@ -12,7 +12,8 @@
 # - ( ) command-aliases
 # - ( ) is-valid-path
 
-# investigate AI for organizing the aliases
+# TEST: Investigate AI for organizing the aliases.
+#
 
 function command_aliases_test() (
 	# Test that aliases are migrated and parsed correctly. Handle:
@@ -35,6 +36,8 @@ function command_aliases() (
 
 	local ALL_EXISTING_ALIAS_PATHS=()
 	local ALL_EXISTING_ALIAS_BASENAMES=()
+
+	local GO_LIVE='no'
 
 	local supported=(
 		sh
@@ -225,8 +228,8 @@ function command_aliases() (
 			return 1
 		fi
 
-		if [[ ! -f "$destination" ]]; then
-			: # echo "$data" >"$destination"
+		if [[ ! -f "$destination" && "$GO_LIVE" = 'yes' ]]; then
+			echo "$data" >"$destination"
 		else
 			echo "Alias at [$(basename "$USER_COMMAND_ALIASES_DIR")/"$(basename "$destination")"] already exists!"
 			return 1
@@ -234,6 +237,15 @@ function command_aliases() (
 	}
 
 	# takes an array of <alias_path> <content> mappings
+	#
+	# 1. take an array of each <name>
+	# 2. get <path> and <content> from arrays NEW_PATHS, and NEW_CONTENTS
+	# 3. Loop creating each alias, and correcting permissions.
+	# 4. Collect all aliases that could not be created.
+	# 5. Put these names into FAILURES array.
+	# 6. Prompt user if we want to rectify these failures
+	#       a. by fixing the name conflicts,
+	#       b. OR, override existing alias conflicts.
 	function create_aliases() {
 		: #
 		# SINGLE
