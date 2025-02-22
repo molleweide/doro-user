@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# TODO:
-# ( ) browse
-#       reuse doc_helper
-
 # TODO: validate paths
 
 # TODO: MOVE TO CORE
@@ -27,6 +23,7 @@ function command_aliases() (
 
   local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
   local SHEBANG_BASH="#!/usr/bin/env bash"
+  local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
 
   local supported=(
     sh
@@ -170,7 +167,34 @@ function command_aliases() (
   # BINDINGS
   #   ( ) create new DCA from selection.
   function act_browse() {
-    :
+
+    local regex_rm_paths_with_files_extension='\.[^/]+$'
+    local alias_paths=()
+    local alias_names=()
+    local alias_labels=()
+
+    # -maxdepth 1
+    mapfile -t alias_paths < <(find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension")
+    for path in "${alias_paths[@]}"; do
+      local header contents
+      # ${path#*"commands.aliases"} does not work for trimming everything before
+      # the match pattern. That is why the string looks a bit weird below.
+      header="commands${path#*"commands"}"
+      contents="$("${BAT_CMD[@]}" "$path")"
+      alias_names+=("$header")
+      alias_labels+=("$header"$'\n'"$contents")
+    done
+
+    __print_lines "${alias_labels[@]}"
+
+    local index=0 choose_title="Aliases | Browser"
+    while :; do
+      index="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${alias_labels[@]}")"
+      if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
+        break
+      fi
+    done
+
   }
 
   # Use `dorothy-new` command here later when it is finished.
@@ -188,12 +212,12 @@ function command_aliases() (
     final+="$SHEBANG_BASH"
     final+=$'\n'"# Name: $name"
     final+=$'\n'"# Desc: $desc"
-    final+=$'\n'"$value"
+    final+=$'\n'"$value"'"$@"'
 
     create_alias_at="$(make_destination "$sub_path")"
 
     local sub_path_question=''
-    if [[ -n "$sub_path" ]] ; then
+    if [[ -n "$sub_path" ]]; then
       sub_path_question="/$sub_path"
     fi
 
@@ -257,7 +281,7 @@ function command_aliases() (
             final+="$SHEBANG_BASH"
             final+=$'\n'"# Name: $name"
             final+=$'\n'"# Desc: $trailing_comment"
-            final+=$'\n'"$value"
+            final+=$'\n'"$value "'"$@"'
             output_name_body_mapping+=("$final")
           done
 
@@ -306,7 +330,7 @@ function command_aliases() (
             target_path="$migrate_aliases_to/${output_name_body_mapping[i]}"
             echo "$target_path"
             bat --style numbers --color always --language bash --paging=never <<<"${output_name_body_mapping[i + 1]}"
-            create_file "${output_name_body_mapping[i + 1]}"  "$target_path"
+            create_file "${output_name_body_mapping[i + 1]}" "$target_path"
           done
 
           # =======================================================
