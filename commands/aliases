@@ -3,10 +3,11 @@
 # FIX: ( ) Apply correct return/exit statuses wherever something returns
 #
 # TODO:
-# ( ) Handle conflicts with nested aliases eg. [gs, sub/gs,...]
+# (*) Handle conflicts with nested aliases eg. [gs, sub/gs,...]
 #       ensure_unique()
+# (*) create_aliases
+#       Put handle (file creation) and (permission correction) in the same func
 # ( ) Only allow N alias subdir depth
-# ( ) create_aliases
 # MOVE TO CORE
 # - ( ) aliases
 # - ( ) get-interpreter
@@ -30,6 +31,7 @@ function command_aliases() (
 	local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
 	local SHEBANG_BASH="#!/usr/bin/env bash"
 	local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
+	local ALL_ALIAS_BASENAMES=()
 
 	local supported=(
 		sh
@@ -234,6 +236,14 @@ function command_aliases() (
 	# with nested alias subdirs we have to check for uniqueness
 	function ensure_unique() {
 		:
+		# - collect all alias basenames in a global array
+		#   ALL_ALIAS_BASENAMES
+		# - is-needle
+		#     if is-needle "$alias" -- "${ALL_ALIAS_BASENAMES[@]}"; then
+		#       return 1
+		#     fi
+		#     >> [is-needle --all ...] can be used to process multiple needles.
+		#     >>>>>>> use this when migrating files
 	}
 
 	# =======================================================
@@ -330,7 +340,7 @@ function command_aliases() (
 		local migrate_aliases_to
 
 		if ! is_valid_path "$option_migrate_to"; then
-		  echo-style --error "Supplied invalid sub path: [$option_migrate_to]"
+			echo-style --error "Supplied invalid sub path: [$option_migrate_to]"
 			exit 1
 		fi
 
