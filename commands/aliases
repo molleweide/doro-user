@@ -311,10 +311,13 @@ function command_aliases() (
 
 		# bulk correct permissions
 		# do we have to capture failers with permission as well?
-		complete_failure='yes'
 		if [[ "${#successful_paths[@]}" -gt 0 ]]; then
-			complete_failure='no'
 			correct_permissions "${successful_paths[@]}"
+		fi
+
+		local complete_failure='yes'
+		if [[ "${#successful_paths[@]}" == "${#NEW_ALIAS_NAMES[@]}" ]]; then
+			complete_failure='no'
 		fi
 
 		# 1 complete failure
