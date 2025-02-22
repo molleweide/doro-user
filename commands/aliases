@@ -11,6 +11,9 @@
 # - ( ) get-interpreter
 # - ( ) command-aliases
 # - ( ) is-valid-path
+
+# investigate AI for organizing the aliases
+
 function command_aliases_test() (
 	# Test that aliases are migrated and parsed correctly. Handle:
 	# - surrounding comments properly.
@@ -107,13 +110,13 @@ function command_aliases() (
 	}
 
 	# local option_args=()
-	local option_action='' option_migrate_to='' option_args=()
+	local option_action='' option_migrate_to_subdir='' option_args=()
 	while [[ $# -ne 0 ]]; do
 		item="$1"
 		shift
 		case "$item" in
 		'--help' | '-h') help ;;
-		'--to='*) option_migrate_to="${item#*=}" ;;
+		'--to='*) option_migrate_to_subdir="${item#*=}" ;;
 		'browse') option_action="browse" ;;
 		'new' | 'create') option_action="create" ;;
 		'migrate') option_action="migrate" ;;
@@ -162,7 +165,6 @@ function command_aliases() (
 		# else
 		# 	echo "valid path" >/dev/tty
 		fi
-
 	}
 
 	# get paths of existing aliases
@@ -194,6 +196,7 @@ function command_aliases() (
 	# if no args, then correct permissions for all alias paths
 	# else, correct permissions for input <path>s
 	function correct_permissions() {
+	  return
 		if [[ $# -eq 0 ]]; then
 			local alias_paths=()
 			mapfile -t alias_paths < <(get_all_command_aliases)
@@ -204,8 +207,8 @@ function command_aliases() (
 	}
 
 	function make_destination() {
-		if [[ -n "$option_migrate_to" ]]; then
-			echo "$USER_COMMAND_ALIASES_DIR/$option_migrate_to"
+		if [[ -n "$option_migrate_to_subdir" ]]; then
+			echo "$USER_COMMAND_ALIASES_DIR/$option_migrate_to_subdir"
 		elif [[ -n "${1-}" ]]; then
 			echo "$USER_COMMAND_ALIASES_DIR/$1"
 		else
@@ -249,6 +252,9 @@ function command_aliases() (
 	}
 
 	# with nested alias subdirs we have to check for uniqueness
+	# TODO: check if the name exists in the PATH, to prevent conflict
+	# with existing commands.
+	# which -a
 	function is_unique_alias() {
 		local alias=$1
 		if is-needle "$alias" -- "${ALL_EXISTING_ALIAS_BASENAMES[@]}"; then
@@ -311,7 +317,7 @@ function command_aliases() (
 		desc="$(ask --linger 'Aliases create | What will the DESC be?')"
 
 		# validate and confirm
-		if confirm --ppid=$$ --positive -- 'Aliases create | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?'; then
+		if confirm --ppid=$$ --negative -- 'Aliases create | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?'; then
 			sub_path="$(ask --linger 'Aliases create | What will the SUB PATH be?')"
 			# ensure valid subpath
 			while :; do
@@ -357,8 +363,8 @@ function command_aliases() (
 	function act_migrate() {
 		local migrate_aliases_to
 
-		if ! is_valid_path "$option_migrate_to"; then
-			echo-style --error "Supplied invalid sub path: [$option_migrate_to]"
+		if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_path "$option_migrate_to_subdir"; then
+			echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
 			exit 1
 		fi
 
@@ -454,16 +460,18 @@ function command_aliases() (
 
 					# ----
 					# loop each <name> <alias> pair
+					local new_alias_paths=()
 					local target_path='' target_paths=()
 					for ((i = 0; i < "${#output_name_body_mapping[@]}"; i += 2)); do
 						target_path="$migrate_aliases_to/${output_name_body_mapping[i]}"
 						echo "$target_path"
+						new_alias_paths+=("$target_path")
 						bat --style numbers --color always --language bash --paging=never <<<"${output_name_body_mapping[i + 1]}"
 						try_create_alias_file "${output_name_body_mapping[i + 1]}" "$target_path"
 					done
 
 					# ensure permissions
-					if [[ "${#new_alias_paths}" -gt 0 ]]; then
+					if [[ "${#new_alias_paths[@]}" -gt 0 ]]; then
 						correct_permissions "${new_alias_paths[@]}"
 					fi
 

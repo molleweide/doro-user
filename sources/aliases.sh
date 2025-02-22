@@ -520,7 +520,7 @@ alias cronuse="crontab $DOROTHY/user/backups/crontab.bak"
 #------------------------------
 
 # OS X apps
-alias md="open -a Markoff $@"
+alias md="open -a Markoff"
 
 #--------------------------
 #---       OTHERS       ---
