@@ -8,6 +8,7 @@
 # echo-clear-lines: clear N lines
 
 # TODO:
+# - (x) capture keys correctly
 # - prevent escape chars from being outputted to screen.
 #     a. put codes into vars
 #     b. create basic helper funcs for codes.
@@ -15,6 +16,9 @@
 #     d. combine them into the final key_bind funcs
 # - track and columns
 # - move ansi vars and helpers to its own source file.
+# - Let tty handle buffer.
+#   I can just use a command to capture the current terminal output,
+#   or current line, so I dont need to track a buffer multiline string.
 
 # TODO:
 # - wrap all codes in vars
@@ -103,7 +107,7 @@
 # Use read key
 function v2() {
   echo "Press CTRL+D to submit:"
-  input=""
+  local input="" current_line=""
 
   # =======================================================
   # ANSI helpers
@@ -114,8 +118,12 @@ function v2() {
   # printf '\033[5D' # Move cursor left 5 characters
   # printf '\033[P'  # Delete character at cursor position
 
-  function clear__cursor_to_start() {
+  function clear_before_cursor() {
     printf "\033[1K"
+  }
+
+  function clear_after_cursor() {
+    printf "\033[K"
   }
 
   function clear__n_chars_backwards() {
@@ -127,9 +135,23 @@ function v2() {
 
   function move__n_chars_backwards() {
     local n=$1 # Number of characters to clear
-    for ((i = 0; i < n; i++)); do
-      printf "\033[1D" # Move backward and clear the character
-    done
+
+    # # method 1
+    # for ((i = 0; i < n; i++)); do
+    #   printf "\033[1D" # Move backward and clear the character
+    # done
+
+    # method 2
+    printf '\033[%sD' "$n"
+
+    # if back
+    #   ...
+    # if forward
+    #   ...
+    # if up
+    #   ...
+    # if down
+    #   ...
   }
 
   # =======================================================
@@ -140,25 +162,98 @@ function v2() {
     :
   }
 
+  # ===
+  # tput helpers
+
+  # This will need modifications. Apparently when moving the cursor you can
+  # read the line to which it is moving (kinda).
+  function get_line_at_cursor() {
+    # Save the current cursor position
+    tput sc
+
+    # Move the cursor up 1 line (change based on your cursor position)
+    tput cuu1
+
+    # Capture the current line into a variable
+    input=""
+    IFS= read -r input # Read the line (assuming it's not too long)
+    echo "Captured line: '$input'"
+
+    # Restore the cursor position
+    tput rc
+  }
+
   # =======================================================
   # key handlers
   #
   # Eg. backspace should call both `ansi_mv -1` AND `buffer_rm_chars 1`
+  #
+  # NOTE: Each special key handler need to do a basic call to `ansi_rm n`
+  # depending on the length of the outputted chars so that I know for sure
+  # that I have a clean handling of ANSI codes before I can start working on
+  # the text editing.
 
+  # - (x) moves cursor back
+  # - ( ) fix garbage added at the end.
+  # - ( )
+  # solution:
+  # - clear line
+  # - put current line back.
   function handle_left() {
-    move__n_chars_backwards 1
+    # move__n_chars_backwards 8
+    #
+
+    # tput cub 5         # Move cursor back 5 spaces
+    # echo -ne "\033[4h" # Enable insert mode
+    # echo -n "My "      # Insert "My "
+    # echo -ne "\033[4l" # Disable insert mode
+
+    # I should only clear after cursor instead
+    # clear_before_cursor
+    clear_after_cursor
+
+    local pre="${current_line%${current_line: -1}}"
+    local post="${current_line: -1}"
+
+    # echo -ne "\r${current_line}" # Output current input (without the deleted character)
+    echo -ne "\r${pre}" # Output current input (without the deleted character)
+
+    tput cub 1
+
+    echo -ne "\033[4h" # Enable insert mode
+    echo -n "$post"      # Insert "My "
+    echo -ne "\033[4l" # Disable insert mode
 
     # removes the last character from the variable input.
-    input="${input%${input: -1}}"
+    # input="${input%${input: -1}}"
 
-    echo -ne "\r$input" # Output current input (without the deleted character)
+    # echo -ne "\r$input" # Output current input (without the deleted character)
   }
 
+  # Explanation: There is now ANSI code for removing only one single char.
+  # 1. What we do is clear line
+  # 2. Trim the current line string.
+  # 3. Replace line with \r
+  # (*) The reason why all escape chars are being removed is because they are
+  #     not stored in the current line var.
+  #
+  # KEEP TEXT AFTER CURSOR:
+  # - track the lengh of the line
+  # - replace the line and remove only the char at position.
+  # - and move the cursor to [pos-1]
   function handle_backspace() {
-    clear__n_chars_backwards 1
+    # clear__n_chars_backwards 1
+    clear_before_cursor
 
-    input="${input%${input: -1}}"
-    echo -ne "\r$input" # Output current input (without the deleted character)
+    current_line="${current_line%${current_line: -1}}"
+
+    # -n: prevent adding new line
+    # -e: interpret escape chars
+    # \r: carriage return - anything printed after \r overwrites the current line.
+    echo -ne "\r${current_line}" # Output current input (without the deleted character)
+
+    # the cursor is "kept" but this char seems to take place infron
+    # echo -n "X"
 
     # printf "\033[1D\033[2K" # Move backward and clear the character
   }
@@ -178,7 +273,13 @@ function v2() {
     # dont get captured unless we read the following chars and store in var.
 
     local key='' extra_chars=''
-    if [[ $char == $'\e'* ]]; then
+    if [[ -z $char ]]; then
+      # read -n1 treats Enter as an empty input ("") instead of "$'\n'"
+      # TODO: reset current line variable
+      echo "prev line: $current_line"
+      current_line=""
+      key="return"
+    elif [[ $char == $'\e'* ]]; then
 
       # =======================================================
       # Handle multi char ANSI escapes
@@ -220,9 +321,14 @@ function v2() {
         key="backspace"
         handle_backspace
         ;;
+      $'\n')
+        key="return"
+        echo "<ret>"
+        ;;
       *)
         key="$char"
         input+="$char" # This is where standard keys are capture to input string
+        current_line+="$char"
         ;;
       esac
     fi
