@@ -4,6 +4,8 @@
 # DOROTHY COMMAND ALIAS (DCA) HELPER
 #
 
+# WARN: Only handle name collisions for the parser. DO NOT GO OVER BOARD!!!
+
 # TODO: ( ) split validation and creation ??
 #           try_create_alias_files should be split up again into two.
 #           So that we can dry run it and collect failure info.
@@ -68,6 +70,9 @@ function command_aliases() (
 	local NEW_ALIAS_PATHS=()
 	local NEW_ALIAS_CONTENTS=()
 
+	# most of this could be reduced if we just keep track of all the indices
+	# that failed, and then remove the indices from the array. and only create
+	# aliases as long as the failed indices #array == 0.
 	local FAILING_ALIAS_NAMES=()
 	local FAILING_ALIAS_SUB_DIR=()
 	local FAILING_ALIAS_VALUES=()
@@ -308,18 +313,31 @@ function command_aliases() (
 		return "$status"
 	}
 
-	# 3. Loop creating each alias, and correcting permissions.
-	# 4. Collect all aliases that could not be created.
-	# 5. Put these names into FAILURES array.
-	# 6. Prompt user if we want to rectify these failures
-	#       a. by fixing the name conflicts,
-	#       b. OR, override existing alias conflicts.
-	function try_create_alias_files() {
-    local dry_run='yes' arg=${1-}
+	function create_alias_files() {
+		for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
+			# TODO: fix var names here.
+			local content=$1 path=$2 status=0
+			__mkdirp "$(dirname "$path")"
+			echo "${NEW_ALIAS_CONTENTS[i]}" >"${NEW_ALIAS_PATHS[i]}" || status=$?
+			# return "$status"
+		done
 
-    # if [[ "$arg" == "create" ]] ; then
-    #   dry_run
-    # fi
+		# # bulk correct permissions
+		# # do we have to capture failers with permission as well?
+		# if [[ "${#successful_paths[@]}" -gt 0 ]]; then
+		#   correct_permissions "${successful_paths[@]}"
+		# fi
+
+	}
+
+	# TODO: Rename to "validate_and_capture_failures"
+
+	function try_create_alias_files() {
+		local dry_run='yes' arg=${1-}
+
+		# if [[ "$arg" == "create" ]] ; then
+		#   dry_run
+		# fi
 
 		# SINGLE
 		#   create
@@ -550,25 +568,36 @@ function command_aliases() (
 
 			# NOTE: I need to check the err tests to understand why this exists
 			# without eval_capture
+
+			# TODO: call the final validator func here instead.
 			local status
 			eval_capture --statusvar=status -- try_create_alias_files
-			# echo "status: $status"
-			# if try_create_alias_files; then
+
 			if [[ "$status" -ne 0 ]]; then
 				local label
+
+				# TODO: change to "The alias name already exists. Do you want to re-edit the failing part?"
+
 				label="[$status] Creating alias [$(short_name_from_path "$new_alias_path")] failed with reason:"
 				label+=$'\n'"REASON: ${FAILING_ALIAS_REASON[0]}"
 				label+=$'\n'"Do you want to re-edit failing part?"
+
 				if confirm --ppid=$$ --positive -- "$label"; then
+
 					local failure_redo_func="${FAILING_ALIAS_PARTS_REDO_FUNCS[0]}"
+
+					# If failure func does not exist. Should never be an issue really..
 					if [[ -n "$failure_redo_func" && "$failure_redo_func" == "none" ]]; then
 						echo-style --error "CREATE | Could not create alias [$(short_name_from_path "$new_alias_path")]. No re-edit func exists for failure. (todo: ignore/discard?)"
 					fi
+
 					"$failure_redo_func"
 					reset_failure_arrays
 					set_NEW_ALIAS_arrays_to_new_single
+
 				fi
 			else
+				# TODO: Move the actual creation down to here, and break out for next alias. <<<
 				break
 			fi
 		done
