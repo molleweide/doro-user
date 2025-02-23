@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# TODO:
+# - act_create: if dont like final then select part to redo.
+# - act_create: add another one?
+
 # FIX: ( ) Apply correct return/exit statuses wherever something returns
 #
 # TODO:
@@ -14,64 +18,64 @@
 #
 
 function command_aliases_test() (
-	# Test that aliases are migrated and parsed correctly. Handle:
-	# - surrounding comments properly.
-	# - collect arguments order and naming?
-	# - ensure uniqueness
-	:
+  # Test that aliases are migrated and parsed correctly. Handle:
+  # - surrounding comments properly.
+  # - collect arguments order and naming?
+  # - ensure uniqueness
+  :
 )
 
 function command_aliases() (
-	source "$DOROTHY/sources/bash.bash"
-	__require_array 'mapfile'
+  source "$DOROTHY/sources/bash.bash"
+  __require_array 'mapfile'
 
-	# short DCA = dorothy command aliases
-	# migrate aliases to dorothy
+  # short DCA = dorothy command aliases
+  # migrate aliases to dorothy
 
-	local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
-	local SHEBANG_BASH="#!/usr/bin/env bash"
-	local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
+  local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
+  local SHEBANG_BASH="#!/usr/bin/env bash"
+  local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
 
-	local ALLOW_MAX_SUB_DIRS=2
+  local ALLOW_MAX_SUB_DIRS=2
 
-	local ALL_EXISTING_ALIAS_PATHS=()
-	local ALL_EXISTING_ALIAS_BASENAMES=()
+  local ALL_EXISTING_ALIAS_PATHS=()
+  local ALL_EXISTING_ALIAS_BASENAMES=()
 
-	# Use indices to get these back
-	local NEW_ALIAS_NAMES=()
-	local NEW_ALIAS_PATHS=()
-	local NEW_ALIAS_CONTENTS=()
+  # Use indices to get these back
+  local NEW_ALIAS_NAMES=()
+  local NEW_ALIAS_PATHS=()
+  local NEW_ALIAS_CONTENTS=()
 
-	local FAILING_ALIAS_NAMES=()
-	local FAILING_ALIAS_PATHS=()
-	local FAILING_ALIAS_CONTENTS=()
-	local FAILING_ALIAS_REASON=()
+  local FAILING_ALIAS_NAMES=()
+  local FAILING_ALIAS_PATHS=()
+  local FAILING_ALIAS_CONTENTS=()
+  local FAILING_ALIAS_REASON=()
 
-	local GO_LIVE='yes'
+  local GO_LIVE='yes'
 
-	local supported=(
-		sh
-		bash
-		zsh
-		fish
-	)
-	local supported_posix=(
-		sh
-		bash
-		zsh
-		fish
-	)
-	local supported_non_posix=(
-		nu
-		elvish
-		xonsh
-	)
+  local supported=(
+    sh
+    bash
+    zsh
+    fish
+  )
+  local supported_posix=(
+    sh
+    bash
+    zsh
+    fish
+  )
+  local supported_non_posix=(
+    nu
+    elvish
+    xonsh
+  )
 
-	# =====================================
-	# Arguments
+  # =====================================
+  # Arguments
 
-	function help {
-		cat <<-EOF >/dev/stderr
+  function help {
+    cat <<-EOF >/dev/stderr
 			ABOUT:
 			Helper command for managing "dorothy command aliases" (DCA), which are
 			small executable files that functionally are treated and acts like aliases
@@ -116,549 +120,567 @@ function command_aliases() (
 			    aliases are nicely put in a semantic location.
 
 		EOF
-		if [[ $# -ne 0 ]]; then
-			echo-error "$@"
-		fi
-		return 22 # EINVAL 22 Invalid argument
-	}
-
-	# local option_args=()
-	local option_action='' option_migrate_to_subdir='' option_args=()
-	while [[ $# -ne 0 ]]; do
-		item="$1"
-		shift
-		case "$item" in
-		'--help' | '-h') help ;;
-		'--to='*) option_migrate_to_subdir="${item#*=}" ;;
-		'browse') option_action="browse" ;;
-		'new' | 'create') option_action="create" ;;
-		'migrate') option_action="migrate" ;;
-			# '--')
-			#   # 	option_args+=("$item" "$@")
-			#   break
-			#   ;;
-			#   # *) option_args+=("$item") ;;
-		'--')
-			option_args+=("$@")
-			shift $#
-			break
-			;;
-		*)
-			help "Unknown argument was provided"
-			;;
-		esac
-	done
-
-	# =======================================================
-	# HELPER
-
-	function log_contents() {
-		bat --style numbers --color always --language bash --paging=never <<<"$1"
-	}
-
-	function reset_failure_arrays() {
-		NEW_ALIAS_NAMES=()
-		NEW_ALIAS_PATHS=()
-		NEW_ALIAS_CONTENTS=()
-		FAILING_ALIAS_NAMES=()
-		FAILING_ALIAS_PATHS=()
-		FAILING_ALIAS_CONTENTS=()
-		FAILING_ALIAS_REASON=()
-	}
-
-	function short_name_from_path() {
-		# ${path#*"commands.aliases"} does not work for trimming everything before
-		# the match pattern. That is why the string looks a bit weird below.
-		echo "commands${1#*"commands"}"
-	}
-
-	# Ensure the path contains only valid characters
-	# ( ) make standalone w/[--subpath --absolute --relative]
-	function is_valid_path() {
-		local input=$1
-		local initial_slash="/?"
-		local trailing_slash="/?"
-		local special_chars_last="._-"
-		# local char_classes="A-Za-z0-9"
-		local char_classes="[:alpha:][:digit:]"
-		local valid_chars="([$char_classes/]+)"
-		local start='^'
-		local end='$'
-		# local regex='^(/)?([^/\0]+(/)?)+$'
-		# local regex='^/?([A-Za-z0-9._-]+/?)*$'
-		local regex="$start$valid_chars$end"
-		if [[ ! "$input" =~ $regex ]]; then
-			# echo "invalid path" >/dev/tty
-			return 1
-		# else
-		# 	echo "valid path" >/dev/tty
-		fi
-	}
-
-	function is_valid_subdir_depth() {
-		local check_str="$1" parts=()
-		IFS='/' read -ra parts <<<"$check_str"
-		if [[ "${#parts[@]}" -gt $ALLOW_MAX_SUB_DIRS ]]; then
-			return 1
-		fi
-	}
-
-	# get paths of existing aliases
-	function get_all_command_aliases() {
-		local regex_rm_paths_with_files_extension='\.[^/]+$'
-		find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
-	}
-
-	function collect_existing_alias_info() {
-		ALL_EXISTING_ALIAS_BASENAMES=()
-		ALL_EXISTING_ALIAS_PATHS=()
-		while read -r line; do
-			ALL_EXISTING_ALIAS_PATHS+=("$line")
-			ALL_EXISTING_ALIAS_BASENAMES+=("$(basename "$line")")
-		done < <(echo-lines -- "$(get_all_command_aliases)" | echo-trim-empty-lines --stdin)
-	}
-
-	function add_command_aliases_dirs_to_path() {
-		local path='' alias_dirs=()
-		mapfile -t alias_dirs < <(find "$USER_COMMAND_ALIASES_DIR" -type d)
-		# __print_lines "${alias_dirs[@]}"
-		local path=''
-		for p in "${alias_dirs[@]}"; do
-			path+="$p:"
-		done
-		echo "$path$PATH"
-		# export PATH
-	}
-
-	function make_destination() {
-		if [[ -n "$option_migrate_to_subdir" ]]; then
-			echo "$USER_COMMAND_ALIASES_DIR/$option_migrate_to_subdir"
-		elif [[ -n "${1-}" ]]; then
-			echo "$USER_COMMAND_ALIASES_DIR/$1"
-		else
-			echo "$USER_COMMAND_ALIASES_DIR"
-		fi
-
-	}
-
-	# if no args, then correct permissions for all alias paths
-	# else, correct permissions for input <path>s
-	function correct_permissions() {
-		return
-		if [[ $# -eq 0 ]]; then
-			local alias_paths=()
-			mapfile -t alias_paths < <(get_all_command_aliases)
-			fs-own --x -- "${alias_paths[@]}"
-		else
-			fs-own --x -- "$@" # correct permissions for inpus only
-		fi
-	}
-
-	# with nested alias subdirs we have to check for uniqueness
-	# TODO: check if the name exists in the PATH, to prevent conflict
-	# with existing commands.
-	# which -a
-	function is_unique_alias() {
-		local alias=$1
-		if is-needle "$alias" -- "${ALL_EXISTING_ALIAS_BASENAMES[@]}"; then
-			return 1
-		fi
-		#
-		#     >> [is-needle --all ...] can be used to process multiple needles.
-		#     >>>>>>> use this when migrating files
-		#       if is-needle --all "$@" -- "${ALL_EXISTING_ALIAS_BASENAMES[@]}"; then
-		#       	return 1
-		#       fi
-		#     >>> but this is not good because it makes all aliases fail
-	}
-
-	function try_create_alias_file() {
-		local content=$1 path=$2 status=0
-		__mkdirp "$(dirname "$path")"
-		echo "$content" >"$path" || status=$?
-		return "$status"
-	}
-
-	# 3. Loop creating each alias, and correcting permissions.
-	# 4. Collect all aliases that could not be created.
-	# 5. Put these names into FAILURES array.
-	# 6. Prompt user if we want to rectify these failures
-	#       a. by fixing the name conflicts,
-	#       b. OR, override existing alias conflicts.
-	function try_create_alias_files() {
-		: #
-		# SINGLE
-		#   create
-		#   fix perms
-		#     return status
-		for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
-			local failure='no' reason='' successful_paths=()
-			local name="${NEW_ALIAS_NAMES[i]}"
-			local path="${NEW_ALIAS_PATHS[i]}"
-			local content="${NEW_ALIAS_CONTENTS[i]}"
-
-			if ! is_unique_alias "$name"; then
-				failure='yes'
-				reason="Alias with name [$name] already exists"
-				echo-style --error "$reason"
-			elif ! try_create_alias_file "$content" "$path"; then
-				failure='yes'
-				reason="Failure creating alias [$(short_name_from_path "$path")]!"
-				successful_paths+=("$path")
-				echo-style --error "$reason"
-			else
-				echo-style --success "Successfully created alias [$(short_name_from_path "$path")]"
-				# add to existing here so the unique checks will work correctly in the
-				# act_create loop
-				ALL_EXISTING_ALIAS_BASENAMES+=("$name")
-				ALL_EXISTING_ALIAS_PATHS+=("$path")
-			fi
-
-			if [[ "$failure" == 'yes' ]]; then
-				FAILING_ALIAS_NAMES+=("$name")
-				FAILING_ALIAS_PATHS+=("$path")
-				FAILING_ALIAS_CONTENTS+=("$content")
-				FAILING_ALIAS_REASON+=("$reason")
-			fi
-		done
-
-		# bulk correct permissions
-		# do we have to capture failers with permission as well?
-		if [[ "${#successful_paths[@]}" -gt 0 ]]; then
-			correct_permissions "${successful_paths[@]}"
-		fi
-
-		local complete_failure='yes'
-		if [[ "${#successful_paths[@]}" == "${#NEW_ALIAS_NAMES[@]}" ]]; then
-			complete_failure='no'
-		fi
-
-		# 1 complete failure
-		# 2 partial failure. some paths succeeded
-		if [[ "$failure" == 'no' ]]; then
-			return 0
-		else
-			if [[ "$complete_failure" == 'yes' ]]; then
-				return 1
-			else
-				return 2
-			fi
-		fi
-
-	}
-
-	# =======================================================
-	# ACTIONS
-
-	# ( ) choose
-	# ( ) fuzzy-helper
-	# BINDINGS
-	#   ( ) create new DCA from selection.
-	function act_browse() {
-		local regex_rm_paths_with_files_extension='\.[^/]+$'
-		local alias_paths=()
-		local alias_names=()
-		local alias_labels=()
-
-		# -maxdepth 1
-		mapfile -t alias_paths < <(get_all_command_aliases)
-		for path in "${alias_paths[@]}"; do
-			local header contents
-			# ${path#*"commands.aliases"} does not work for trimming everything before
-			# the match pattern. That is why the string looks a bit weird below.
-			header="commands${path#*"commands"}"
-			contents="$("${BAT_CMD[@]}" "$path")"
-			alias_names+=("$header")
-			alias_labels+=("$header"$'\n'"$contents")
-		done
-
-		__print_lines "${alias_labels[@]}"
-
-		local index=0 choose_title="Aliases | Browser"
-		while :; do
-			index="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${alias_labels[@]}")"
-			if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
-				break
-			fi
-		done
-
-	}
-
-	# Use `dorothy-new` command here later when it is finished.
-	# ( ) check if name already exists. confirm...
-	# ( ) if you specify a path then create sub dirs under (*)
-	function act_create() {
-		reset_failure_arrays
-		local new_alias_name='' new_alias_path='' value=''desc='' sub_path='' confirm_final='' new_alias_content=''
-		new_alias_name="$(ask --linger 'Aliases create | What will the NAME be?')"
-		value="$(ask --linger 'Aliases create | What will the VALUE be?')"
-		desc="$(ask --linger 'Aliases create | What will the DESC be?')"
-
-		# validate and confirm
-		if confirm --ppid=$$ --negative -- 'Aliases create | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?'; then
-			sub_path="$(ask --linger 'Aliases create | What will the SUB PATH be?')"
-
-			# TODO: only allow ALLOW_MAX_SUB_DIRS
-
-			# ensure valid subpath
-			while :; do
-				if ! is_valid_path "$sub_path"; then
-					echo "Enter invalid"
-					sub_path="$(ask --linger "[$sub_path] is not valid | Input sub path again:")"
-				elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
-					sub_path="$(ask --linger "Input subpath again:")"
-				else
-					echo "OK"
-					break
-				fi
-			done
-		fi
-
-		new_alias_content+="$SHEBANG_BASH"
-		new_alias_content+=$'\n'"# Name: $new_alias_name"
-		new_alias_content+=$'\n'"# Desc: $desc"
-		new_alias_content+=$'\n'"$value"
-		new_alias_content+=' "$@"'
-
-		create_alias_at="$(make_destination "$sub_path")"
-
-		new_alias_path="$create_alias_at/$new_alias_name"
-
-		local sub_path_question=''
-		if [[ -n "$sub_path" ]]; then
-			sub_path_question="/$sub_path"
-		fi
-
-		confirm_final="Aliases create | Proceed and create alias at ["$(basename "$USER_COMMAND_ALIASES_DIR")"$sub_path_question/$new_alias_name]?"$'\n'
-		confirm_final+="$(bat --style numbers --color always --language bash --paging=never <<<"$new_alias_content")"
-
-		NEW_ALIAS_NAMES+=("$new_alias_name")
-		NEW_ALIAS_PATHS+=("$new_alias_path")
-		NEW_ALIAS_CONTENTS+=("$new_alias_content")
-
-		# TODO: prompt choose select which part of the new alias you want to
-		# change/redo.
-
-		if confirm --ppid=$$ --positive -- "$confirm_final"; then
-
-			# NOTE: I need to check the err tests to understand why this exists
-			# without eval_capture
-
-			local status
-			eval_capture --statusvar=status -- try_create_alias_files
-			# echo "status: $status"
-			# if try_create_alias_files; then
-			if [[ "$status" -ne 0 ]]; then
-				local label
-				label="[$status] Creating alias [$(short_name_from_path "$new_alias_path")] failed with reason:"$'\n'
-				label+="REASON: ${FAILING_ALIAS_REASON[0]}"
-				if confirm --ppid=$$ --positive -- "$label"; then
-
-					# TODO: only prompt to redo the variable that causes the failure,
-					# eg. the name / invalid value / desc.
-					act_create
-				fi
-			fi
-
-			# TODO: Prompt continue add another alias??
-
-		fi
-	}
-
-	function act_migrate() {
-		local destination_sub_dir
-
-		if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_path "$option_migrate_to_subdir"; then
-			echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
-			exit 1
-		fi
-
-		destination_sub_dir="$(make_destination)"
-
-		function migrate_single_file() {
-			local input_file=$1
-
-			local output_test_string=''
-			local output_name_body_mapping=()
-
-			local interpreter=''
-
-			interpreter="$(get-interpreter --name -- "$input_file")"
-			if is-needle "$interpreter" -- "${supported[@]}"; then
-
-				# =======================================================
-				# HANDLE POSIX
-				# =======================================================
-
-				function parse_new_alias_from_posix_alias() {
-					:
-				}
-
-				function parse_new_alias_from_posix_function() {
-					:
-				}
-
-				if is-needle "$interpreter" -- "${supported_posix[@]}"; then
-					local aliases=() function_names=() function_bodies=()
-
-					# ----
-					# HANDLE POSIX ALIASES
-
-					output_test_string+=$'\n###############################'
-					output_test_string+=$'\n# ALIASES'
-					output_test_string+=$'\n###############################'
-
-					local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
-					mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
-					for line_alias in "${aliases[@]}"; do
-						local new_alias_name='' value='' trailing_comment='' new_alias_path new_alias_content=''
-						# handle trim trailing comment
-						#
-						if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
-							line_alias="${BASH_REMATCH[1]}"
-							trailing_comment="${BASH_REMATCH[2]}"
-						fi
-						# handle split alias
-						if [[ "$line_alias" =~ alias\ ([^=]+)=\"(.*)\" ]]; then
-							new_alias_name="${BASH_REMATCH[1]}"
-							value="${BASH_REMATCH[2]}"
-						elif [[ "$line_alias" =~ alias\ ([^=]+)=\'(.*)\' ]]; then
-							new_alias_name="${BASH_REMATCH[1]}"
-							value="${BASH_REMATCH[2]}"
-						fi
-
-						# echo "$new_alias_name | $value"
-
-						output_name_body_mapping+=("$new_alias_name")
-						new_alias_content+="$SHEBANG_BASH"
-						new_alias_content+=$'\n'"# Name: $new_alias_name"
-						new_alias_content+=$'\n'"# Desc: $trailing_comment"
-						new_alias_content+=$'\n'"$value "'"$@"'
-						output_name_body_mapping+=("$new_alias_content")
-
-						NEW_ALIAS_NAMES+=("$new_alias_name")
-						NEW_ALIAS_PATHS+=("$destination_sub_dir/$new_alias_name")
-						NEW_ALIAS_CONTENTS+=("$new_alias_content")
-					done
-
-					# ----
-					# HANDLE POSIX FUNCTIONS
-
-					output_test_string+=$'\n###############################'
-					output_test_string+=$'\n# FUNCTIONS'
-					output_test_string+=$'\n###############################'
-					mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
-					for new_alias_name in "${function_names[@]}"; do
-						local final='' body body_trimmed new_alias_name new_alias_path new_alias_content
-						body="$(bash -c 'source '"$input_file"'; declare -f '"$new_alias_name")"
-						body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
-						# Capture how many arguments each func snippets takes
-						# This is not perfect but at least it gives some indication.
-						local arguments=()
-						local count=0
-						while read -r line; do
-							local line="$line"
-							while [[ "$line" =~ (\$[0-9]+) ]]; do
-								local match="${BASH_REMATCH[0]}"
-								if ! is-needle "$match" -- "${arguments[@]}"; then
-									arguments+=("$match")
-								fi
-								line="${line/"$match"/}" # Remove the matched part from the line
-								# echo "trim: [$line]"
-								if [[ "$count" == 10 ]]; then
-									break
-								fi
-							done
-						done <<<"$body_trimmed"
-						output_name_body_mapping+=("$new_alias_name")
-						final+="$SHEBANG_BASH"
-						final+=$'\n'"# Name: $new_alias_name"
-						final+=$'\n'"# Desc: ..."
-						final+=$'\n'"# Args: ${arguments[*]}"
-						final+=$'\n'"$body_trimmed"
-						output_name_body_mapping+=("$final")
-
-						NEW_ALIAS_NAMES+=("$new_alias_name")
-						NEW_ALIAS_PATHS+=("$destination_sub_dir/$new_alias_name")
-						NEW_ALIAS_CONTENTS+=("$new_alias_content")
-					done
-
-					for i in "${NEW_ALIAS_CONTENTS[@]}"; do
-						log_contents "$i"
-					done
-
-					try_create_alias_files
-
-					# TODO: If any failures, prompt do you want to discard them or
-					# edit them?
-					# Reuse the logic from act_create here.
-
-					# =======================================================
-					# HANDLE OTHER SHELLS BELOW
-					# =======================================================
-
-				elif is-needle "$interpreter" -- "${supported_non_posix[@]}"; then
-
-					if [[ "$interpreter" == "nu" ]]; then
-						# HANDLE NUSHELL
-						:
-					elif [[ "$interpreter" == "elvish" ]]; then
-						# HANDLE ELVISH
-						:
-					elif [[ "$interpreter" == "xonsh" ]]; then
-						# HANDLE XONSH
-						:
-					fi
-				else
-					echo "Interpreter [$interpreter] not supported"
-				fi
-			fi
-		}
-
-		# remove this to make the <action> go live.
-		# option_args=("$DOROTHY/user/sources/aliases.sh")
-		for migrate_file in "${option_args[@]}"; do
-			migrate_single_file "$migrate_file"
-		done
-	}
-
-	# =======================================================
-	# PREPARE
-
-	if [[ -z "$option_action" ]]; then
-		# help "No action provided"
-		option_action="browse"
-	fi
-
-	if [[ -n "$option_migrate_to_subdir" ]]; then
-		if ! is_valid_subdir_depth "$option_migrate_to_subdir"; then
-			echo-style --error "Maximum sub dir depth allowed is [$ALLOW_MAX_SUB_DIRS]"
-			exit
-		fi
-	fi
-
-	# Because we collect things here, I can clean up some redundancy below.
-	collect_existing_alias_info
-
-	# =======================================================
-	# Act
-
-	# This is a better one liner but my linter complains too much about
-	# funcs being unreachable so for now i go with the switch case.
-	# "act_$option_action"
-
-	case "$option_action" in
-	browse) act_browse ;;
-	create) act_create ;;
-	migrate) act_migrate ;;
-	esac
+    if [[ $# -ne 0 ]]; then
+      echo-error "$@"
+    fi
+    return 22 # EINVAL 22 Invalid argument
+  }
+
+  # local option_args=()
+  local option_action='' option_migrate_to_subdir='' option_args=()
+  while [[ $# -ne 0 ]]; do
+    item="$1"
+    shift
+    case "$item" in
+    '--help' | '-h') help ;;
+    '--to='*) option_migrate_to_subdir="${item#*=}" ;;
+    'browse') option_action="browse" ;;
+    'new' | 'create') option_action="create" ;;
+    'migrate') option_action="migrate" ;;
+      # '--')
+      #   # 	option_args+=("$item" "$@")
+      #   break
+      #   ;;
+      #   # *) option_args+=("$item") ;;
+    '--')
+      option_args+=("$@")
+      shift $#
+      break
+      ;;
+    *)
+      help "Unknown argument was provided"
+      ;;
+    esac
+  done
+
+  # =======================================================
+  # HELPER
+
+  function log_contents() {
+    bat --style numbers --color always --language bash --paging=never <<<"$1"
+  }
+
+  function reset_failure_arrays() {
+    NEW_ALIAS_NAMES=()
+    NEW_ALIAS_PATHS=()
+    NEW_ALIAS_CONTENTS=()
+    FAILING_ALIAS_NAMES=()
+    FAILING_ALIAS_PATHS=()
+    FAILING_ALIAS_CONTENTS=()
+    FAILING_ALIAS_REASON=()
+  }
+
+  function short_name_from_path() {
+    # ${path#*"commands.aliases"} does not work for trimming everything before
+    # the match pattern. That is why the string looks a bit weird below.
+    echo "commands${1#*"commands"}"
+  }
+
+  # Ensure the path contains only valid characters
+  # ( ) make standalone w/[--subpath --absolute --relative]
+  function is_valid_path() {
+    local input=$1
+    local initial_slash="/?"
+    local trailing_slash="/?"
+    local special_chars_last="._-"
+    # local char_classes="A-Za-z0-9"
+    local char_classes="[:alpha:][:digit:]"
+    local valid_chars="([$char_classes/]+)"
+    local start='^'
+    local end='$'
+    # local regex='^(/)?([^/\0]+(/)?)+$'
+    # local regex='^/?([A-Za-z0-9._-]+/?)*$'
+    local regex="$start$valid_chars$end"
+    if [[ ! "$input" =~ $regex ]]; then
+      # echo "invalid path" >/dev/tty
+      return 1
+    # else
+    # 	echo "valid path" >/dev/tty
+    fi
+  }
+
+  function is_valid_subdir_depth() {
+    local check_str="$1" parts=()
+    IFS='/' read -ra parts <<<"$check_str"
+    if [[ "${#parts[@]}" -gt $ALLOW_MAX_SUB_DIRS ]]; then
+      return 1
+    fi
+  }
+
+  # get paths of existing aliases
+  function get_all_command_aliases() {
+    local regex_rm_paths_with_files_extension='\.[^/]+$'
+    find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
+  }
+
+  function collect_existing_alias_info() {
+    ALL_EXISTING_ALIAS_BASENAMES=()
+    ALL_EXISTING_ALIAS_PATHS=()
+    while read -r line; do
+      ALL_EXISTING_ALIAS_PATHS+=("$line")
+      ALL_EXISTING_ALIAS_BASENAMES+=("$(basename "$line")")
+    done < <(echo-lines -- "$(get_all_command_aliases)" | echo-trim-empty-lines --stdin)
+  }
+
+  function add_command_aliases_dirs_to_path() {
+    local path='' alias_dirs=()
+    mapfile -t alias_dirs < <(find "$USER_COMMAND_ALIASES_DIR" -type d)
+    # __print_lines "${alias_dirs[@]}"
+    local path=''
+    for p in "${alias_dirs[@]}"; do
+      path+="$p:"
+    done
+    echo "$path$PATH"
+    # export PATH
+  }
+
+  function make_destination() {
+    if [[ -n "$option_migrate_to_subdir" ]]; then
+      echo "$USER_COMMAND_ALIASES_DIR/$option_migrate_to_subdir"
+    elif [[ -n "${1-}" ]]; then
+      echo "$USER_COMMAND_ALIASES_DIR/$1"
+    else
+      echo "$USER_COMMAND_ALIASES_DIR"
+    fi
+
+  }
+
+  # if no args, then correct permissions for all alias paths
+  # else, correct permissions for input <path>s
+  function correct_permissions() {
+    return
+    if [[ $# -eq 0 ]]; then
+      local alias_paths=()
+      mapfile -t alias_paths < <(get_all_command_aliases)
+      fs-own --x -- "${alias_paths[@]}"
+    else
+      fs-own --x -- "$@" # correct permissions for inpus only
+    fi
+  }
+
+  # with nested alias subdirs we have to check for uniqueness
+  # TODO: check if the name exists in the PATH, to prevent conflict
+  # with existing commands.
+  # which -a
+  function is_unique_alias() {
+    local alias=$1
+    if is-needle "$alias" -- "${ALL_EXISTING_ALIAS_BASENAMES[@]}"; then
+      return 1
+    fi
+    #
+    #     >> [is-needle --all ...] can be used to process multiple needles.
+    #     >>>>>>> use this when migrating files
+    #       if is-needle --all "$@" -- "${ALL_EXISTING_ALIAS_BASENAMES[@]}"; then
+    #       	return 1
+    #       fi
+    #     >>> but this is not good because it makes all aliases fail
+  }
+
+  function try_create_alias_file() {
+    local content=$1 path=$2 status=0
+    __mkdirp "$(dirname "$path")"
+    echo "$content" >"$path" || status=$?
+    return "$status"
+  }
+
+  # 3. Loop creating each alias, and correcting permissions.
+  # 4. Collect all aliases that could not be created.
+  # 5. Put these names into FAILURES array.
+  # 6. Prompt user if we want to rectify these failures
+  #       a. by fixing the name conflicts,
+  #       b. OR, override existing alias conflicts.
+  function try_create_alias_files() {
+    : #
+    # SINGLE
+    #   create
+    #   fix perms
+    #     return status
+    for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
+      local failure='no' reason='' successful_paths=()
+      local name="${NEW_ALIAS_NAMES[i]}"
+      local path="${NEW_ALIAS_PATHS[i]}"
+      local content="${NEW_ALIAS_CONTENTS[i]}"
+
+      if ! is_unique_alias "$name"; then
+        failure='yes'
+        reason="Alias with name [$name] already exists"
+        echo-style --error "$reason"
+      elif ! try_create_alias_file "$content" "$path"; then
+        failure='yes'
+        reason="Failure creating alias [$(short_name_from_path "$path")]!"
+        successful_paths+=("$path")
+        echo-style --error "$reason"
+      else
+        echo-style --success "Successfully created alias [$(short_name_from_path "$path")]"
+        # add to existing here so the unique checks will work correctly in the
+        # act_create loop
+        ALL_EXISTING_ALIAS_BASENAMES+=("$name")
+        ALL_EXISTING_ALIAS_PATHS+=("$path")
+      fi
+
+      if [[ "$failure" == 'yes' ]]; then
+        FAILING_ALIAS_NAMES+=("$name")
+        FAILING_ALIAS_PATHS+=("$path")
+        FAILING_ALIAS_CONTENTS+=("$content")
+        FAILING_ALIAS_REASON+=("$reason")
+      fi
+    done
+
+    # bulk correct permissions
+    # do we have to capture failers with permission as well?
+    if [[ "${#successful_paths[@]}" -gt 0 ]]; then
+      correct_permissions "${successful_paths[@]}"
+    fi
+
+    local complete_failure='yes'
+    if [[ "${#successful_paths[@]}" == "${#NEW_ALIAS_NAMES[@]}" ]]; then
+      complete_failure='no'
+    fi
+
+    # 1 complete failure
+    # 2 partial failure. some paths succeeded
+    if [[ "$failure" == 'no' ]]; then
+      return 0
+    else
+      if [[ "$complete_failure" == 'yes' ]]; then
+        return 1
+      else
+        return 2
+      fi
+    fi
+
+  }
+
+  # =======================================================
+  # ACTIONS
+
+  # ( ) choose
+  # ( ) fuzzy-helper
+  # BINDINGS
+  #   ( ) create new DCA from selection.
+  function act_browse() {
+    local regex_rm_paths_with_files_extension='\.[^/]+$'
+    local alias_paths=()
+    local alias_names=()
+    local alias_labels=()
+
+    # -maxdepth 1
+    mapfile -t alias_paths < <(get_all_command_aliases)
+    for path in "${alias_paths[@]}"; do
+      local header contents
+      # ${path#*"commands.aliases"} does not work for trimming everything before
+      # the match pattern. That is why the string looks a bit weird below.
+      header="commands${path#*"commands"}"
+      contents="$("${BAT_CMD[@]}" "$path")"
+      alias_names+=("$header")
+      alias_labels+=("$header"$'\n'"$contents")
+    done
+
+    __print_lines "${alias_labels[@]}"
+
+    local index=0 choose_title="Aliases | Browser"
+    while :; do
+      index="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${alias_labels[@]}")"
+      if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
+        break
+      fi
+    done
+
+  }
+
+  # Use `dorothy-new` command here later when it is finished.
+  # ( ) check if name already exists. confirm...
+  # ( ) if you specify a path then create sub dirs under (*)
+  function act_create() {
+    reset_failure_arrays
+    local new_alias_name='' new_alias_path='' value=''desc='' sub_path='' confirm_proceed_and_create='' new_alias_content=''
+    new_alias_name="$(ask --linger 'Aliases create | What will the NAME be?')"
+    value="$(ask --linger 'Aliases create | What will the VALUE be?')"
+    desc="$(ask --linger 'Aliases create | What will the DESC be?')"
+    # handle sub dir group
+    if confirm --ppid=$$ --negative -- 'Aliases create | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?'; then
+      sub_path="$(ask --linger 'Aliases create | What will the SUB PATH be?')"
+      # ensure valid subpath
+      while :; do
+        # path valid
+        if ! is_valid_path "$sub_path"; then
+          echo "Enter invalid"
+          sub_path="$(ask --linger "[$sub_path] is not valid | Input sub path again:")"
+          # path maxth depth
+        elif ! is_valid_subdir_depth "$sub_path"; then
+          sub_path="$(ask --linger "[$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
+        # elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
+        # # this is handled by the redo choose menu
+        # 	sub_path="$(ask --linger "Input subpath again:")"
+        else
+          break
+        fi
+      done
+    fi
+
+    # TODO: fix these and call after the re-edit choose menu upon request.
+    # function edit_name() {}
+    # function edit_value() {}
+    # function edit_description() {}
+    # function edit_subpath() {}
+
+    # compile data
+    new_alias_path="$(make_destination "$sub_path")/$new_alias_name"
+    new_alias_content+="$SHEBANG_BASH"
+    new_alias_content+=$'\n'"# Name: $new_alias_name"
+    new_alias_content+=$'\n'"# Desc: $desc"
+    new_alias_content+=$'\n'"$value"
+    new_alias_content+=' "$@"'
+
+    confirm_proceed_and_create="Go ahead create alias at [$(short_name_from_path "$new_alias_path")] OR edit alias?"$'\n'
+    confirm_proceed_and_create+="$(bat --style numbers --color always --language bash --paging=never <<<"$new_alias_content")"
+
+    # Is statisfied or redo part
+    if ! confirm --ppid=$$ --positive -- "$confirm_proceed_and_create"; then
+      echo-style --bold "Redo !!!"
+      local sel redo_options=(
+        "Name ($new_alias_name)"
+        "Value ($value)"
+        "Sub group name ($sub_path)"
+        "Description ($desc)"
+      ) title="Select which part to edit:"
+      while :; do
+        sel="$(choose "$title" -- "${redo_options[@]}")"
+        echo "Edit: $sel"
+
+        # TODO: call selected re-edit func.
+
+        exit
+        # if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
+        # 	break
+        # fi
+      done
+    fi
+
+    NEW_ALIAS_NAMES+=("$new_alias_name")
+    NEW_ALIAS_PATHS+=("$new_alias_path")
+    NEW_ALIAS_CONTENTS+=("$new_alias_content")
+
+    # if confirm --ppid=$$ --positive -- "$confirm_proceed_and_create"; then
+
+    # NOTE: I need to check the err tests to understand why this exists
+    # without eval_capture
+
+    local status
+    eval_capture --statusvar=status -- try_create_alias_files
+    # echo "status: $status"
+    # if try_create_alias_files; then
+    if [[ "$status" -ne 0 ]]; then
+      local label
+      label="[$status] Creating alias [$(short_name_from_path "$new_alias_path")] failed with reason:"$'\n'
+      label+="REASON: ${FAILING_ALIAS_REASON[0]}"
+      if confirm --ppid=$$ --positive -- "$label"; then
+
+        # TODO:
+        echo-style --error "TODO... redo failing part."
+        exit
+      fi
+    fi
+
+    # TODO: Prompt continue add another alias??
+
+    # fi
+  }
+
+  function act_migrate() {
+    local destination_sub_dir
+
+    if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_path "$option_migrate_to_subdir"; then
+      echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
+      exit 1
+    fi
+
+    destination_sub_dir="$(make_destination)"
+
+    function migrate_single_file() {
+      local input_file=$1
+
+      local output_test_string=''
+      local output_name_body_mapping=()
+
+      local interpreter=''
+
+      interpreter="$(get-interpreter --name -- "$input_file")"
+      if is-needle "$interpreter" -- "${supported[@]}"; then
+
+        # =======================================================
+        # HANDLE POSIX
+        # =======================================================
+
+        function parse_new_alias_from_posix_alias() {
+          :
+        }
+
+        function parse_new_alias_from_posix_function() {
+          :
+        }
+
+        if is-needle "$interpreter" -- "${supported_posix[@]}"; then
+          local aliases=() function_names=() function_bodies=()
+
+          # ----
+          # HANDLE POSIX ALIASES
+
+          output_test_string+=$'\n###############################'
+          output_test_string+=$'\n# ALIASES'
+          output_test_string+=$'\n###############################'
+
+          local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
+          mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
+          for line_alias in "${aliases[@]}"; do
+            local new_alias_name='' value='' trailing_comment='' new_alias_path new_alias_content=''
+            # handle trim trailing comment
+            #
+            if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
+              line_alias="${BASH_REMATCH[1]}"
+              trailing_comment="${BASH_REMATCH[2]}"
+            fi
+            # handle split alias
+            if [[ "$line_alias" =~ alias\ ([^=]+)=\"(.*)\" ]]; then
+              new_alias_name="${BASH_REMATCH[1]}"
+              value="${BASH_REMATCH[2]}"
+            elif [[ "$line_alias" =~ alias\ ([^=]+)=\'(.*)\' ]]; then
+              new_alias_name="${BASH_REMATCH[1]}"
+              value="${BASH_REMATCH[2]}"
+            fi
+
+            # echo "$new_alias_name | $value"
+
+            output_name_body_mapping+=("$new_alias_name")
+            new_alias_content+="$SHEBANG_BASH"
+            new_alias_content+=$'\n'"# Name: $new_alias_name"
+            new_alias_content+=$'\n'"# Desc: $trailing_comment"
+            new_alias_content+=$'\n'"$value "'"$@"'
+            output_name_body_mapping+=("$new_alias_content")
+
+            NEW_ALIAS_NAMES+=("$new_alias_name")
+            NEW_ALIAS_PATHS+=("$destination_sub_dir/$new_alias_name")
+            NEW_ALIAS_CONTENTS+=("$new_alias_content")
+          done
+
+          # ----
+          # HANDLE POSIX FUNCTIONS
+
+          output_test_string+=$'\n###############################'
+          output_test_string+=$'\n# FUNCTIONS'
+          output_test_string+=$'\n###############################'
+          mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
+          for new_alias_name in "${function_names[@]}"; do
+            local final='' body body_trimmed new_alias_name new_alias_path new_alias_content
+            body="$(bash -c 'source '"$input_file"'; declare -f '"$new_alias_name")"
+            body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
+            # Capture how many arguments each func snippets takes
+            # This is not perfect but at least it gives some indication.
+            local arguments=()
+            local count=0
+            while read -r line; do
+              local line="$line"
+              while [[ "$line" =~ (\$[0-9]+) ]]; do
+                local match="${BASH_REMATCH[0]}"
+                if ! is-needle "$match" -- "${arguments[@]}"; then
+                  arguments+=("$match")
+                fi
+                line="${line/"$match"/}" # Remove the matched part from the line
+                # echo "trim: [$line]"
+                if [[ "$count" == 10 ]]; then
+                  break
+                fi
+              done
+            done <<<"$body_trimmed"
+            output_name_body_mapping+=("$new_alias_name")
+            final+="$SHEBANG_BASH"
+            final+=$'\n'"# Name: $new_alias_name"
+            final+=$'\n'"# Desc: ..."
+            final+=$'\n'"# Args: ${arguments[*]}"
+            final+=$'\n'"$body_trimmed"
+            output_name_body_mapping+=("$final")
+
+            NEW_ALIAS_NAMES+=("$new_alias_name")
+            NEW_ALIAS_PATHS+=("$destination_sub_dir/$new_alias_name")
+            NEW_ALIAS_CONTENTS+=("$new_alias_content")
+          done
+
+          for i in "${NEW_ALIAS_CONTENTS[@]}"; do
+            log_contents "$i"
+          done
+
+          try_create_alias_files
+
+          # TODO: If any failures, prompt do you want to discard them or
+          # edit them?
+          # Reuse the logic from act_create here.
+
+          # =======================================================
+          # HANDLE OTHER SHELLS BELOW
+          # =======================================================
+
+        elif is-needle "$interpreter" -- "${supported_non_posix[@]}"; then
+
+          if [[ "$interpreter" == "nu" ]]; then
+            # HANDLE NUSHELL
+            :
+          elif [[ "$interpreter" == "elvish" ]]; then
+            # HANDLE ELVISH
+            :
+          elif [[ "$interpreter" == "xonsh" ]]; then
+            # HANDLE XONSH
+            :
+          fi
+        else
+          echo "Interpreter [$interpreter] not supported"
+        fi
+      fi
+    }
+
+    # remove this to make the <action> go live.
+    # option_args=("$DOROTHY/user/sources/aliases.sh")
+    for migrate_file in "${option_args[@]}"; do
+      migrate_single_file "$migrate_file"
+    done
+  }
+
+  # =======================================================
+  # PREPARE
+
+  if [[ -z "$option_action" ]]; then
+    # help "No action provided"
+    option_action="browse"
+  fi
+
+  if [[ -n "$option_migrate_to_subdir" ]]; then
+    if ! is_valid_subdir_depth "$option_migrate_to_subdir"; then
+      echo-style --error "Maximum sub dir depth allowed is [$ALLOW_MAX_SUB_DIRS]"
+      exit
+    fi
+  fi
+
+  # Because we collect things here, I can clean up some redundancy below.
+  collect_existing_alias_info
+
+  # =======================================================
+  # Act
+
+  # This is a better one liner but my linter complains too much about
+  # funcs being unreachable so for now i go with the switch case.
+  # "act_$option_action"
+
+  case "$option_action" in
+  browse) act_browse ;;
+  create) act_create ;;
+  migrate) act_migrate ;;
+  esac
 )
 
 # fire if invoked standalone
 if [[ $0 == "${BASH_SOURCE[0]}" ]]; then
-	if [[ $* == '--test' ]]; then
-		command_aliases_test
-	else
-		command_aliases "$@"
-	fi
+  if [[ $* == '--test' ]]; then
+    command_aliases_test
+  else
+    command_aliases "$@"
+  fi
 fi
