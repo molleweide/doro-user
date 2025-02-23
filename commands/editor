@@ -4,46 +4,115 @@
 
 # echo-style --dim='Press ' --key='CTRL+D' --dim=' to submit:'; read -p '' -d $'\004'; echo-escape-special -- "$REPLY"
 
-# TODO: document and test clearing codes into variables.
+# NOTE:
+# echo-clear-lines: clear N lines
 
-# # these dont apply to this terminal
+# TODO:
+# - prevent escape chars from being outputted to screen.
+#     a. put codes into vars
+#     b. create basic helper funcs for codes.
+#     c. separate text_input helpers from ansi helpers
+#     d. combine them into the final key_bind funcs
+# - track and columns
+# - move ansi vars and helpers to its own source file.
+
+# TODO:
+# - wrap all codes in vars
+# - make test functions for each
+# - run test functions on my key bindings.
+
+# -----
+
+# Start of ANSI escape = \033
+#
+# https://espterm.github.io/docs/VT100%20escape%20codes.html
+# https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
+
+# \033[2K	Clear entire current line
+# \033[0K	Clear from cursor to end of line
+# \033[1K	Clear from start of line to cursor
+# \033[G	Move cursor to the beginning of the line
+
+# \033[1D moves the cursor one position left.
+# \033[2K clears the current character under the cursor.
+
+# =======================================================
+# =======================================================
+# =======================================================
+# =======================================================
+# ANSI vars
+
+# cursorup(n) CUU       Move cursor up n lines                 ^[[<n>A
+# cursordn(n) CUD       Move cursor down n lines               ^[[<n>B
+# cursorrt(n) CUF       Move cursor right n lines              ^[[<n>C
+# cursorlf(n) CUB       Move cursor left n lines               ^[[<n>D
+# cursorhome            Move cursor to upper left corner       ^[[H
+# cursorhome            Move cursor to upper left corner       ^[[;H
+# cursorpos(v,h) CUP    Move cursor to screen location v,h     ^[[<v>;<h>H
+# hvhome                Move cursor to upper left corner       ^[[f
+# hvhome                Move cursor to upper left corner       ^[[;f
+# hvpos(v,h) CUP        Move cursor to screen location v,h     ^[[<v>;<h>f
+# index IND             Move/scroll window up one line         ^[D
+# revindex RI           Move/scroll window down one line       ^[M
+# nextline NEL          Move to next line                      ^[E
+# savecursor DECSC      Save cursor position and attributes    ^[7
+# restorecursor DECSC   Restore cursor position and attributes ^[8
+
 # clear_line_from_cursor_right="^[[K"
 # clear_line_from_cursor_riht="^[[0K"
 # clear_line_from_cursor_left="^[[1K"
 # clear_entire_line="^[[2K"
 
+# cleareos ED0          Clear screen from cursor down          ^[[J
+# cleareos ED0          Clear screen from cursor down          ^[[0J
+# clearbos ED1          Clear screen from cursor up            ^[[1J
+# clearscreen ED2       Clear entire screen                    ^[[2J
 
+# =======================================================
+# =======================================================
+# =======================================================
+# =======================================================
 
-# Basic read multiline, wo/nav
-function v1() {
-  echo "Press CTRL+D to submit:"
-  input=""
-  while IFS= read -e line; do
-    input+="$line"$'\n'
-  done
-  echo "Captured input:"
-  echo "$input"
-}
+# keys
+# up=$'\e[A'
+# down=$'\e[B'
+# right=$'\e[C'
+# left=$'\e[D'
+# newline=$'\n'
+# tab=$'\t' \
+#   backspace=$'\b'*
+# backspace_hex
+# carriage_return=$'\r'
+# escape=$'\e'
+# home=$'\e[H'
+
+# =======================================================
+# versions
+
+# # Basic read multiline, wo/nav
+# function v1() {
+#   echo "Press CTRL+D to submit:"
+#   input=""
+#   while IFS= read -e line; do
+#     input+="$line"$'\n'
+#   done
+#   echo "Captured input:"
+#   echo "$input"
+# }
 
 # Use read key
 function v2() {
   echo "Press CTRL+D to submit:"
   input=""
 
-  # -----
+  # =======================================================
+  # ANSI helpers
 
-  # Start of ANSI escape = \033
+  # Eg. clear single char should only be responsible for clearing one single char.
   #
-  # https://espterm.github.io/docs/VT100%20escape%20codes.html
-  # https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
-
-  # \033[2K	Clear entire current line
-  # \033[0K	Clear from cursor to end of line
-  # \033[1K	Clear from start of line to cursor
-  # \033[G	Move cursor to the beginning of the line
-
-  # \033[1D moves the cursor one position left.
-  # \033[2K clears the current character under the cursor.
+  # printf '\033[1A' # Move cursor up one line
+  # printf '\033[5D' # Move cursor left 5 characters
+  # printf '\033[P'  # Delete character at cursor position
 
   function clear__cursor_to_start() {
     printf "\033[1K"
@@ -56,7 +125,6 @@ function v2() {
     done
   }
 
-
   function move__n_chars_backwards() {
     local n=$1 # Number of characters to clear
     for ((i = 0; i < n; i++)); do
@@ -64,100 +132,57 @@ function v2() {
     done
   }
 
+  # =======================================================
+  # string buffer helpers
+
+  # Eg. backspace should trim one char from buffer
+  function buffer_rm_chars() {
+    :
+  }
+
+  # =======================================================
+  # key handlers
+  #
+  # Eg. backspace should call both `ansi_mv -1` AND `buffer_rm_chars 1`
+
   function handle_left() {
     move__n_chars_backwards 1
+
+    # removes the last character from the variable input.
     input="${input%${input: -1}}"
+
     echo -ne "\r$input" # Output current input (without the deleted character)
   }
 
   function handle_backspace() {
-    # clear__n_chars_backwards 1
-    #
-    # input="${input%${input: -1}}"
-    # echo -ne "\r$input" # Output current input (without the deleted character)
+    clear__n_chars_backwards 1
 
-      printf "\033[1D\033[2K" # Move backward and clear the character
+    input="${input%${input: -1}}"
+    echo -ne "\r$input" # Output current input (without the deleted character)
+
+    # printf "\033[1D\033[2K" # Move backward and clear the character
   }
+
+  # =======================================================
+  # Handle input loop
 
   # stty -echo -icanon
   while IFS= read -r -n1 char; do
-    # echo "char: $char"
-
-    # On enter, append a linebreak and move to next line
-    # input+="$line"$'\n'
-
-    # echo "char: [$char]">/dev/tty
-
-    # TODO:
-    # 1. prevent escape chars from being outputted to screen.
-    #     > only capture them
-    # 2. Prevent <esc> key pressed from freezing the input.
-    # 3. move cursor around, beginning, end.
-
-    # echo "[$char]"
-    # read -r -n3 rest                # Read next two characters
-    # echo [$rest]
-
-    # case "$char" in
-    #   $'\x7f')  # Backspace (DEL)
-    #     # Remove last character from the input string
-    #     input="${input%${input: -1}}"
-    #     echo -ne "\r$input"  # Output current input (without the deleted character)
-    #     ;;
-    #   # $'\x1b')  # ESC key (to exit)
-    #   #   echo -e "\n[ESC] Detected, exiting."
-    #   #   break
-    #   #   ;;
-    #   # *)  # Normal character
-    #   #   input+="$char"
-    #   #   echo -ne "\r$input"
-    #   #   ;;
-    # esac
-
-    # if [[ $char == $'\e' ]]; then
-    #   echo [?]
-    # fi
-
-    local keys \
-      up=$'\e[A' \
-      down=$'\e[B' \
-      right=$'\e[C' \
-      left=$'\e[D' \
-      newline=$'\n' \
-      tab=$'\t' \
-      backspace=$'\b'* \
-      backspace_hex
-    carriage_return=$'\r' \
-      escape=$'\e' \
-      home=$'\e[H'
-
-    # echo "char: {$char}"
 
     # NOTE: Because im reading each char one by one I nead to handle the length
     # of escape codes
-
-    # if [[ $char == $'\n' ]]; then
-    #   echo "<line>"
-    # fi
-
-    # read -r -n3 rest # Read next two characters
-    # echo "_rest: {$rest} {${#rest}}"
-
-    # if [[ $char == $'\e' ]]; then
-    #   # try to always enter here if ansi code.
-    #   echo "<special>"
-    # fi
 
     # TODO: Handle <tab>
 
     # NOTE: The issue is that since chars are read one by one, ansi codes
     # dont get captured unless we read the following chars and store in var.
 
-    # Handle multi char ANSI escapes
-
     local key='' extra_chars=''
-
     if [[ $char == $'\e'* ]]; then
+
+      # =======================================================
+      # Handle multi char ANSI escapes
+
       # A. explicitly check for codes
       # read -r -n2 rest # Read next two characters
       # echo "_rest: {$rest} {${#rest}}"
@@ -171,11 +196,14 @@ function v2() {
         key="esc"
       else
         case "$extra_chars" in
-        '[A'*) key="up"
+        '[A'*)
+          key="up"
           ;;
-        '[B'*) key="down"
+        '[B'*)
+          key="down"
           ;;
-        '[C'*) key="right"
+        '[C'*)
+          key="right"
           ;;
         '[D'*)
           key="left"
@@ -185,6 +213,7 @@ function v2() {
       fi
 
     else
+      # =======================================================
       # Handle single code chars, including, eg backspace ($'\b')
       case "$char" in
       $'\x7f' | $'\b')
@@ -200,134 +229,6 @@ function v2() {
 
     # echo "<$key>"
 
-    # Handle multiline
-
-    # Handle single line
-
-    # if [[ $char == $'\e' ]]; then
-    #
-    #   # echo "entered escape"
-    #
-    #   read -r -n2 rest # Read next two characters
-    #   echo "rest: [$rest]"
-    #
-    #   case "$char" in
-    #   "$up") printf '\033[2K' ;;
-    #   "$down") echo "down" ;; # down arrow printf "%s" "Down Arrow" ;;
-    #   "$right") printf "%s" "Right Arrow" ;;
-    #     # "$left"*) handle_left ;;
-    #   $'\177'* | $'\b'*) handle_backspace ;;
-    #
-    #   $'\e[D'*) handle_left ;;
-    #
-    #   "$escape") ;;
-    #   *) ;; # unknown key..
-    #   esac
-    # elif [[ $char == $'\x7f' ]]; then
-    #   echo "<backspace>"
-    # else
-    #   input+="$char"
-    # fi
-
-    # # some escape chars require this??
-    # if [[ "$char" == $'\x1b' ]]; then # Escape type key detected
-    #   read -r -n2 rest                # Read next two characters
-    #   echo "[!]"
-    #
-    #   case "$rest" in
-    #
-    #   '^[') break ;;
-    #
-    #   # up arrow
-    #   # $'\e[D'*)
-    #   '[A')
-    #     printf '\033[2K'
-    #     ;;
-    #
-    #   '[B') # down arrow
-    #     printf "%s" "Down Arrow" ;;
-    #
-    #   # right arrow
-    #   '[C') printf "%s" "Right Arrow" ;;
-    #
-    #   # left arrow
-    #   '[D') handle_left ;;
-    #     # '^[[D[DD' ) handle_backspace ;;
-    #     # $'\e[D'*) handle_backspace ;;
-    #
-    #     # *)
-    #     #   echo "[ESC] Detected, exiting."
-    #     #   break
-    #     #   ;;
-    #   *)
-    #     input+="$char"
-    #     ;;
-    #   esac
-    #
-    # else
-    #   case "$char" in
-    #
-    #   # esc
-    #
-    #   # backspace
-    #   # $'\x7f') echo "[Backspace] Detected" ;; # Handle Backspace (Delete key)
-    #   $'\177'* | $'\b'*)
-    #     # input="${input%${input: -1}}"
-    #     # echo -ne "\r$input" # Output current input (without the deleted character)
-    #     handle_backspace
-    #     ;;
-    #
-    #     # up arrow
-    #     # $'\e[D'*)
-    #   '^[A')
-    #     printf '\033[2K'
-    #     ;;
-    #
-    #   '^[B') # down arrow
-    #     printf "%s" "Down Arrow" ;;
-    #
-    #   # right arrow
-    #   '^[C') printf "%s" "Right Arrow" ;;
-    #
-    #     # left arrow
-    #     # '^[[D') handle_left ;;
-    #     # '^[[D[DD' ) handle_backspace ;;
-    #   $'\e[D'*) handle_backspace ;;
-    #
-    #     # *)
-    #     #   echo "[ESC] Detected, exiting."
-    #     #   break
-    #     #   ;;
-    #   *)
-    #     input+="$char"
-    #     ;;
-    #   esac
-    # fi
-
-    # case "$char" in
-    # # "^[")
-    # # $'\033')
-    # $'\x1b')
-    #   echo "[] Detected, exiting."
-    #   # input+=$'\n'
-    #   # break
-    #   ;; # Handle Escape key
-    # $'\x04')
-    #   echo "[CTRL+D] Detected, exiting."
-    #   # break
-    #   ;; # Handle EOF
-    # $'\x03')
-    #   # echo "[CTRL+C] Detected, exiting."
-    #   exit 1
-    #   ;;                                    # Handle Interrupt
-    # $'\x7f') echo "[Backspace] Detected" ;; # Handle Backspace (Delete key)
-    # $'\x15')
-    #   # echo "[CTRL+U] Detected - Clearing line"
-    #   input=""
-    #   ;;                 # Handle CTRL+U (clear line)
-    # *) input+="$char" ;; # Append character normally
-    # esac
-
   done
 
   # stty echo icanon
@@ -337,47 +238,47 @@ function v2() {
   echo "$input"
 }
 
-function v3() {
-  echo-style --dim='Press ' --key='CTRL+D' --dim=' to submit.'
-  history -w
-  history -c
-  read -i $'brew\ndownload\neval\napt' -p '' -d $'\004'
-  history -r
-  echo-escape-special -- "$REPLY"
-}
+# function v3() {
+#   echo-style --dim='Press ' --key='CTRL+D' --dim=' to submit.'
+#   history -w
+#   history -c
+#   read -i $'brew\ndownload\neval\napt' -p '' -d $'\004'
+#   history -r
+#   echo-escape-special -- "$REPLY"
+# }
 
-function v4() {
-  echo "Press CTRL+D to submit:"
-  input=""
-  :
-  # NOTE: okay so it is possible to do this but I need to do this in a much
-  # more controlled fashion. I need to look at the read-key command and
-  #
-  # TEST: brainstorm
+# function v4() {
+#   echo "Press CTRL+D to submit:"
+#   input=""
+#   :
+#   # NOTE: okay so it is possible to do this but I need to do this in a much
+#   # more controlled fashion. I need to look at the read-key command and
+#   #
+#   # TEST: brainstorm
+#
+#   function add {
+#     local input="$1"
+#     if [[ -z $input ]]; then
+#       input=$'\n'
+#     fi
+#     if [[ $input == $'\e' || $input == $'\n' ]]; then
+#       flush
+#     fi
+#     # if __discard_key_if_line_buffer_enter; then
+#     # 	if [[ $option_keep_line_buffer_newlines == 'yes' ]]; then
+#     # 		printf '%s\n' 'line-buffer'
+#     # 	fi
+#     # 	last_key="$input"
+#     # 	input=''
+#     # fi
+#     #printf 'input: %q\tinputs: %q\n' "$input" "$inputs"
+#     inputs+="$input"
+#   }
+#
+#   while IFS= read -r -n1 char; do
+#     add "$char"
+#
+#   done
+# }
 
-  function add {
-    local input="$1"
-    if [[ -z $input ]]; then
-      input=$'\n'
-    fi
-    if [[ $input == $'\e' || $input == $'\n' ]]; then
-      flush
-    fi
-    # if __discard_key_if_line_buffer_enter; then
-    # 	if [[ $option_keep_line_buffer_newlines == 'yes' ]]; then
-    # 		printf '%s\n' 'line-buffer'
-    # 	fi
-    # 	last_key="$input"
-    # 	input=''
-    # fi
-    #printf 'input: %q\tinputs: %q\n' "$input" "$inputs"
-    inputs+="$input"
-  }
-
-  while IFS= read -r -n1 char; do
-    add "$char"
-
-  done
-}
-
-"$1"
+v2
