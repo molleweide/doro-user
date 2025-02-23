@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-# Name: ab
-# Desc: a testing ls
-testing testing"$@"

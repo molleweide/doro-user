@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-# TODO:
-# - act_create: if dont like final then select part to redo.
-# - act_create: add another one?
+# TODO: PARSER: handle failures in interactive loop.
 
 # FIX: ( ) Apply correct return/exit statuses wherever something returns
 #
@@ -50,6 +48,7 @@ function command_aliases() (
   local FAILING_ALIAS_PATHS=()
   local FAILING_ALIAS_CONTENTS=()
   local FAILING_ALIAS_REASON=()
+  local FAILING_ALIAS_PARTS=()
 
   local GO_LIVE='yes'
 
@@ -161,9 +160,6 @@ function command_aliases() (
   }
 
   function reset_failure_arrays() {
-    NEW_ALIAS_NAMES=()
-    NEW_ALIAS_PATHS=()
-    NEW_ALIAS_CONTENTS=()
     FAILING_ALIAS_NAMES=()
     FAILING_ALIAS_PATHS=()
     FAILING_ALIAS_CONTENTS=()
@@ -300,20 +296,23 @@ function command_aliases() (
       local name="${NEW_ALIAS_NAMES[i]}"
       local path="${NEW_ALIAS_PATHS[i]}"
       local content="${NEW_ALIAS_CONTENTS[i]}"
+      local failure_part_redo_func=''
 
       if ! is_unique_alias "$name"; then
         failure='yes'
+        failure_part_redo_func='edit_name'
         reason="Alias with name [$name] already exists"
         echo-style --error "$reason"
       elif ! try_create_alias_file "$content" "$path"; then
         failure='yes'
+        failure_part_redo_func='none'
         reason="Failure creating alias [$(short_name_from_path "$path")]!"
         successful_paths+=("$path")
         echo-style --error "$reason"
       else
         echo-style --success "Successfully created alias [$(short_name_from_path "$path")]"
         # add to existing here so the unique checks will work correctly in the
-        # act_create loop
+        # act_create loop for multiple creation loops.
         ALL_EXISTING_ALIAS_BASENAMES+=("$name")
         ALL_EXISTING_ALIAS_PATHS+=("$path")
       fi
@@ -323,6 +322,7 @@ function command_aliases() (
         FAILING_ALIAS_PATHS+=("$path")
         FAILING_ALIAS_CONTENTS+=("$content")
         FAILING_ALIAS_REASON+=("$reason")
+        FAILING_ALIAS_PARTS+=("$failure_part_redo_func")
       fi
     done
 
@@ -400,7 +400,6 @@ function command_aliases() (
     # handle sub dir group
     if confirm --ppid=$$ --negative -- 'Aliases create | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?'; then
       sub_path="$(ask --linger 'Aliases create | What will the SUB PATH be?')"
-      # ensure valid subpath
       while :; do
         # path valid
         if ! is_valid_path "$sub_path"; then
@@ -409,9 +408,9 @@ function command_aliases() (
           # path maxth depth
         elif ! is_valid_subdir_depth "$sub_path"; then
           sub_path="$(ask --linger "[$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
-        # elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
-        # # this is handled by the redo choose menu
-        # 	sub_path="$(ask --linger "Input subpath again:")"
+          # elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
+          # # this is handled by the redo choose menu
+          # 	sub_path="$(ask --linger "Input subpath again:")"
         else
           break
         fi
@@ -419,72 +418,116 @@ function command_aliases() (
     fi
 
     # TODO: fix these and call after the re-edit choose menu upon request.
-    # function edit_name() {}
-    # function edit_value() {}
-    # function edit_description() {}
-    # function edit_subpath() {}
-
-    # compile data
-    new_alias_path="$(make_destination "$sub_path")/$new_alias_name"
-    new_alias_content+="$SHEBANG_BASH"
-    new_alias_content+=$'\n'"# Name: $new_alias_name"
-    new_alias_content+=$'\n'"# Desc: $desc"
-    new_alias_content+=$'\n'"$value"
-    new_alias_content+=' "$@"'
-
-    confirm_proceed_and_create="Go ahead create alias at [$(short_name_from_path "$new_alias_path")] OR edit alias?"$'\n'
-    confirm_proceed_and_create+="$(bat --style numbers --color always --language bash --paging=never <<<"$new_alias_content")"
-
-    # Is statisfied or redo part
-    if ! confirm --ppid=$$ --positive -- "$confirm_proceed_and_create"; then
-      echo-style --bold "Redo !!!"
-      local sel redo_options=(
-        "Name ($new_alias_name)"
-        "Value ($value)"
-        "Sub group name ($sub_path)"
-        "Description ($desc)"
-      ) title="Select which part to edit:"
+    function edit_name() {
+      new_alias_name="$(ask --linger 'Edit new alias name:')"
+      build_alias_content
+    }
+    function edit_value() {
+      value="$(ask --linger 'Edit new alias value:')"
+      build_alias_content
+    }
+    function edit_desc() {
+      desc="$(ask --linger 'Edit new alias description:')"
+      build_alias_content
+    }
+    function edit_sub_path() {
       while :; do
-        sel="$(choose "$title" -- "${redo_options[@]}")"
-        echo "Edit: $sel"
+        sub_path="$(ask --linger 'Edit sub path:')"
+        # path valid
+        if ! is_valid_path "$sub_path"; then
+          echo "Enter invalid"
+          sub_path="$(ask --linger "[$sub_path] is not valid | Input sub path again:")"
+          # path maxth depth
+        elif ! is_valid_subdir_depth "$sub_path"; then
+          sub_path="$(ask --linger "[$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
+          # elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
+          # # this is handled by the redo choose menu
+          # 	sub_path="$(ask --linger "Input subpath again:")"
+        else
+          break
+        fi
+      done
+      build_alias_content
+    }
 
-        # TODO: call selected re-edit func.
+    function set_NEW_ALIAS_arrays_to_new_single() {
+      NEW_ALIAS_NAMES=()
+      NEW_ALIAS_PATHS=()
+      NEW_ALIAS_CONTENTS=()
+      NEW_ALIAS_NAMES+=("$new_alias_name")
+      NEW_ALIAS_PATHS+=("$new_alias_path")
+      NEW_ALIAS_CONTENTS+=("$new_alias_content")
+    }
+    function build_alias_content() {
+      # compile data
+      new_alias_content=''
+      new_alias_path="$(make_destination "$sub_path")/$new_alias_name"
+      new_alias_content+="$SHEBANG_BASH"
+      new_alias_content+=$'\n'"# Name: $new_alias_name"
+      new_alias_content+=$'\n'"# Desc: $desc"
+      new_alias_content+=$'\n'"$value"
+      new_alias_content+=' "$@"'
+    }
+    build_alias_content
 
-        exit
+    # confirm current state of alias
+    while :; do
+      confirm_proceed_and_create="Go ahead create alias at [$(short_name_from_path "$new_alias_path")] OR edit alias?"$'\n'
+      confirm_proceed_and_create+="$(bat --style numbers --color always --language bash --paging=never <<<"$new_alias_content")"
+
+      if ! confirm --ppid=$$ --positive -- "$confirm_proceed_and_create"; then
+        local sel redo_options=() title="Select which part to edit:"
+        echo-style --bold "Redo !!!"
+        redo_options+=(edit_name "Name ($new_alias_name)")
+        redo_options+=(edit_value "Value ($value)")
+        redo_options+=(edit_sub_path "Sub group name ($sub_path)")
+        redo_options+=(edit_desc "Description ($desc)")
+
+        sel="$(choose "$title" --label -- "${redo_options[@]}")"
+        "$sel"
+
         # if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
         # 	break
         # fi
-      done
-    fi
+      else
+        break
+      fi
 
-    NEW_ALIAS_NAMES+=("$new_alias_name")
-    NEW_ALIAS_PATHS+=("$new_alias_path")
-    NEW_ALIAS_CONTENTS+=("$new_alias_content")
+    done
 
+    set_NEW_ALIAS_arrays_to_new_single
     # if confirm --ppid=$$ --positive -- "$confirm_proceed_and_create"; then
 
-    # NOTE: I need to check the err tests to understand why this exists
-    # without eval_capture
+    while :; do
 
-    local status
-    eval_capture --statusvar=status -- try_create_alias_files
-    # echo "status: $status"
-    # if try_create_alias_files; then
-    if [[ "$status" -ne 0 ]]; then
-      local label
-      label="[$status] Creating alias [$(short_name_from_path "$new_alias_path")] failed with reason:"$'\n'
-      label+="REASON: ${FAILING_ALIAS_REASON[0]}"
-      if confirm --ppid=$$ --positive -- "$label"; then
-
-        # TODO:
-        echo-style --error "TODO... redo failing part."
-        exit
+      # NOTE: I need to check the err tests to understand why this exists
+      # without eval_capture
+      local status
+      eval_capture --statusvar=status -- try_create_alias_files
+      # echo "status: $status"
+      # if try_create_alias_files; then
+      if [[ "$status" -ne 0 ]]; then
+        local label
+        label="[$status] Creating alias [$(short_name_from_path "$new_alias_path")] failed with reason:"
+        label+=$'\n'"REASON: ${FAILING_ALIAS_REASON[0]}"
+        label+=$'\n'"Do you want to re-edit failing part?"
+        if confirm --ppid=$$ --positive -- "$label"; then
+          local failure_redo_func="${FAILING_ALIAS_PARTS[0]}"
+          if [[ -n "$failure_redo_func" && "$failure_redo_func" == "none" ]]; then
+            echo-style --error "CREATE | Could not create alias [$(short_name_from_path "$new_alias_path")]. No re-edit func exists for failure. (todo: ignore/discard?)"
+          fi
+          "$failure_redo_func"
+          reset_failure_arrays
+          set_NEW_ALIAS_arrays_to_new_single
+        fi
+      else
+        break
       fi
+    done
+
+    if confirm --ppid=$$ --positive -- "Add nother alias?"; then
+      act_create
     fi
-
-    # TODO: Prompt continue add another alias??
-
-    # fi
   }
 
   function act_migrate() {
