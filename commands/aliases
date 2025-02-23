@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 
-# TODO: PARSER: handle failures in interactive loop.
+# TODO: (*) PARSER: handle failures in interactive loop.
+# TODO: ( ) Use fabric
 
 # FIX: ( ) Apply correct return/exit statuses wherever something returns
 #
-# TODO:
-# ( ) Only allow N alias subdir depth
 # MOVE TO CORE
 # - ( ) aliases
 # - ( ) get-interpreter
@@ -18,7 +17,6 @@
 #
 
 # TEST: Investigate AI for organizing the aliases.
-#
 
 function command_aliases_test() (
   # Test that aliases are migrated and parsed correctly. Handle:
@@ -689,11 +687,29 @@ function command_aliases() (
           #
           # choose menu, put failures first, and then sucesses.
           # enter -> fix.
+          #
+          # - (x) collect failures
+          # - ( ) collect successes.
+          # - ( )
+          #
+          # -----
+          # >> CHOOSE: 7 of 100 aliases had naming collisions. Select how to proceed:
+          # ? Create 93 aliases and discard collision?
+          # ? Fix naming collisions and try again?
+          # ? Abort completely ?
+          # ? Edit name/path of all aliases both successful AND failures ?
+          # -----
+          # choose failures.
+          #   for each one rectified
+          #     remove from failures
+          #       update the indexed value in NEW_ALIAS_*
+          #         when last one is done
+          #           confirm create N number of aliases.
+          # ------
+          # choose BROWSE parsed aliases.
 
           local status
           eval_capture --statusvar=status -- try_create_alias_files
-
-
 
           # Fix errors loop
           if [[ "$status" -ne 0 ]]; then
