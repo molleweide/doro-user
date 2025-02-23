@@ -12,6 +12,11 @@
 # - ( ) command-aliases
 # - ( ) is-valid-path
 
+# TODO: (overkill maybe)
+# - Capture the args and rename them to better names and inject this as a line
+#   before the function contents. And also rename the args in the function bodies.
+#
+
 # TEST: Investigate AI for organizing the aliases.
 #
 
@@ -41,14 +46,22 @@ function command_aliases() (
 
   # Use indices to get these back
   local NEW_ALIAS_NAMES=()
+  local NEW_ALIAS_VALUES=()
+  local NEW_ALIAS_DESCS=()
+  local NEW_ALIAS_ARGS=()
   local NEW_ALIAS_PATHS=()
   local NEW_ALIAS_CONTENTS=()
 
+  # a subset of these might only be used in `act_create` or `act_migrate`
   local FAILING_ALIAS_NAMES=()
+  local FAILING_ALIAS_KEY=() # Use so we can more easilly check which part failed.
+  local FAILING_ALIAS_VALUES=()
+  local FAILING_ALIAS_DESCS=()
+  local FAILING_ALIAS_ARGS=()
   local FAILING_ALIAS_PATHS=()
   local FAILING_ALIAS_CONTENTS=()
   local FAILING_ALIAS_REASON=()
-  local FAILING_ALIAS_PARTS=()
+  local FAILING_ALIAS_PARTS_REDO_FUNCS=() # Only used in `act_create`
 
   local GO_LIVE='yes'
 
@@ -317,12 +330,17 @@ function command_aliases() (
         ALL_EXISTING_ALIAS_PATHS+=("$path")
       fi
 
+      # echo "new args: [${NEW_ALIAS_ARGS[i]}] ???"
+
       if [[ "$failure" == 'yes' ]]; then
         FAILING_ALIAS_NAMES+=("$name")
+        FAILING_ALIAS_VALUES+=("${NEW_ALIAS_VALUES[i]}")
+        FAILING_ALIAS_DESCS+=("${NEW_ALIAS_DESCS[i]}")
+        FAILING_ALIAS_ARGS+=("${NEW_ALIAS_ARGS[i]}")
         FAILING_ALIAS_PATHS+=("$path")
         FAILING_ALIAS_CONTENTS+=("$content")
         FAILING_ALIAS_REASON+=("$reason")
-        FAILING_ALIAS_PARTS+=("$failure_part_redo_func")
+        FAILING_ALIAS_PARTS_REDO_FUNCS+=("$failure_part_redo_func")
       fi
     done
 
@@ -394,9 +412,11 @@ function command_aliases() (
   function act_create() {
     reset_failure_arrays
     local new_alias_name='' new_alias_path='' value=''desc='' sub_path='' confirm_proceed_and_create='' new_alias_content=''
+
     new_alias_name="$(ask --linger 'Aliases create | What will the NAME be?')"
     value="$(ask --linger 'Aliases create | What will the VALUE be?')"
     desc="$(ask --linger 'Aliases create | What will the DESC be?')"
+
     # handle sub dir group
     if confirm --ppid=$$ --negative -- 'Aliases create | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?'; then
       sub_path="$(ask --linger 'Aliases create | What will the SUB PATH be?')"
@@ -454,9 +474,15 @@ function command_aliases() (
       NEW_ALIAS_NAMES=()
       NEW_ALIAS_PATHS=()
       NEW_ALIAS_CONTENTS=()
+      NEW_ALIAS_VALUES=("")
+      NEW_ALIAS_DESCS=("")
+      NEW_ALIAS_ARGS=("")
       NEW_ALIAS_NAMES+=("$new_alias_name")
       NEW_ALIAS_PATHS+=("$new_alias_path")
       NEW_ALIAS_CONTENTS+=("$new_alias_content")
+      NEW_ALIAS_VALUES+=("")
+      NEW_ALIAS_DESCS+=("")
+      NEW_ALIAS_ARGS+=("")
     }
     function build_alias_content() {
       # compile data
@@ -512,7 +538,7 @@ function command_aliases() (
         label+=$'\n'"REASON: ${FAILING_ALIAS_REASON[0]}"
         label+=$'\n'"Do you want to re-edit failing part?"
         if confirm --ppid=$$ --positive -- "$label"; then
-          local failure_redo_func="${FAILING_ALIAS_PARTS[0]}"
+          local failure_redo_func="${FAILING_ALIAS_PARTS_REDO_FUNCS[0]}"
           if [[ -n "$failure_redo_func" && "$failure_redo_func" == "none" ]]; then
             echo-style --error "CREATE | Could not create alias [$(short_name_from_path "$new_alias_path")]. No re-edit func exists for failure. (todo: ignore/discard?)"
           fi
@@ -576,12 +602,11 @@ function command_aliases() (
           local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
           mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
           for line_alias in "${aliases[@]}"; do
-            local new_alias_name='' value='' trailing_comment='' new_alias_path new_alias_content=''
+            local new_alias_name='' new_alias_desc='' value='' trailing_comment='' new_alias_path new_alias_content=''
             # handle trim trailing comment
-            #
             if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
               line_alias="${BASH_REMATCH[1]}"
-              trailing_comment="${BASH_REMATCH[2]}"
+              new_alias_desc="${BASH_REMATCH[2]}"
             fi
             # handle split alias
             if [[ "$line_alias" =~ alias\ ([^=]+)=\"(.*)\" ]]; then
@@ -597,11 +622,14 @@ function command_aliases() (
             output_name_body_mapping+=("$new_alias_name")
             new_alias_content+="$SHEBANG_BASH"
             new_alias_content+=$'\n'"# Name: $new_alias_name"
-            new_alias_content+=$'\n'"# Desc: $trailing_comment"
+            new_alias_content+=$'\n'"# Desc: $new_alias_desc"
             new_alias_content+=$'\n'"$value "'"$@"'
             output_name_body_mapping+=("$new_alias_content")
 
             NEW_ALIAS_NAMES+=("$new_alias_name")
+            NEW_ALIAS_VALUES+=("$value")
+            NEW_ALIAS_DESCS+=("$new_alias_desc")
+            NEW_ALIAS_ARGS+=("")
             NEW_ALIAS_PATHS+=("$destination_sub_dir/$new_alias_name")
             NEW_ALIAS_CONTENTS+=("$new_alias_content")
           done
@@ -614,7 +642,7 @@ function command_aliases() (
           output_test_string+=$'\n###############################'
           mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
           for new_alias_name in "${function_names[@]}"; do
-            local final='' body body_trimmed new_alias_name new_alias_path new_alias_content
+            local final='' descriptiven='' body body_trimmed new_alias_name new_alias_path new_alias_content
             body="$(bash -c 'source '"$input_file"'; declare -f '"$new_alias_name")"
             body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
             # Capture how many arguments each func snippets takes
@@ -635,15 +663,19 @@ function command_aliases() (
                 fi
               done
             done <<<"$body_trimmed"
+            description="..."
             output_name_body_mapping+=("$new_alias_name")
             final+="$SHEBANG_BASH"
             final+=$'\n'"# Name: $new_alias_name"
-            final+=$'\n'"# Desc: ..."
+            final+=$'\n'"# Desc: $description"
             final+=$'\n'"# Args: ${arguments[*]}"
             final+=$'\n'"$body_trimmed"
             output_name_body_mapping+=("$final")
 
             NEW_ALIAS_NAMES+=("$new_alias_name")
+            NEW_ALIAS_VALUES+=("$body_trimmed")
+            NEW_ALIAS_DESCS+=("")
+            NEW_ALIAS_ARGS+=("'${arguments[@]}'")
             NEW_ALIAS_PATHS+=("$destination_sub_dir/$new_alias_name")
             NEW_ALIAS_CONTENTS+=("$new_alias_content")
           done
@@ -652,18 +684,39 @@ function command_aliases() (
             log_contents "$i"
           done
 
-          try_create_alias_files
+          # TODO: Before creating, choose menu browse confirm all and hit
+          # enter on a specific snippet to edit it.
+          #
+          # choose menu, put failures first, and then sucesses.
+          # enter -> fix.
 
-          # TODO: If any failures, prompt do you want to discard them or
-          # edit them?
-          # Reuse the logic from act_create here.
+          local status
+          eval_capture --statusvar=status -- try_create_alias_files
+
+
+
+          # Fix errors loop
+          if [[ "$status" -ne 0 ]]; then
+            echo-style --bold "ALIASES MIGRATE | Fix parser errors begin"
+            for ((i = 0; i < "${#FAILING_ALIAS_NAMES[@]}"; i++)); do
+              __print_lines "--------------------------------------------" \
+                "NAME: ${FAILING_ALIAS_NAMES[i]}" \
+                "DESC: ${FAILING_ALIAS_DESCS[i]}" \
+                "ARGS: ${FAILING_ALIAS_ARGS[i]}" \
+                "CONTENTS:" \
+                "${FAILING_ALIAS_CONTENTS[i]}"
+            done
+
+            # TODO: Create UI to fix each failed alias
+            #
+            #
+          fi
 
           # =======================================================
           # HANDLE OTHER SHELLS BELOW
           # =======================================================
 
         elif is-needle "$interpreter" -- "${supported_non_posix[@]}"; then
-
           if [[ "$interpreter" == "nu" ]]; then
             # HANDLE NUSHELL
             :

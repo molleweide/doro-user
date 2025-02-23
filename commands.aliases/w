@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Name: w
+# Desc: q
+q "$@"
