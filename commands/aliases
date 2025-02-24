@@ -30,6 +30,8 @@
 #               > alias -> dca
 #               >
 #
+# TODO: add custom keybind mappings to choose??
+#
 # TEST: test run/source newly created aliases to see if there are any missing
 # parts that would cause error.
 #
@@ -97,21 +99,12 @@ function command_aliases() (
 
 	local ALLOW_MAX_SUB_DIRS=2
 
-	# these are added in the validate_aliases_and_capture_failures so that subsequent aliases
-	# will always be able to check against the totality of all aliases when
-	# checking for uniqueness
-	# NOTE: If using `which <name>` in checking for uniqueness, then these two become
-	# redundant.
-	local ALL_EXISTING_ALIAS_PATHS=() # currently unused
-	local ALL_EXISTING_ALIAS_BASENAMES=()
-
 	# Use indices to get these back
 	local NEW_ALIAS_NAMES=()
 	local NEW_ALIAS_SUB_DIRS=()
 	local NEW_ALIAS_VALUES=()
 	local NEW_ALIAS_DESCS=()
 	local NEW_ALIAS_ARGS=()
-	local NEW_ALIAS_PATHS=() # remove this, and always concat the path..
 	local NEW_ALIAS_CONTENTS=()
 	local NEW_ALIAS_IS_FUNC=()
 
@@ -119,7 +112,7 @@ function command_aliases() (
 	local FAILING_ALIAS_CORRECTION_FUNCS=() # Only used in `act_create`
 	local SUCCESS_POSITIONS=() FAILING_POSITIONS=()
 
-	local GO_LIVE='yes'
+	local regex_rm_paths_with_files_extension='\.[^/]+$'
 
 	local supported=(
 		sh
@@ -263,7 +256,6 @@ function command_aliases() (
 	function reset_new_alias_arrays() {
 		NEW_ALIAS_NAMES=()
 		NEW_ALIAS_SUB_DIRS=()
-		NEW_ALIAS_PATHS=()
 		NEW_ALIAS_CONTENTS=()
 		NEW_ALIAS_VALUES=()
 		NEW_ALIAS_DESCS=()
@@ -272,12 +264,12 @@ function command_aliases() (
 	}
 
 	function reset_status_arrays() {
-		SUCCESS_POSITIONS=() FAILING_POSITIONS=()
+		SUCCESS_POSITIONS=() FAILING_POSITIONS=() FAILING_ALIAS_REASON=()
+	}
 
-		# FAILING_ALIAS_NAMES=()
-		# FAILING_ALIAS_PATHS=()
-		# FAILING_ALIAS_CONTENTS=()
-		FAILING_ALIAS_REASON=()
+	function reset_all() {
+		reset_new_alias_arrays
+		reset_status_arrays
 	}
 
 	# local char_classes="A-Za-z0-9"
@@ -307,20 +299,9 @@ function command_aliases() (
 	}
 
 	# get paths of existing aliases
-	function get_all_command_aliases() {
-		local regex_rm_paths_with_files_extension='\.[^/]+$'
+	function get_all_existing_dcas() {
 		find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
 	}
-
-	# # NOTE: Becomes redundant when checking w/`which`
-	# function collect_existing_alias_info() {
-	# 	ALL_EXISTING_ALIAS_BASENAMES=()
-	# 	ALL_EXISTING_ALIAS_PATHS=()
-	# 	while read -r line; do
-	# 		ALL_EXISTING_ALIAS_PATHS+=("$line")
-	# 		ALL_EXISTING_ALIAS_BASENAMES+=("$(basename "$line")")
-	# 	done < <(echo-lines -- "$(get_all_command_aliases)" | echo-trim-empty-lines --stdin)
-	# }
 
 	function get_dca_sub_dir_target() {
 		local input="${1-}"
@@ -331,7 +312,6 @@ function command_aliases() (
 		else
 			echo "$USER_COMMAND_ALIASES_DIR"
 		fi
-
 	}
 
 	function get_dca_path() {
@@ -347,13 +327,10 @@ function command_aliases() (
 		echo "commands${path#*"commands"}"
 	}
 
-	# if no args, then correct permissions for all alias paths
-	# else, correct permissions for input <path>s
 	function correct_permissions() {
-		echo "perms # == $#"
 		if [[ $# -eq 0 ]]; then
 			local alias_paths=()
-			mapfile -t alias_paths < <(get_all_command_aliases)
+			mapfile -t alias_paths < <(get_all_existing_dcas)
 			fs-own --x -- "${alias_paths[@]}"
 		else
 			fs-own --x --no-quiet -- "$@" # correct permissions for inpus only
@@ -394,7 +371,6 @@ function command_aliases() (
 
 	function name_has_uppercase() {
 		local index="${1-0}"
-		# echo "${NEW_ALIAS_NAMES[$index]} =~ [A-Z]"
 		if [[ "${NEW_ALIAS_NAMES[$index]}" =~ [A-Z] ]]; then
 			return 0
 		fi
@@ -404,7 +380,6 @@ function command_aliases() (
 	function name_has_valid_chars() {
 		local index="${1-0}"
 		local valid_chars="[a-zA-Z0-9._-]"
-		# echo "${NEW_ALIAS_NAMES[$index]} =~ $valid_chars"
 		if [[ "${NEW_ALIAS_NAMES[$index]}" =~ $valid_chars ]]; then
 			return 0
 		fi
@@ -414,7 +389,6 @@ function command_aliases() (
 	# make check case insensitive; macos filesystem is case insensitive.
 	function name_is_unique() {
 		local index="${1-0}"
-		# echo "which -s ${NEW_ALIAS_NAMES[$index],,}"
 		if which -s "${NEW_ALIAS_NAMES[$index],,}"; then
 			return 1
 		fi
@@ -496,16 +470,12 @@ function command_aliases() (
 		remove_array_index "FAILING_ALIAS_REASON" "$index"
 		remove_array_index "FAILING_ALIAS_CORRECTION_FUNCS" "$index"
 	}
-	# Defaults to index zero.
+
 	function build_contents() {
 		local index=${1-0} c=''
-
-		NEW_ALIAS_PATHS[$index]="$(get_dca_sub_dir_target "${NEW_ALIAS_SUB_DIRS[$index]}")/${NEW_ALIAS_NAMES[$index]}"
-
 		c+="$SHEBANG_BASH"
 		c+=$'\n'"# Name: ${NEW_ALIAS_NAMES[$index]}"
 		c+=$'\n'"# Desc: ${NEW_ALIAS_DESCS[$index]}"
-
 		if [[ "${NEW_ALIAS_IS_FUNC[$index]}" == 'yes' ]]; then
 			c+=$'\n'"# Args: ${NEW_ALIAS_ARGS[$index]}"
 			c+=$'\n'"${NEW_ALIAS_VALUES[$index]}"
@@ -566,16 +536,10 @@ function command_aliases() (
 
 	# ( ) choose
 	# ( ) fuzzy-helper
-	# BINDINGS
-	#   ( ) create new DCA from selection.
+	# ( ) keybind create new DCA from selection.
 	function act_browse() {
-		local regex_rm_paths_with_files_extension='\.[^/]+$'
-		local alias_paths=()
-		local alias_names=()
-		local alias_labels=()
-
-		# -maxdepth 1
-		mapfile -t alias_paths < <(get_all_command_aliases)
+		local alias_paths=() alias_names=() alias_labels=()
+		mapfile -t alias_paths < <(get_all_existing_dcas)
 		for path in "${alias_paths[@]}"; do
 			local header contents
 			# ${path#*"commands.aliases"} does not work for trimming everything before
@@ -585,9 +549,7 @@ function command_aliases() (
 			alias_names+=("$header")
 			alias_labels+=("$header"$'\n'"$contents")
 		done
-
-		__print_lines "${alias_labels[@]}"
-
+		# __print_lines "${alias_labels[@]}"
 		local index=0 choose_title="Aliases | Browser"
 		while :; do
 			index="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${alias_labels[@]}")"
@@ -595,28 +557,15 @@ function command_aliases() (
 				break
 			fi
 		done
-
 	}
 
-	# Use `dorothy-new` command here later when it is finished.
-	# ( ) check if name already exists. confirm...
-	# ( ) if you specify a path then create sub dirs under (*)
 	function act_create() {
-		local ask_prefix="ALIAS CREATE"
-		reset_new_alias_arrays
-		reset_status_arrays
-		local new_alias_name='' new_alias_path='' \
-			value=''desc='' sub_path='' confirm_proceed_and_create='' # new_alias_content=''
-
-		# this is just to make it not complain. not used in this func...
-		NEW_ALIAS_ARGS+=("")
-
+		local sub_path=''
+		reset_all
 		NEW_ALIAS_IS_FUNC+=('no')
-		NEW_ALIAS_NAMES+=("$(ask --linger "$ask_prefix | What will the NAME be?")")
-		NEW_ALIAS_VALUES+=("$(ask --linger "$ask_prefix | What will the VALUE be?")")
+		NEW_ALIAS_NAMES+=("$(ask --linger --required "$ask_prefix | What will the NAME be?")")
+		NEW_ALIAS_VALUES+=("$(ask --linger --required "$ask_prefix | What will the VALUE be?")")
 		NEW_ALIAS_DESCS+=("$(ask --linger "$ask_prefix | What will the DESC be?")")
-
-		# handle sub dir group
 		if confirm --ppid=$$ --negative -- "$ask_prefix | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?"; then
 			sub_path="$(ask --linger "$ask_prefix | What will the SUB PATH be?")"
 			while :; do
@@ -637,35 +586,11 @@ function command_aliases() (
 		else
 			NEW_ALIAS_SUB_DIRS+=("")
 		fi
-
-		# function reset_new_alias_arrays_single() {
-		#   NEW_ALIAS_NAMES=()
-		#   NEW_ALIAS_SUB_DIRS=()
-		#   NEW_ALIAS_PATHS=()
-		#   NEW_ALIAS_CONTENTS=()
-		#   NEW_ALIAS_VALUES=()
-		#   NEW_ALIAS_DESCS=()
-		#   NEW_ALIAS_ARGS=()
-		#
-		#   NEW_ALIAS_NAMES+=("$new_alias_name")
-		#   NEW_ALIAS_SUB_DIRS+=("$sub_path")
-		#   NEW_ALIAS_PATHS+=("$new_alias_path")
-		#   NEW_ALIAS_CONTENTS+=("$new_alias_content")
-		#   NEW_ALIAS_VALUES+=("")
-		#   NEW_ALIAS_DESCS+=("")
-		#   NEW_ALIAS_ARGS+=("")
-		# }
-
 		build_contents
-
-		# confirm current state of alias
+		local confirm_or_edit
 		while :; do
-			confirm_proceed_and_create="Go ahead create alias at "
-			confirm_proceed_and_create+="[$(short_name_from_path)] OR edit alias?"$'\n'
-			confirm_proceed_and_create+="$(bat --style numbers --color always --language bash --paging=never <<<"${NEW_ALIAS_CONTENTS[0]}")"}
-
-			# create or update current alias
-			if ! confirm --ppid=$$ --positive -- "$confirm_proceed_and_create"; then
+			confirm_or_edit="Go ahead create alias at [$(short_name_from_path)] OR edit alias?"$'\n'"$(log_single_content)"
+			if ! confirm --ppid=$$ --positive -- "$confirm_or_edit"; then
 				local redo_func redo_options=() title="Select which part to edit:"
 				redo_options+=(edit_name "Name (${NEW_ALIAS_NAMES[0]})")
 				redo_options+=(edit_value "Value (${NEW_ALIAS_VALUES[0]})")
@@ -676,56 +601,23 @@ function command_aliases() (
 			else
 				break
 			fi
-
 		done
 
-		# reset_new_alias_arrays_single
-
-		# loop
-		#   is valid
-		#     > fix failures
-		#     > break
-		# create
+		local failure_redo_func status
 		while :; do
-
-			# NOTE: I need to check the err tests to understand why this exists
-			# without eval_capture
-
-			# TODO: call the final validator func here instead.
-			local status
 			eval_capture --statusvar=status -- validate_aliases_and_capture_failures
-
 			if [[ "$status" -ne 0 ]]; then
 				local label
-
-				# Since we only deal with one DCA at once here, it means we can just use
-				# index 0 to access the data in FAILING_* arrays
-
 				label="[$status] Creating alias [$(short_name_from_path)] failed with reason:"
 				label+=$'\n'"REASON: ${FAILING_ALIAS_REASON[0]}"
 				label+=$'\n'"Do you want to re-edit failing part?"
-
 				if confirm --ppid=$$ --positive -- "$label"; then
-
-					local failure_redo_func="${FAILING_ALIAS_CORRECTION_FUNCS[0]}"
-
-					# Should never enter here
+					failure_redo_func="${FAILING_ALIAS_CORRECTION_FUNCS[0]}"
 					if [[ -n "$failure_redo_func" && "$failure_redo_func" == "none" ]]; then
-						local msg=''
-						msg="CREATE | Could not create alias "
-						msg+="[$(short_name_from_path)]. "
-						msg+="No re-edit func exists for failure. (todo: ignore/discard?)"
-						echo-style --error "$msg"
+						echo-style --error "CREATE | Could not create alias [$(short_name_from_path)]. No re-edit func exists for failure. (todo: ignore/discard?)"
 					fi
-
-					# pass failure index
 					"$failure_redo_func"
-
-					# reset for next validation loop
 					reset_status_arrays
-
-					# reset_new_alias_arrays_single
-
 				fi
 			else
 				create_new_alias_files # single
@@ -793,7 +685,6 @@ function command_aliases() (
 						NEW_ALIAS_VALUES+=("$value")
 						NEW_ALIAS_DESCS+=("$new_alias_desc")
 						NEW_ALIAS_ARGS+=("")
-						NEW_ALIAS_PATHS+=("$destination_sub_dir/$new_alias_name")
 						build_contents $(("${#NEW_ALIAS_NAMES[@]}" - 1))
 					done
 
@@ -829,7 +720,6 @@ function command_aliases() (
 						NEW_ALIAS_VALUES+=("$body_trimmed")
 						NEW_ALIAS_DESCS+=("")
 						NEW_ALIAS_ARGS+=("'${arguments[@]}'")
-						NEW_ALIAS_PATHS+=("$destination_sub_dir/$new_alias_name")
 						build_contents $(("${#NEW_ALIAS_NAMES[@]}" - 1))
 					done
 
