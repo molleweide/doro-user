@@ -10,6 +10,8 @@
 # TODO: (*) PARSER: handle failures in interactive loop.
 # TODO: ( ) Use fabric
 # TODO: ( ) Analyze existing DCAs and check which could be improved with `exec`
+#
+# WARN: This command is compatible with [Bash version 4.0 or later]
 
 # FIX: ( ) Apply correct return/exit statuses wherever something returns
 #
@@ -293,21 +295,43 @@ function command_aliases() (
     fi
   }
 
+  # Function to remove an index N from an array
+  function remove_array_index() {
+    local array_name="$1" # Array name passed as the first argument
+    local index="$2"      # Index to be removed
+
+    echo "remove index $index from array $array_name"
+
+    # Indirect reference to the array (using single quotes to prevent expansion)
+    echo 'local arr=("${'"$array_name"'[@]})'
+
+    # Rebuild the array excluding the element at the specified index
+    echo "$array_name"'=("${arr[@]:0:'"$index"'}" "${arr[@]:$(('"$index + 1"'))}")'
+  }
+
   # =======================================================
   # VALIDATORS
 
-  function name_has_uppercas() {
-    :
+  function name_has_uppercase() {
+    local index="${1-0}"
+    if [[ "${NEW_ALIAS_NAMES[$index]}" =~ [A-Z] ]]; then
+      return 1
+    fi
   }
 
   function name_has_valid_chars() {
-    :
+    local index="${1-0}"
+    local valid_chars="[a-zA-Z0-9._-]"
+    if [[ "${NEW_ALIAS_NAMES[$index]}" =~ $valid_chars ]]; then
+      return 0
+    fi
+    return 1
   }
 
   # make check case insensitive; macos filesystem is case insensitive.
-  function is_unique_alias() {
-    local alias=$1
-    if which -s "${alias,,}"; then
+  function name_is_unique() {
+    local index="${1-0}"
+    if which -s "${NEW_ALIAS_NAMES[$index],,}"; then
       return 1
     fi
   }
@@ -333,42 +357,35 @@ function command_aliases() (
 
   function validate_aliases_and_capture_failures() {
     for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
-      echo "index in validate: $i, #NEW_ALIAS_PATHS: ${#NEW_ALIAS_PATHS[@]}, #NEW_ALIAS_NAMES: ${#NEW_ALIAS_NAMES[@]}"
       local failure='no' reason=''
-      # local successful_paths=()
+
+      local failure_part_redo_func='' failure_validate_func=''
+
       local name="${NEW_ALIAS_NAMES[$i]}"
       local path="${NEW_ALIAS_PATHS[$i]}"
-      local content="${NEW_ALIAS_CONTENTS[$i]}"
-      local failure_part_redo_func=''
-      local failure_validate_func=''
 
-      #
-
-      if [[ "$name" =~ [A-Z] ]]; then
+      if ! name_has_uppercase "$i"; then
         FAILURE_INDICES+=("$i")
         failure='yes'
         failure_part_redo_func='edit_name'
         # failure_validate_func=''
         reason="Alias can only be lower case. Your input was [$name]."
         echo-style --error "$reason"
-      elif [[ "$name" =~ [^a-zA-Z0-9._-] ]]; then
+
+      elif ! name_has_valid_chars "$i"; then
         FAILURE_INDICES+=("$i")
         failure='yes'
         failure_part_redo_func='edit_name'
         reason="New alias name contains invalid characters. Your input was [$name]. These are valid chars (a-z0-9._-)"
         echo-style --error "$reason"
-      elif ! is_unique_alias "$name"; then
+
+      elif ! name_is_unique "$i"; then
         FAILURE_INDICES+=("$i")
         failure='yes'
         failure_part_redo_func='edit_name'
         reason="Alias with name [$name] already exists"
         echo-style --error "$reason"
-      # elif ! try_create_alias_file "$content" "$path"; then
-      # 	failure='yes'
-      # 	failure_part_redo_func='none'
-      # 	reason="Failure creating alias [$(short_name_from_path "$path")]!"
-      # 	successful_paths+=("$path")
-      # 	echo-style --error "$reason"
+
       else
         SUCCESS_INDICES+=("$i")
         echo-style --success "Successfully validated alias [$(short_name_from_path "$path")]"
@@ -426,8 +443,6 @@ function command_aliases() (
   function build_contents() {
     local index=${1-0} c=''
 
-    echo "BUILD | index: $index, #NEW_ALIAS_PATHS: ${#NEW_ALIAS_PATHS[@]}"
-
     NEW_ALIAS_PATHS[$index]="$(make_destination "${NEW_ALIAS_SUB_DIRS[$index]}")/${NEW_ALIAS_NAMES[$index]}"
 
     c+="$SHEBANG_BASH"
@@ -446,12 +461,13 @@ function command_aliases() (
 
   # =======================================================
   # EDIT FUNCS
+  #
+  # - ( ) Add ability to create more informative labels by passing, eg. failure reason.
 
   function edit_name() {
     local index=${1-0}
-    NEW_ALIAS_NAMES[index]="$(ask --linger "Edit new alias name (index: $index):")"
+    NEW_ALIAS_NAMES[index]="$(ask --linger "Edit name (old: ${NEW_ALIAS_NAMES[index]}) for index ($index):")"
     build_contents
-    echo "Length of #NEW_ALIAS_NAMES after re-edit: ${#NEW_ALIAS_NAMES[@]}"
   }
 
   function edit_value() {
@@ -533,7 +549,7 @@ function command_aliases() (
     reset_new_alias_arrays
     reset_status_arrays
     local new_alias_name='' new_alias_path='' \
-      value=''desc='' sub_path='' confirm_proceed_and_create='' new_alias_content=''
+      value=''desc='' sub_path='' confirm_proceed_and_create='' # new_alias_content=''
 
     #
     NEW_ALIAS_ARGS+=("")
@@ -595,6 +611,9 @@ function command_aliases() (
         # redo
         local redo_func redo_options=() title="Select which part to edit:"
         echo-style --bold "Redo !!!"
+
+        # FIX: update these variables to use NEW_* arrs
+
         redo_options+=(edit_name "Name ($new_alias_name)")
         redo_options+=(edit_value "Value ($value)")
         redo_options+=(edit_sub_path "Sub group name ($sub_path)")
@@ -742,7 +761,6 @@ function command_aliases() (
             new_alias_content+=$'\n'"# Name: $new_alias_name"
             new_alias_content+=$'\n'"# Desc: $new_alias_desc"
             new_alias_content+=$'\n'"$value "'"$@"'
-            # output_name_body_mapping+=("$new_alias_content")
 
             NEW_ALIAS_IS_FUNC+=('no')
             NEW_ALIAS_NAMES+=("$new_alias_name")
@@ -751,9 +769,7 @@ function command_aliases() (
             NEW_ALIAS_DESCS+=("$new_alias_desc")
             NEW_ALIAS_ARGS+=("")
             NEW_ALIAS_PATHS+=("$destination_sub_dir/$new_alias_name")
-            NEW_ALIAS_CONTENTS+=("$new_alias_content")
-
-            build_contents "${#NEW_ALIAS_NAMES[@]}"
+            build_contents $(("${#NEW_ALIAS_NAMES[@]}" - 1))
           done
 
           # ----
@@ -786,17 +802,6 @@ function command_aliases() (
                 fi
               done
             done <<<"$body_trimmed"
-
-            # description="..."
-
-            # output_name_body_mapping+=("$new_alias_name")
-            # final+="$SHEBANG_BASH"
-            # final+=$'\n'"# Name: $new_alias_name"
-            # final+=$'\n'"# Desc: $description"
-            # final+=$'\n'"# Args: ${arguments[*]}"
-            # final+=$'\n'"$body_trimmed"
-            # output_name_body_mapping+=("$final")
-
             NEW_ALIAS_IS_FUNC+=('yes')
             NEW_ALIAS_NAMES+=("$new_alias_name")
             NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
@@ -804,8 +809,7 @@ function command_aliases() (
             NEW_ALIAS_DESCS+=("")
             NEW_ALIAS_ARGS+=("'${arguments[@]}'")
             NEW_ALIAS_PATHS+=("$destination_sub_dir/$new_alias_name")
-            NEW_ALIAS_CONTENTS+=("$new_alias_content")
-            build_contents "${#NEW_ALIAS_NAMES[@]}"
+            build_contents $(("${#NEW_ALIAS_NAMES[@]}" - 1))
           done
 
           # for i in "${NEW_ALIAS_CONTENTS[@]}"; do
@@ -866,48 +870,38 @@ function command_aliases() (
           echo "-------"
 
           while [[ "${#FAILURE_INDICES[@]}" -gt 0 ]]; do
-
             local index=0 choose_title="${#FAILURE_INDICES[@]} / ${#NEW_ALIAS_NAMES[@]} failed. Select below to fix failing issue."
             local labels_failures=()
-
             for ((i = 0; i < "${#FAILURE_INDICES[@]}"; i++)); do
-              # local
-              # echo "loop failure indices: $i"
-
               local label=''
               label+="$(echo-style --error+bold "[$(short_name_from_path "${NEW_ALIAS_SUB_DIRS[$i]}/${NEW_ALIAS_NAMES[$i]}")] FAILED")"
               label+=$'\n'"$(echo-style --dim "REASON: ${FAILING_ALIAS_REASON[$i]}")"
               labels_failures+=("$label")
-
-              # label="[$status] Creating alias [$(short_name_from_path "$new_alias_path")] failed with reason:"
-              # label+=$'\n'"REASON: ${FAILING_ALIAS_REASON[0]}"
-              # label+=$'\n'"Do you want to re-edit failing part?"
             done
-
-            # select alias to fix
             selected_failure_arr_index="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${labels_failures[@]}")"
             local corresponding_new_aliases_index="${FAILURE_INDICES[$selected_failure_arr_index]}"
-
             echo "map sel($selected_failure_arr_index) -> all($corresponding_new_aliases_index)"
             local fixed='no'
 
-            # (x) select failure index
-            # ( ) while
+            # target index
+            local ti="$corresponding_new_aliases_index"
             while [[ "$fixed" == "no" ]]; do
-              # CALL FIX_FAILURE_FUNC
-              # >> this will modify the NEW_* arrs value
-              "${FAILING_ALIAS_PARTS_REDO_FUNCS[$selected_failure_arr_index]}" "$corresponding_new_aliases_index"
 
-              # TODO: VALIDATE MODIFIED NEW_* ARRS VALUE
-              # - break out the validator into its own func so that I can validate
-              #     a single value
-              #
-              # I need to know what to use in order to perform the singular check
-              #   create a small helper for each check
-              #     assign failure key
-              #       call key
+              edit_name "$ti"
 
-              # TODO: on success -> update NEW_* arr AND trim index from FAILURE_INDICES
+              if ! name_has_uppercase "$ti" && name_has_valid_chars "$ti" && name_is_unique "$ti"; then
+                fixed='yes'
+
+                # - (x) update NEW_* arr is done in the edit_func above.
+
+                # - (x) trim failures index
+
+                remove_array_index "FAILURE_INDICES" "$selected_failure_arr_index"
+                remove_array_index "FAILING_ALIAS_REASON" "$selected_failure_arr_index"
+                remove_array_index "FAILING_ALIAS_PARTS_REDO_FUNCS" "$selected_failure_arr_index"
+
+              fi
+
             done
 
             #
