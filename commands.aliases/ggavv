@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-# Name: b
+# Name: GG
 # Desc: 
 echo "$@"

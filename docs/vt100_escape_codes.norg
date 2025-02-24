@@ -4,20 +4,27 @@ description:
 authors: hjalmarjakobsson
 categories:
 created: 2025-02-23T10:41:59-0500
-updated: 2025-02-23T10:42:46-0500
+updated: 2025-02-24T07:38:34-0500
 version: 1.1.1
 @end
 
 @code bash
 
 VT100 escape codes
-This document describes how to control a VT100 terminal. The entries are of the form "name, description, escape code".
+This document describes how to control a VT100 terminal. The entries are of the
+form "name, description, escape code".
 
-The name isn't important, and the description is just to help you find what you're looking for. What you have to do is send the "escape code" to the screen. These codes are often several characters long, but they all begin with ^[. This isn't the two characters ^ and [, but rather a representation of the ASCII code ESC (which is why these are called escape codes).
+The name isn't important, and the description is just to help you find what
+you're looking for. What you have to do is send the "escape code" to the
+screen. These codes are often several characters long, but they all begin with
+^[. This isn't the two characters ^ and [, but rather a representation of the
+ASCII code ESC (which is why these are called escape codes).
 
-ESC has the decimal value 27 and should be sent before the rest of the code, which is simply an ASCII string.
+ESC has the decimal value 27 and should be sent before the rest of the code,
+which is simply an ASCII string.
 
-As an example of how to use this information, here's how to clear the screen in C, using the VT100 escape codes:
+As an example of how to use this information, here's how to clear the screen in
+C, using the VT100 escape codes:
 
     #define ASCII_ESC 27
     printf( "%c[2J", ASCII_ESC );

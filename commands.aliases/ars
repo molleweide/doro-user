@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
-# Name: eeeee
+# Name: ars
 # Desc: 
-echo "$@"
+# Args: ''
+echo "????"
