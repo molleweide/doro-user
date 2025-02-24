@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Name: kork
+# Desc: bosk
+tork "$@"

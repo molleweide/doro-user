@@ -4,10 +4,9 @@
 # DOROTHY COMMAND ALIAS (DCA) HELPER
 #
 
-# WARN: Only handle name collisions for the parser. DO NOT GO OVER BOARD!!!
-
-# TODO: (x) use NEW_ALIAS_SUB_DIRS and concatenate paths in validate_aliases_and_capture_failures
-# TODO: (*) PARSER: handle failures in interactive loop.
+# TODO: ( ) create_new -> adding a subd dir is not working anymore >> fix
+# TODO: ( ) create_new -> fix choose edit alias.
+#               >> i am using old variables that dont work anymore.
 # TODO: ( ) Use fabric
 # TODO: ( ) Analyze existing DCAs and check which could be improved with `exec`
 #
@@ -66,7 +65,7 @@ function command_aliases() (
   local ALL_EXISTING_ALIAS_PATHS=() # currently unused
   local ALL_EXISTING_ALIAS_BASENAMES=()
 
-  local SUCCESS_INDICES=() FAILING_POSITIONS=()
+  local SUCCESS_POSITIONS=() FAILING_POSITIONS=()
 
   # Use indices to get these back
   local NEW_ALIAS_NAMES=()
@@ -195,11 +194,38 @@ function command_aliases() (
     esac
   done
 
+  ###
+
+  function debug_against_failures() {
+
+    echo "-------"
+    for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
+      echo "NEW_ALIAS_NAMES: $i -> ${NEW_ALIAS_NAMES[i]}"
+    done
+    echo "-------"
+    for i in "${FAILING_POSITIONS[@]}"; do
+      echo "FPOS: $i -> ALL: ${NEW_ALIAS_NAMES[i]}"
+    done
+    echo "-------"
+
+  }
+  ###
+
+  function log_failure_and_success_positions() {
+    echo "--- failure positions ---"
+    echo "${FAILING_POSITIONS[@]}"
+    echo "--- success positions ---"
+    echo "${SUCCESS_POSITIONS[@]}"
+    echo "-------"
+  }
+
   # =======================================================
   # HELPER
 
   function log_contents() {
-    bat --style numbers --color always --language bash --paging=never <<<"$1"
+    for c in "${NEW_ALIAS_CONTENTS[@]}"; do
+      bat --style numbers --color always --language bash --paging=never <<<"$c"
+    done
   }
 
   function reset_new_alias_arrays() {
@@ -214,7 +240,7 @@ function command_aliases() (
   }
 
   function reset_status_arrays() {
-    SUCCESS_INDICES=() FAILING_POSITIONS=()
+    SUCCESS_POSITIONS=() FAILING_POSITIONS=()
 
     # FAILING_ALIAS_NAMES=()
     # FAILING_ALIAS_PATHS=()
@@ -406,7 +432,7 @@ function command_aliases() (
         echo-style --error "$reason"
 
       else
-        SUCCESS_INDICES+=("$i")
+        SUCCESS_POSITIONS+=("$i")
         echo-style --success "Successfully validated alias [$(short_name_from_path "$path")]"
         # successful_paths+=("$path")
         # add to existing here so the unique checks will work correctly in the
@@ -440,7 +466,7 @@ function command_aliases() (
     # fi
 
     local complete_failure='yes'
-    if [[ "${#SUCCESS_INDICES[@]}" == "${#NEW_ALIAS_NAMES[@]}" ]]; then
+    if [[ "${#SUCCESS_POSITIONS[@]}" == "${#NEW_ALIAS_NAMES[@]}" ]]; then
       complete_failure='no'
     fi
 
@@ -735,23 +761,11 @@ function command_aliases() (
         # HANDLE POSIX
         # =======================================================
 
-        function parse_new_alias_from_posix_alias() {
-          :
-        }
-
-        function parse_new_alias_from_posix_function() {
-          :
-        }
-
         if is-needle "$interpreter" -- "${supported_posix[@]}"; then
           local aliases=() function_names=()
 
           # ----
           # HANDLE POSIX ALIASES
-
-          # output_test_string+=$'\n###############################'
-          # output_test_string+=$'\n# ALIASES'
-          # output_test_string+=$'\n###############################'
 
           local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
           mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
@@ -771,14 +785,6 @@ function command_aliases() (
               value="${BASH_REMATCH[2]}"
             fi
 
-            # echo "$new_alias_name | $value"
-
-            # # output_name_body_mapping+=("$new_alias_name")
-            # new_alias_content+="$SHEBANG_BASH"
-            # new_alias_content+=$'\n'"# Name: $new_alias_name"
-            # new_alias_content+=$'\n'"# Desc: $new_alias_desc"
-            # new_alias_content+=$'\n'"$value "'"$@"'
-
             NEW_ALIAS_IS_FUNC+=('no')
             NEW_ALIAS_NAMES+=("$new_alias_name")
             NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
@@ -791,10 +797,6 @@ function command_aliases() (
 
           # ----
           # HANDLE POSIX FUNCTIONS
-
-          # output_test_string+=$'\n###############################'
-          # output_test_string+=$'\n# FUNCTIONS'
-          # output_test_string+=$'\n###############################'
 
           mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
           for new_alias_name in "${function_names[@]}"; do
@@ -829,69 +831,25 @@ function command_aliases() (
             build_contents $(("${#NEW_ALIAS_NAMES[@]}" - 1))
           done
 
-          # for i in "${NEW_ALIAS_CONTENTS[@]}"; do
-          # 	log_contents "$i"
-          # done
+          #	log_contents
 
-          # TODO: Before creating, choose menu browse confirm all and hit
-          # enter on a specific snippet to edit it.
-          #
-          # choose menu, put failures first, and then sucesses.
-          # enter -> fix.
-          #
-          # - (x) collect failures
-          # - ( ) collect successes.
-          # - ( )
-          #
           # -----
           # >> CHOOSE: 7 of 100 aliases had naming collisions. Select how to proceed:
           # ? Create 93 aliases and discard collision?
           # ? Fix naming collisions and try again?
           # ? Abort completely ?
           # ? Edit name/path of all aliases both successful AND failures ?
-          # -----
-          # TODO: ASSUME WE WANT TO FIX FAILURES
-          # choose failures
-          #   select single and edit
-          #     if valid remove from failures
-          #       update indices in NEW_ALIAS_*
-          #         if failures == 0 break
-          # confirm create N numbe of aliases
+          # ----
 
-          # local alias_paths=()
-          # local failure_name=()
-          # local failure_labels=()
-          # for ((i=0; i < "${#FAILING_ALIAS_NAMES[@]}"; i++)); do
-          # 	local header contents
-          # 	# ${path#*"commands.aliases"} does not work for trimming everything before
-          # 	# the match pattern. That is why the string looks a bit weird below.
-          # 	#
-          # 	# header="commands${path#*"commands"}"
-          # 	# contents="$("${BAT_CMD[@]}" "$path")"
-          # 	# alias_names+=("$header")
-          # 	alias_labels+=("$header"$'\n'"$contents")
-          # done
-
-          # __print_lines "${alias_labels[@]}"
-
-          # TODO: How do I now handle dry running?
-          #
-
-          # local status
+          # validate parsed aliases and funcs
           eval_capture --statusvar=status -- validate_aliases_and_capture_failures
 
-          echo "--- failure indices ---"
-          echo "${FAILING_POSITIONS[@]}"
-          echo "--- success indices ---"
-          echo "${SUCCESS_INDICES[@]}"
-          echo "-------"
+          # log_failure_and_success_positions
 
           while [[ "${#FAILING_POSITIONS[@]}" -gt 0 ]]; do
-            local index=0 choose_title="${#FAILING_POSITIONS[@]} bad / ${#SUCCESS_INDICES[@]} good / ${#NEW_ALIAS_NAMES[@]} total | Select below to fix failing issue."
+            local index=0 choose_title="${#FAILING_POSITIONS[@]} bad / ${#SUCCESS_POSITIONS[@]} good / ${#NEW_ALIAS_NAMES[@]} total | Select below to fix failing issue."
             local labels_failures=()
-
-            echo "::: FAILING_POSITIONS[@]} :::"
-
+            # echo "::: FAILING_POSITIONS[@]} :::"
             for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
               local label=''
               local label_number=$((i + 1))
@@ -904,59 +862,36 @@ function command_aliases() (
               labels_failures+=("$label")
             done
 
-            # collect failing positions
-
             sel_fail_idx_pos="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${labels_failures[@]}")"
+            local sel_fail_idx_val="${FAILING_POSITIONS[$sel_fail_idx_pos]}"
 
-            local fail_idx_val="${FAILING_POSITIONS[$sel_fail_idx_pos]}"
+            # debug_against_failures
 
-            echo "-------"
-            for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
-              echo "NEW_ALIAS_NAMES: $i -> ${NEW_ALIAS_NAMES[i]}"
-            done
-            echo "-------"
-            for i in "${FAILING_POSITIONS[@]}"; do
-              echo "FPOS: $i -> ALL: ${NEW_ALIAS_NAMES[i]}"
-            done
-            echo "-------"
-
-            # echo "failure indices: ${FAILING_POSITIONS[*]}"
-            # echo "fail idx pos: $sel_fail_idx_pos"
-            # echo "fail idx val: ${FAILING_POSITIONS[$sel_fail_idx_pos]}"
-            # echo "fail idx val in NEW_ALIAS_NAMES: ${NEW_ALIAS_NAMES[$fail_idx_val]}"
-            # echo "map sel($sel_fail_idx_pos) -> all($fail_idx_val) -> ${NEW_ALIAS_NAMES[$fail_idx_val]}"
+            # TODO: handle cancellation
+            if [[ -z "$sel_fail_idx_pos" ]]; then
+              :
+            fi
 
             local fixed='no'
 
             # target index
-            local ti="$fail_idx_val"
+            local ti="$sel_fail_idx_val"
             while [[ "$fixed" == "no" ]]; do
-
               edit_name "$ti"
-
               if ! name_has_uppercase "$ti" && name_has_valid_chars "$ti" && name_is_unique "$ti"; then
                 fixed='yes'
-
-                # - (x) update NEW_* arr is done in the edit_func above.
-
-                # - (x) trim failures index
-                #
-                # FIX: It is not removing indices properly
 
                 remove_array_index "FAILING_POSITIONS" "$sel_fail_idx_pos"
                 remove_array_index "FAILING_ALIAS_REASON" "$sel_fail_idx_pos"
                 remove_array_index "FAILING_ALIAS_PARTS_REDO_FUNCS" "$sel_fail_idx_pos"
 
-                # maybe sort??
-                SUCCESS_INDICES+=("$ti")
-                SUCCESS_INDICES=($(printf "%s\n" "${array[@]}" | sort -n))
+                SUCCESS_POSITIONS+=("$ti")
+                SUCCESS_POSITIONS=($(printf "%s\n" "${array[@]}" | sort -n))
 
               fi
 
             done
 
-            #
-            # ( )
 
             # if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${FAILING_ALIAS_PATHS[index]}"$'\n'"Prompt again?"; then
             # 	break
@@ -964,25 +899,7 @@ function command_aliases() (
 
           done
 
-          # write alias files
-          # create_new_alias_files
-
-          # # Fix errors loop
-          # if [[ "$status" -ne 0 ]]; then
-          #   echo-style --bold "ALIASES MIGRATE | Fix parser errors begin"
-          #   for ((i = 0; i < "${#FAILING_ALIAS_NAMES[@]}"; i++)); do
-          #     __print_lines "--------------------------------------------" \
-          #       "NAME: ${FAILING_ALIAS_NAMES[i]}" \
-          #       "DESC: ${FAILING_ALIAS_DESCS[i]}" \
-          #       "ARGS: ${FAILING_ALIAS_ARGS[i]}" \
-          #       "CONTENTS:" \
-          #       "${FAILING_ALIAS_CONTENTS[i]}"
-          #   done
-          #
-          #   # TODO: Create UI to fix each failed alias
-          #   #
-          #   #
-          # fi
+          create_new_alias_files
 
           # =======================================================
           # HANDLE OTHER SHELLS BELOW

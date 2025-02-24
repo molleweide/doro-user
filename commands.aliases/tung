@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Name: tung
+# Desc: tung
+echo "$@"
