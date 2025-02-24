@@ -8,8 +8,6 @@
 
 # TODO: (x) use NEW_ALIAS_SUB_DIRS and concatenate paths in validate_aliases_and_capture_failures
 # TODO: (*) PARSER: handle failures in interactive loop.
-#           (*) make redo funcs operate on NEW_* arrs instead of internal vars
-#               ( ) modify `act_create`
 # TODO: ( ) Use fabric
 # TODO: ( ) Analyze existing DCAs and check which could be improved with `exec`
 
@@ -45,6 +43,10 @@ function command_aliases() (
   source "$DOROTHY/sources/bash.bash"
   __require_array 'mapfile'
 
+  # set -o errtrace  # Ensures ERR traps are inherited by functions
+  # set -o functrace # Ensures DEBUG traps are inherited by functions
+  # # set -E           # Same as `errtrace`
+
   # short DCA = dorothy command aliases
   # migrate aliases to dorothy
 
@@ -72,6 +74,7 @@ function command_aliases() (
   local NEW_ALIAS_ARGS=()
   local NEW_ALIAS_PATHS=() # remove this, and always concat the path..
   local NEW_ALIAS_CONTENTS=()
+  local NEW_ALIAS_IS_FUNC=()
 
   # NOTE: If using `FAILURE_INDICES` in checking for uniqueness, then these two become
   # redundant.
@@ -80,7 +83,7 @@ function command_aliases() (
   local FAILING_ALIAS_VALUES=()
   local FAILING_ALIAS_DESCS=()
   local FAILING_ALIAS_ARGS=()
-  local FAILING_ALIAS_PATHS=()
+  # local FAILING_ALIAS_PATHS=()
   local FAILING_ALIAS_CONTENTS=()
 
   # These are necessary.
@@ -205,15 +208,15 @@ function command_aliases() (
     NEW_ALIAS_VALUES=()
     NEW_ALIAS_DESCS=()
     NEW_ALIAS_ARGS=()
+    NEW_ALIAS_IS_FUNC=()
   }
 
   function reset_status_arrays() {
     SUCCESS_INDICES=() FAILURE_INDICES=()
 
-    # TODO: these should be removed when using indices is fully implemented
-    FAILING_ALIAS_NAMES=()
-    FAILING_ALIAS_PATHS=()
-    FAILING_ALIAS_CONTENTS=()
+    # FAILING_ALIAS_NAMES=()
+    # FAILING_ALIAS_PATHS=()
+    # FAILING_ALIAS_CONTENTS=()
     FAILING_ALIAS_REASON=()
   }
 
@@ -290,6 +293,17 @@ function command_aliases() (
     fi
   }
 
+  # =======================================================
+  # VALIDATORS
+
+  function name_has_uppercas() {
+    :
+  }
+
+  function name_has_valid_chars() {
+    :
+  }
+
   # make check case insensitive; macos filesystem is case insensitive.
   function is_unique_alias() {
     local alias=$1
@@ -297,6 +311,8 @@ function command_aliases() (
       return 1
     fi
   }
+
+  # =======================================================
 
   function create_new_alias_files() {
 
@@ -317,11 +333,14 @@ function command_aliases() (
 
   function validate_aliases_and_capture_failures() {
     for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
-      local failure='no' reason='' successful_paths=()
+      echo "index in validate: $i, #NEW_ALIAS_PATHS: ${#NEW_ALIAS_PATHS[@]}, #NEW_ALIAS_NAMES: ${#NEW_ALIAS_NAMES[@]}"
+      local failure='no' reason=''
+      # local successful_paths=()
       local name="${NEW_ALIAS_NAMES[$i]}"
       local path="${NEW_ALIAS_PATHS[$i]}"
       local content="${NEW_ALIAS_CONTENTS[$i]}"
       local failure_part_redo_func=''
+      local failure_validate_func=''
 
       #
 
@@ -329,6 +348,7 @@ function command_aliases() (
         FAILURE_INDICES+=("$i")
         failure='yes'
         failure_part_redo_func='edit_name'
+        # failure_validate_func=''
         reason="Alias can only be lower case. Your input was [$name]."
         echo-style --error "$reason"
       elif [[ "$name" =~ [^a-zA-Z0-9._-] ]]; then
@@ -352,11 +372,11 @@ function command_aliases() (
       else
         SUCCESS_INDICES+=("$i")
         echo-style --success "Successfully validated alias [$(short_name_from_path "$path")]"
-        successful_paths+=("$path")
+        # successful_paths+=("$path")
         # add to existing here so the unique checks will work correctly in the
         # act_create loop for multiple creation loops.
-        ALL_EXISTING_ALIAS_BASENAMES+=("$name")
-        ALL_EXISTING_ALIAS_PATHS+=("$path")
+        # ALL_EXISTING_ALIAS_BASENAMES+=("$name")
+        # ALL_EXISTING_ALIAS_PATHS+=("$path")
       fi
 
       # echo "new args: [${NEW_ALIAS_ARGS[i]}] ???"
@@ -364,12 +384,12 @@ function command_aliases() (
       if [[ "$failure" == 'yes' ]]; then
 
         # When using FAILURE_INDICES then all of these are redundant.
-        FAILING_ALIAS_NAMES+=("$name")
-        FAILING_ALIAS_VALUES+=("${NEW_ALIAS_VALUES[i]}")
-        FAILING_ALIAS_DESCS+=("${NEW_ALIAS_DESCS[i]}")
-        FAILING_ALIAS_ARGS+=("${NEW_ALIAS_ARGS[i]}")
-        FAILING_ALIAS_PATHS+=("$path")
-        FAILING_ALIAS_CONTENTS+=("$content")
+        # FAILING_ALIAS_NAMES+=("$name")
+        # FAILING_ALIAS_VALUES+=("${NEW_ALIAS_VALUES[i]}")
+        # FAILING_ALIAS_DESCS+=("${NEW_ALIAS_DESCS[i]}")
+        # FAILING_ALIAS_ARGS+=("${NEW_ALIAS_ARGS[i]}")
+        # FAILING_ALIAS_PATHS+=("$path")
+        # FAILING_ALIAS_CONTENTS+=("$content")
 
         # need these arrays
         FAILING_ALIAS_REASON+=("$reason")
@@ -384,7 +404,7 @@ function command_aliases() (
     # fi
 
     local complete_failure='yes'
-    if [[ "${#successful_paths[@]}" == "${#NEW_ALIAS_NAMES[@]}" ]]; then
+    if [[ "${#SUCCESS_INDICES[@]}" == "${#NEW_ALIAS_NAMES[@]}" ]]; then
       complete_failure='no'
     fi
 
@@ -402,6 +422,72 @@ function command_aliases() (
 
   }
 
+  # Defaults to index zero.
+  function build_contents() {
+    local index=${1-0} c=''
+
+    echo "BUILD | index: $index, #NEW_ALIAS_PATHS: ${#NEW_ALIAS_PATHS[@]}"
+
+    NEW_ALIAS_PATHS[$index]="$(make_destination "${NEW_ALIAS_SUB_DIRS[$index]}")/${NEW_ALIAS_NAMES[$index]}"
+
+    c+="$SHEBANG_BASH"
+    c+=$'\n'"# Name: ${NEW_ALIAS_NAMES[$index]}"
+    c+=$'\n'"# Desc: ${NEW_ALIAS_DESCS[$index]}"
+
+    if [[ "${NEW_ALIAS_IS_FUNC[$index]}" == 'yes' ]]; then
+      c+=$'\n'"# Args: ${NEW_ALIAS_ARGS[$index]}"
+      c+=$'\n'"${NEW_ALIAS_VALUES[$index]}"
+    else
+      c+=$'\n'"${NEW_ALIAS_VALUES[$index]}"
+      c+=' "$@"'
+    fi
+    NEW_ALIAS_CONTENTS[index]="$c"
+  }
+
+  # =======================================================
+  # EDIT FUNCS
+
+  function edit_name() {
+    local index=${1-0}
+    NEW_ALIAS_NAMES[index]="$(ask --linger "Edit new alias name (index: $index):")"
+    build_contents
+    echo "Length of #NEW_ALIAS_NAMES after re-edit: ${#NEW_ALIAS_NAMES[@]}"
+  }
+
+  function edit_value() {
+    local index=${1-0}
+    NEW_ALIAS_VALUES[index]="$(ask --linger "Edit command value (index: $index):")"
+    build_contents
+  }
+
+  function edit_desc() {
+    local index=${1-0}
+    NEW_ALIAS_DESCS[index]="$(ask --linger "Edit new alias description (index: $index):")"
+    build_contents
+  }
+
+  function edit_sub_path() {
+    local index=${1-0}
+    local sub_path
+    while :; do
+      sub_path="$(ask --linger 'Redo sub path:')"
+      # path valid | validation is already done in the final validator func.
+      # maybe it can be removed from here...
+      if ! is_valid_path "$sub_path"; then
+        sub_path="$(ask --linger "[$sub_path] is not valid | Input sub path again:")"
+        # This could also go into the validator?
+      elif ! is_valid_subdir_depth "$sub_path"; then
+        sub_path="$(ask --linger "[$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
+        # elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
+        # # this is handled by the redo choose menu
+        # 	sub_path="$(ask --linger "Input subpath again:")"
+      else
+        break
+      fi
+    done
+    NEW_ALIAS_SUB_DIRS[index]="$sub_path"
+    build_contents
+  }
   # =======================================================
   # ACTIONS
 
@@ -443,20 +529,25 @@ function command_aliases() (
   # ( ) check if name already exists. confirm...
   # ( ) if you specify a path then create sub dirs under (*)
   function act_create() {
+    local ask_prefix="ALIAS CREATE"
     reset_new_alias_arrays
     reset_status_arrays
-    local new_alias_name='' new_alias_path='' value=''desc='' sub_path='' confirm_proceed_and_create='' new_alias_content=''
+    local new_alias_name='' new_alias_path='' \
+      value=''desc='' sub_path='' confirm_proceed_and_create='' new_alias_content=''
 
-    NEW_ALIAS_NAMES+=("$(ask --linger 'Aliases create | What will the NAME be?')")
-    NEW_ALIAS_VALUES+=("$(ask --linger 'Aliases create | What will the VALUE be?')")
-    NEW_ALIAS_DESCS+=("$(ask --linger 'Aliases create | What will the DESC be?')")
+    #
+    NEW_ALIAS_ARGS+=("")
+
+    NEW_ALIAS_IS_FUNC+=('no')
+    NEW_ALIAS_NAMES+=("$(ask --linger "$ask_prefix | What will the NAME be?")")
+    NEW_ALIAS_VALUES+=("$(ask --linger "$ask_prefix | What will the VALUE be?")")
+    NEW_ALIAS_DESCS+=("$(ask --linger "$ask_prefix | What will the DESC be?")")
     # handle sub dir group
-    if confirm --ppid=$$ --negative -- 'Aliases create | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?'; then
-      sub_path="$(ask --linger 'Aliases create | What will the SUB PATH be?')"
+    if confirm --ppid=$$ --negative -- "$ask_prefix | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?"; then
+      sub_path="$(ask --linger "$ask_prefix | What will the SUB PATH be?")"
       while :; do
         # path valid
         if ! is_valid_path "$sub_path"; then
-          echo "Enter invalid"
           sub_path="$(ask --linger "[$sub_path] is not valid | Input sub path again:")"
           # path maxth depth
         elif ! is_valid_subdir_depth "$sub_path"; then
@@ -469,76 +560,9 @@ function command_aliases() (
           break
         fi
       done
+    else
+      NEW_ALIAS_SUB_DIRS+=("")
     fi
-
-    # FIX: This needs to take its data from NEW_* arrs
-    # =============================================
-    # == When name updated -> need to rebuild content for same index.
-    # ==
-    # == This is so that the builder func can work for both CREATE and MIGRATE.
-    # =============================================
-
-    function build_alias_contents_single() {
-      # compile data
-      new_alias_content=''
-      new_alias_path="$(make_destination "$sub_path")/$new_alias_name"
-      new_alias_content+="$SHEBANG_BASH"
-      new_alias_content+=$'\n'"# Name: $new_alias_name"
-      new_alias_content+=$'\n'"# Desc: $desc"
-      new_alias_content+=$'\n'"$value"
-      new_alias_content+=' "$@"'
-    }
-
-    # TODO: ??? (i think i can remove this) fix these and call after the re-edit choose menu upon request.
-    #
-    # TODO: for each edit func
-    #         take index in NEW_* arr as arg
-    #           udate the NEW_* arg with corresponding value.
-    #             move these funcs out of `act_create`
-    #               use them in `act_migrate <failure_index>` to handle parser failures.
-    #
-    #
-    # NOTE: When name updated -> need to rebuild content for same index.
-    function edit_name() {
-      new_alias_name="$(ask --linger 'Redo new alias name:')"
-      build_alias_contents_single
-      NEW_ALIAS_NAMES[i]="$new_alias_name"
-
-      NEW_ALIAS_CONTENTS[i]="$new_alias_content"
-    }
-    function edit_value() {
-      value="$(ask --linger 'Redo new alias value:')"
-      build_alias_contents_single
-      NEW_ALIAS_VALUES[i]="$value"
-      NEW_ALIAS_CONTENTS[i]="$new_alias_content"
-    }
-    function edit_desc() {
-      desc="$(ask --linger 'Redo new alias description:')"
-      build_alias_contents_single
-      NEW_ALIAS_DESCS[i]="$desc"
-      NEW_ALIAS_CONTENTS[i]="$new_alias_content"
-    }
-    function edit_sub_path() {
-      while :; do
-        sub_path="$(ask --linger 'Redo sub path:')"
-        # path valid | validation is already done in the final validator func.
-        # maybe it can be removed from here...
-        if ! is_valid_path "$sub_path"; then
-          sub_path="$(ask --linger "[$sub_path] is not valid | Input sub path again:")"
-          # This could also go into the validator?
-        elif ! is_valid_subdir_depth "$sub_path"; then
-          sub_path="$(ask --linger "[$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
-          # elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
-          # # this is handled by the redo choose menu
-          # 	sub_path="$(ask --linger "Input subpath again:")"
-        else
-          break
-        fi
-      done
-      build_alias_contents_single
-      NEW_ALIAS_SUB_DIRS[i]="$sub_path"
-      NEW_ALIAS_CONTENTS[i]="$new_alias_content"
-    }
 
     # function reset_new_alias_arrays_single() {
     #   NEW_ALIAS_NAMES=()
@@ -558,12 +582,13 @@ function command_aliases() (
     #   NEW_ALIAS_ARGS+=("")
     # }
 
-    build_alias_contents_single
+    build_contents
 
     # confirm current state of alias
     while :; do
-      confirm_proceed_and_create="Go ahead create alias at [$(short_name_from_path "$new_alias_path")] OR edit alias?"$'\n'
-      confirm_proceed_and_create+="$(bat --style numbers --color always --language bash --paging=never <<<"$new_alias_content")"
+      confirm_proceed_and_create="Go ahead create alias at "
+      confirm_proceed_and_create+="[$(short_name_from_path "${NEW_ALIAS_PATHS[0]}")] OR edit alias?"$'\n'
+      confirm_proceed_and_create+="$(bat --style numbers --color always --language bash --paging=never <<<"${NEW_ALIAS_CONTENTS[0]}")"}
 
       if ! confirm --ppid=$$ --positive -- "$confirm_proceed_and_create"; then
 
@@ -577,7 +602,7 @@ function command_aliases() (
 
         redo_func="$(choose "$title" --label -- "${redo_options[@]}")"
 
-        "$redo_func" 0
+        "$redo_func"
 
         # if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
         # 	break
@@ -620,11 +645,15 @@ function command_aliases() (
 
           # Should never enter here
           if [[ -n "$failure_redo_func" && "$failure_redo_func" == "none" ]]; then
-            echo-style --error "CREATE | Could not create alias [$(short_name_from_path "$new_alias_path")]. No re-edit func exists for failure. (todo: ignore/discard?)"
+            local msg=''
+            msg="CREATE | Could not create alias "
+            msg+="[$(short_name_from_path "${NEW_ALIAS_PATHS[0]}")]. "
+            msg+="No re-edit func exists for failure. (todo: ignore/discard?)"
+            echo-style --error "$msg"
           fi
 
           # pass failure index
-          "$failure_redo_func" 0
+          "$failure_redo_func"
 
           # reset for next validation loop
           reset_status_arrays
@@ -659,7 +688,7 @@ function command_aliases() (
       local input_file=$1
 
       local output_test_string=''
-      local output_name_body_mapping=()
+      # local output_name_body_mapping=()
 
       local interpreter=''
 
@@ -679,7 +708,7 @@ function command_aliases() (
         }
 
         if is-needle "$interpreter" -- "${supported_posix[@]}"; then
-          local aliases=() function_names=() function_bodies=()
+          local aliases=() function_names=()
 
           # ----
           # HANDLE POSIX ALIASES
@@ -708,13 +737,14 @@ function command_aliases() (
 
             # echo "$new_alias_name | $value"
 
-            output_name_body_mapping+=("$new_alias_name")
+            # output_name_body_mapping+=("$new_alias_name")
             new_alias_content+="$SHEBANG_BASH"
             new_alias_content+=$'\n'"# Name: $new_alias_name"
             new_alias_content+=$'\n'"# Desc: $new_alias_desc"
             new_alias_content+=$'\n'"$value "'"$@"'
-            output_name_body_mapping+=("$new_alias_content")
+            # output_name_body_mapping+=("$new_alias_content")
 
+            NEW_ALIAS_IS_FUNC+=('no')
             NEW_ALIAS_NAMES+=("$new_alias_name")
             NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
             NEW_ALIAS_VALUES+=("$value")
@@ -722,6 +752,8 @@ function command_aliases() (
             NEW_ALIAS_ARGS+=("")
             NEW_ALIAS_PATHS+=("$destination_sub_dir/$new_alias_name")
             NEW_ALIAS_CONTENTS+=("$new_alias_content")
+
+            build_contents "${#NEW_ALIAS_NAMES[@]}"
           done
 
           # ----
@@ -730,6 +762,7 @@ function command_aliases() (
           output_test_string+=$'\n###############################'
           output_test_string+=$'\n# FUNCTIONS'
           output_test_string+=$'\n###############################'
+
           mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
           for new_alias_name in "${function_names[@]}"; do
             local final='' descriptiven='' body body_trimmed new_alias_name new_alias_path new_alias_content
@@ -753,15 +786,18 @@ function command_aliases() (
                 fi
               done
             done <<<"$body_trimmed"
-            description="..."
-            output_name_body_mapping+=("$new_alias_name")
-            final+="$SHEBANG_BASH"
-            final+=$'\n'"# Name: $new_alias_name"
-            final+=$'\n'"# Desc: $description"
-            final+=$'\n'"# Args: ${arguments[*]}"
-            final+=$'\n'"$body_trimmed"
-            output_name_body_mapping+=("$final")
 
+            # description="..."
+
+            # output_name_body_mapping+=("$new_alias_name")
+            # final+="$SHEBANG_BASH"
+            # final+=$'\n'"# Name: $new_alias_name"
+            # final+=$'\n'"# Desc: $description"
+            # final+=$'\n'"# Args: ${arguments[*]}"
+            # final+=$'\n'"$body_trimmed"
+            # output_name_body_mapping+=("$final")
+
+            NEW_ALIAS_IS_FUNC+=('yes')
             NEW_ALIAS_NAMES+=("$new_alias_name")
             NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
             NEW_ALIAS_VALUES+=("$body_trimmed")
@@ -769,6 +805,7 @@ function command_aliases() (
             NEW_ALIAS_ARGS+=("'${arguments[@]}'")
             NEW_ALIAS_PATHS+=("$destination_sub_dir/$new_alias_name")
             NEW_ALIAS_CONTENTS+=("$new_alias_content")
+            build_contents "${#NEW_ALIAS_NAMES[@]}"
           done
 
           # for i in "${NEW_ALIAS_CONTENTS[@]}"; do
@@ -857,12 +894,20 @@ function command_aliases() (
             # (x) select failure index
             # ( ) while
             while [[ "$fixed" == "no" ]]; do
-              :
-              # TODO: need to make edit funcs operate on main arrays instead of internal vars.
+              # CALL FIX_FAILURE_FUNC
+              # >> this will modify the NEW_* arrs value
+              "${FAILING_ALIAS_PARTS_REDO_FUNCS[$selected_failure_arr_index]}" "$corresponding_new_aliases_index"
+
+              # TODO: VALIDATE MODIFIED NEW_* ARRS VALUE
+              # - break out the validator into its own func so that I can validate
+              #     a single value
               #
-              #       call fix_failure_func
-              #         validate again
-              #            on success -> update NEW_* arr AND trim index from FAILURE_INDICES
+              # I need to know what to use in order to perform the singular check
+              #   create a small helper for each check
+              #     assign failure key
+              #       call key
+
+              # TODO: on success -> update NEW_* arr AND trim index from FAILURE_INDICES
             done
 
             #
