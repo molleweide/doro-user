@@ -10,16 +10,16 @@
 # URGENT
 #
 #
-# TODO: act_migrate: --fix-iterate (*)
-#         - instead of using choose, loop `ask` and fix each failure one by one.
-#             (default is choose menu.)
-#
 # TODO: act_migrate: choose improve choices (**)
 #         - select: update entry (if failure then trim and reload)
 #         - esc: cancel to create only successful parsed DCAs
 #         - ^C: to abort completely
 #
-# TODO: act_migrate: --include-successful (pertains to both * and **)
+# TODO: (*) act_migrate: --fix-iterate (*)
+#         - instead of using choose, loop `ask` and fix each failure one by one.
+#             (default is choose menu.)
+#
+# TODO: (*) act_migrate: --include-successful (pertains to both * and **)
 #         - include successful ones so that you can update successful parses
 #           as well
 #
@@ -86,19 +86,10 @@ function command_aliases() (
 	source "$DOROTHY/sources/bash.bash"
 	__require_array 'mapfile'
 
-	# set -o errtrace  # Ensures ERR traps are inherited by functions
-	# set -o functrace # Ensures DEBUG traps are inherited by functions
-	# # set -E           # Same as `errtrace`
-
-	# short DCA = dorothy command aliases
-	# migrate aliases to dorothy
-
 	local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
 	local SHEBANG_BASH="#!/usr/bin/env bash"
 	local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
-
 	local ALLOW_MAX_SUB_DIRS=2
-
 	# Use indices to get these back
 	local NEW_ALIAS_NAMES=()
 	local NEW_ALIAS_SUB_DIRS=()
@@ -107,13 +98,10 @@ function command_aliases() (
 	local NEW_ALIAS_ARGS=()
 	local NEW_ALIAS_CONTENTS=()
 	local NEW_ALIAS_IS_FUNC=()
-
 	local FAILING_ALIAS_REASON=()
 	local FAILING_ALIAS_CORRECTION_FUNCS=() # Only used in `act_create`
 	local SUCCESS_POSITIONS=() FAILING_POSITIONS=()
-
 	local regex_rm_paths_with_files_extension='\.[^/]+$'
-
 	local supported=(
 		sh
 		bash
@@ -188,13 +176,15 @@ function command_aliases() (
 	}
 
 	# local option_args=()
-	local option_action='' option_migrate_to_subdir='' option_args=()
+	local option_action='' option_migrate_to_subdir='' option_args=() option_fix_iterate='no' option_include_successful='no'
 	while [[ $# -ne 0 ]]; do
 		item="$1"
 		shift
 		case "$item" in
 		'--help' | '-h') help ;;
 		'--to='*) option_migrate_to_subdir="${item#*=}" ;;
+		'--fix-iterate') option_fix_iterate='yes' ;;               # todo
+		'--include-successful') option_include_successful='yes' ;; # todo
 		'browse') option_action="browse" ;;
 		'new' | 'create') option_action="create" ;;
 		'migrate') option_action="migrate" ;;
@@ -631,24 +621,15 @@ function command_aliases() (
 	}
 
 	function act_migrate() {
-		local destination_sub_dir
-
-		# On initial parse, then the <sub_path> for all parsed DCAs will be the same.
-		# They will only deviate if user decides to modify DCAs before writing them.
+		local destination_sub_dir interpreter='' inputfile
 		if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_path "$option_migrate_to_subdir"; then
 			echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
 			exit 1
 		fi
-
 		destination_sub_dir="$(get_dca_sub_dir_target)"
 
 		function migrate_single_file() {
-			local input_file=$1 interpreter=''
-
-			# local output_test_string=''
-			# local output_name_body_mapping=()
-
-			interpreter="$(get-interpreter --name -- "$input_file")"
+			input_file=$1 interpreter="$(get-interpreter --name -- "$input_file")"
 			if is-needle "$interpreter" -- "${supported[@]}"; then
 
 				# =======================================================
@@ -678,7 +659,6 @@ function command_aliases() (
 							new_alias_name="${BASH_REMATCH[1]}"
 							value="${BASH_REMATCH[2]}"
 						fi
-
 						NEW_ALIAS_IS_FUNC+=('no')
 						NEW_ALIAS_NAMES+=("$new_alias_name")
 						NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
@@ -696,10 +676,8 @@ function command_aliases() (
 						local final='' descriptiven='' body body_trimmed new_alias_name new_alias_path new_alias_content
 						body="$(bash -c 'source '"$input_file"'; declare -f '"$new_alias_name")"
 						body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
-						# Capture how many arguments each func snippets takes
-						# This is not perfect but at least it gives some indication.
-						local arguments=()
-						local count=0
+						# Capture how many arguments each func snippets takes. This is not perfect but at least it gives some indication.
+						local arguments=() count=0
 						while read -r line; do
 							local line="$line"
 							while [[ "$line" =~ (\$[0-9]+) ]]; do
@@ -744,6 +722,13 @@ function command_aliases() (
 						sel_fail_idx_val="${FAILING_POSITIONS[$sel_fail_idx_pos]}"
 
 						# debug_against_failures
+
+						# TODO: act_migrate: choose improve choices (**)
+						#         (x) select: update entry (if failure then trim and reload)
+						#         (*) esc/cancel: create only successful
+						#         (x) ^C: to abort completely
+						#         ---
+						#         ( ) Add the above to choose title
 
 						# TODO: handle cancellation
 						if [[ -z "$sel_fail_idx_pos" ]]; then
