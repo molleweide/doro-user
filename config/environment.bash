@@ -12,6 +12,14 @@ export LOCATE_PATH
 export DISABLE_AUTO_TITLE
 export TERM
 
+# Add Dorothy Command Aliases (DCA) to path
+path='' alias_dirs=()
+mapfile -t alias_dirs < <(find "$DOROTHY/user/commands.aliases" -type d)
+for p in "${alias_dirs[@]}"; do
+	path+="$p:"
+done
+PATH="$path$PATH"
+
 # DOROTHY_THEME="starship"
 VIRTUAL_ENV_DISABLE_PROMPT=1
 
@@ -42,12 +50,12 @@ LC_ALL="en_US.UTF-8"
 
 # mac
 if is-mac; then
-  XDG_DESKTOP_DIR="$HOME/Desktop"
-  XDG_DOCUMENTS_DIR="$HOME/Documents"
-  XDG_DOWNLOAD_DIR="$HOME/Downloads"
-  XDG_MUSIC_DIR="$HOME/Music"
-  XDG_PICTURES_DIR="$HOME/Pictures"
-  XDG_VIDEOS_DIR="$HOME/Videos"
+	XDG_DESKTOP_DIR="$HOME/Desktop"
+	XDG_DOCUMENTS_DIR="$HOME/Documents"
+	XDG_DOWNLOAD_DIR="$HOME/Downloads"
+	XDG_MUSIC_DIR="$HOME/Music"
+	XDG_PICTURES_DIR="$HOME/Pictures"
+	XDG_VIDEOS_DIR="$HOME/Videos"
 fi
 
 # TMUX_TMPDIR="$XDG_RUNTIME_DIR"
@@ -97,9 +105,9 @@ GHCUP_USE_XDG_DIRS=true # force XDG
 HISTFILE="$XDG_DATA_HOME/history"
 LESSHISTFILE="-"
 if test "$shell" = 'zsh'; then
-  HISTFILE="$XDG_STATE_HOME/zsh/history"
-  mkdir -p "$XDG_STATE_HOME/zsh"
-  touch "$HISTFILE"
+	HISTFILE="$XDG_STATE_HOME/zsh/history"
+	mkdir -p "$XDG_STATE_HOME/zsh"
+	touch "$HISTFILE"
 fi
 
 # Why do I check the path?
@@ -152,11 +160,10 @@ REAPER_TMP_DIR="$REAPER_DIR/tmp"
 REAPER_BACKUP_DIR="$REAPER_DIR/backup"
 REAPER_SAMPLES_DIR="$REAPER_DIR/samples"
 
-
 # =======================================================
 # PAGER
 
-PAGER='less'         # alt. `most`
+PAGER='less' # alt. `most`
 # # Set the default Less options.
 # # Mouse-wheel scrolling has been disabled by -X (disable screen clearing).
 # # Remove -X to enable it.
@@ -167,4 +174,3 @@ PAGER='less'         # alt. `most`
 # if (( $#commands[(i)lesspipe(|.sh)] )); then
 #   export LESSOPEN="| /usr/bin/env $commands[(i)lesspipe(|.sh)] %s 2>&-"
 # fi
-

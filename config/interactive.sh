@@ -11,6 +11,13 @@ source "$DOROTHY/config/interactive.sh"
 
 # load my fancy stuff
 for f in "$DOROTHY/user/sources/"*.sh; do
+
+  if [[ "$f" == *"_.sh" ]]; then
+    echo "ignore [$f]"
+    continue
+  fi
+
+
   source "$f"
 done
 
