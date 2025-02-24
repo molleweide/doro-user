@@ -300,15 +300,28 @@ function command_aliases() (
 		local array_name="$1" # Array name passed as the first argument
 		local index="$2"      # Index to be removed
 
-		# echo
-		# echo
-		echo "remove index $index from array $array_name -> ${!array_name[*]}"
+		# # # echo
+		# # # echo
+		# # echo "remove index $index from array $array_name -> ${!array_name[5]}"
+		# echo "${!array_name[@]}"
+		#
+		# # Indirect reference to the array (using single quotes to prevent expansion)
+		# eval 'local arr=("${!'"$array_name"'[@]}")'
+		#
+		# # Rebuild the array excluding the element at the specified index
+		# eval "$array_name"'=("${arr[@]:0:'"$index"'}" "${arr[@]:$(('"$index + 1"'))}")'
 
-		# Indirect reference to the array (using single quotes to prevent expansion)
-		eval 'local arr=("${!'"$array_name"'[@]}")'
+		# Print the current state of the array
+		eval 'echo "Before removal: ${'"$array_name"'[@]}"'
 
-		# Rebuild the array excluding the element at the specified index
-		eval "$array_name"'=("${arr[@]:0:'"$index"'}" "${arr[@]:$(('"$index + 1"'))}")'
+		# Create a local array copy
+		eval "local arr=(\"\${$array_name[@]}\")"
+
+		# Rebuild the array excluding the element at index N
+		eval "$array_name=(\"\${arr[@]:0:$index}\" \"\${arr[@]:$((index + 1))}\")"
+
+		# # Print the modified array
+		# eval 'echo "After removal: ${'"$array_name"'[@]}"'
 	}
 
 	# =======================================================
@@ -883,7 +896,7 @@ function command_aliases() (
 							local label=''
 							local label_number=$((i + 1))
 							local failing_idx="${FAILING_POSITIONS[i]}"
-							label+="$(echo-style --error+bold "No.$label_number : ")"
+							label+="$(echo-style --error+bold "No.$i : ")"
 							label+="[$(short_name_from_path "${NEW_ALIAS_PATHS[$failing_idx]}")] FAILED "
 							label+="fidx $failing_idx -> ${NEW_ALIAS_NAMES[$failing_idx]}"
 							label+=$'\n'"$(echo-style --dim "REASON: ${FAILING_ALIAS_REASON[$i]}")"
@@ -899,11 +912,11 @@ function command_aliases() (
 
 						echo "-------"
 						for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
-						  echo "NEW_ALIAS_NAMES: $i -> ${NEW_ALIAS_NAMES[i]}"
+							echo "NEW_ALIAS_NAMES: $i -> ${NEW_ALIAS_NAMES[i]}"
 						done
 						echo "-------"
 						for i in ${FAILING_POSITIONS[@]}; do
-						  echo "FPOS: $i -> ALL: ${NEW_ALIAS_NAMES[i]}"
+							echo "FPOS: $i -> ALL: ${NEW_ALIAS_NAMES[i]}"
 						done
 						echo "-------"
 
