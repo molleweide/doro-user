@@ -253,19 +253,6 @@ function command_aliases() (
 	# 	done < <(echo-lines -- "$(get_all_command_aliases)" | echo-trim-empty-lines --stdin)
 	# }
 
-	# WARN: Unused | This should go into SEC.
-	# function add_command_aliases_dirs_to_path() {
-	# 	local path='' alias_dirs=()
-	# 	mapfile -t alias_dirs < <(find "$USER_COMMAND_ALIASES_DIR" -type d)
-	# 	# __print_lines "${alias_dirs[@]}"
-	# 	local path=''
-	# 	for p in "${alias_dirs[@]}"; do
-	# 		path+="$p:"
-	# 	done
-	# 	echo "$path$PATH"
-	# 	# export PATH
-	# }
-
 	# TODO: Use indices here to concat the destination directory
 	function make_destination() {
 		if [[ -n "$option_migrate_to_subdir" ]]; then
@@ -281,59 +268,41 @@ function command_aliases() (
 	# if no args, then correct permissions for all alias paths
 	# else, correct permissions for input <path>s
 	function correct_permissions() {
-		return
+		echo "perms # == $#"
 		if [[ $# -eq 0 ]]; then
 			local alias_paths=()
 			mapfile -t alias_paths < <(get_all_command_aliases)
 			fs-own --x -- "${alias_paths[@]}"
 		else
-			fs-own --x -- "$@" # correct permissions for inpus only
+			fs-own --x --no-quiet -- "$@" # correct permissions for inpus only
 		fi
 	}
 
 	function is_unique_alias() {
 		local alias=$1
-
-		# TODO: Remove `is-needle`, only use `which`
-
-		# if which "$alias"; then
-		#   echo "which passed for [$alias]"
-		# fi
-
-		# if is-needle "$alias" -- "${ALL_EXISTING_ALIAS_BASENAMES[@]}"; then # && ! which "$alias"; then
-
-    echo "lower: ${alias,,}"
-
-    # make check case insensitive; macos filesystem is case insensitive.
+		# make check case insensitive; macos filesystem is case insensitive.
 		if which "${alias,,}"; then
 			echo "which failed for [$alias]"
 			return 1
 		fi
 	}
 
-	# DEPRECATED..
-	# function try_create_alias_file() {
-	# 	local content=$1 path=$2 status=0
-	# 	__mkdirp "$(dirname "$path")"
-	# 	echo "$content" >"$path" || status=$?
-	# 	return "$status"
-	# }
-
 	function create_new_alias_files() {
-		local target_dir target_name prev_dir=''
+
+		local target_path target_dir target_name prev_dir='' target_new_paths=()
 		for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
 			if [[ -z "$prev_dir" || "$target_dir" == "$prev_dir" ]]; then
 				target_dir="$(make_destination "${NEW_ALIAS_SUB_DIRS[$i]}")"
 				__mkdirp "$(dirname "$target_dir")"
 			fi
 			target_name="${NEW_ALIAS_NAMES[$i]}"
-			echo-style --success "[DEBUG] CREATE: $(short_name_from_path "$target_dir/$target_name")"
-			echo "${NEW_ALIAS_CONTENTS[i]}" >"$target_dir/$target_name"
+			target_path="$target_dir/$target_name"
+			echo-style --success "[DEBUG] CREATE: $(short_name_from_path "$target_path")"
+			echo "${NEW_ALIAS_CONTENTS[$i]}" >"$target_path"
+			target_new_paths+=("$target_path")
 		done
-		correct_permissions "${NEW_ALIAS_PATHS[@]}" # bulk correct permissions
+		correct_permissions "${target_new_paths[@]}" # bulk correct permissions
 	}
-
-	# TODO: Rename to "validate_and_capture_failures"
 
 	function validate_aliases_and_capture_failures() {
 		for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
@@ -343,8 +312,21 @@ function command_aliases() (
 			local content="${NEW_ALIAS_CONTENTS[$i]}"
 			local failure_part_redo_func=''
 
-			if ! is_unique_alias "$name"; then
-				echo "??? [$name]"
+			#
+
+			if [[ "$name" =~ [A-Z] ]]; then
+				FAILURE_INDICES+=("$i")
+				failure='yes'
+				failure_part_redo_func='edit_name'
+				reason="Alias can only be lower case. Your input was [$name]."
+				echo-style --error "$reason"
+			elif [[ "$name" =~ [^a-zA-Z0-9._-] ]]; then
+				FAILURE_INDICES+=("$i")
+				failure='yes'
+				failure_part_redo_func='edit_name'
+				reason="New alias name contains invalid characters. Your input was [$name]. These are valid chars (a-z0-9._-)"
+				echo-style --error "$reason"
+			elif ! is_unique_alias "$name"; then
 				FAILURE_INDICES+=("$i")
 				failure='yes'
 				failure_part_redo_func='edit_name'
@@ -798,18 +780,29 @@ function command_aliases() (
 					echo "${SUCCESS_INDICES[@]}"
 					echo "-------"
 
-					local labels_failures=()
-
-					for i in "${FAILURE_INDICES[@]}"; do
-						labels_failures+=("$(make_destination "${NEW_ALIAS_SUB_DIRS[$i]}")/${NEW_ALIAS_NAMES[$i]}")
-					done
-
-					local index=0 choose_title="Fix aliases"
 					while [[ "${#FAILURE_INDICES[@]}" -gt 0 ]]; do
+
+						local index=0 choose_title="Fix aliases" labels_failures=()
+
+						for i in "${FAILURE_INDICES[@]}"; do
+							local label=''
+							label+="$(echo-style --error+bold "[$(short_name_from_path "${NEW_ALIAS_SUB_DIRS[$i]}/${NEW_ALIAS_NAMES[$i]}")] FAILED")"
+							label+=$'\n'"$(echo-style --dim "REASON: ${FAILING_ALIAS_REASON[$i]}")"
+							labels_failures+=("$label")
+
+							# label="[$status] Creating alias [$(short_name_from_path "$new_alias_path")] failed with reason:"
+							# label+=$'\n'"REASON: ${FAILING_ALIAS_REASON[0]}"
+							# label+=$'\n'"Do you want to re-edit failing part?"
+
+						done
+
+						# select alias to fix
 						index="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${labels_failures[@]}")"
+
 						if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${FAILING_ALIAS_PATHS[index]}"$'\n'"Prompt again?"; then
 							break
 						fi
+
 					done
 
 					# write alias files

@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-# Name: xy
+# Name: eeeee
 # Desc: 
-xxxxxyyyy "$@"
+echo "$@"
