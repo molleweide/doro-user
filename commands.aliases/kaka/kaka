@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Name: kaka
+# Desc: kakakakak
+echo "$@"

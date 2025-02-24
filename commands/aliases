@@ -3,14 +3,46 @@
 #
 # DOROTHY COMMAND ALIAS (DCA) HELPER
 #
-
-# TODO: ( ) create_new -> adding a subd dir is not working anymore >> fix
-# TODO: ( ) create_new -> fix choose edit alias.
-#               >> i am using old variables that dont work anymore.
-# TODO: ( ) Use fabric
-# TODO: ( ) Analyze existing DCAs and check which could be improved with `exec`
+# This command is compatible with [Bash version 4.0 or later]
 #
-# WARN: This command is compatible with [Bash version 4.0 or later]
+
+# -----------------------------------------------------------------------------
+# URGENT
+#
+#
+# TODO: act_migrate: --fix-iterate (*)
+#         - instead of using choose, loop `ask` and fix each failure one by one.
+#             (default is choose menu.)
+#
+# TODO: act_migrate: choose improve choices (**)
+#         - select: update entry (if failure then trim and reload)
+#         - esc: cancel to create only successful parsed DCAs
+#         - ^C: to abort completely
+#
+# TODO: act_migrate: --include-successful (pertains to both * and **)
+#         - include successful ones so that you can update successful parses
+#           as well
+#
+# TODO: fix naming conventions.
+#           - ( ) replace terms
+#               > alias -> dca
+#               >
+#
+# -----------------------------------------------------------------------------
+# NEXT
+#
+# ( ) Use fabric
+# ( ) Analyze existing DCAs and check which could be improved with `exec`
+#
+# -----------------------------------------------------------------------------
+#
+# LATER
+#
+# - OPTIMIZATONS
+#   - improve structure. eg. what takes the most time during parsing.
+#   - use other available programs to increase speed.
+#
+# -----------------------------------------------------------------------------
 
 # FIX: ( ) Apply correct return/exit statuses wherever something returns
 #
@@ -222,7 +254,12 @@ function command_aliases() (
   # =======================================================
   # HELPER
 
-  function log_contents() {
+  function log_single_content() {
+    local index="${1-0}"
+    bat --style numbers --color always --language bash --paging=never <<<"${NEW_ALIAS_CONTENTS[$index]}"
+  }
+
+  function log_all_contents() {
     for c in "${NEW_ALIAS_CONTENTS[@]}"; do
       bat --style numbers --color always --language bash --paging=never <<<"$c"
     done
@@ -298,10 +335,11 @@ function command_aliases() (
 
   # TODO: Use indices here to concat the destination directory
   function make_destination() {
+    local input="${1-}"
     if [[ -n "$option_migrate_to_subdir" ]]; then
       echo "$USER_COMMAND_ALIASES_DIR/$option_migrate_to_subdir"
-    elif [[ -n "${1-}" ]]; then
-      echo "$USER_COMMAND_ALIASES_DIR/$1"
+    elif [[ -n "$input" ]]; then
+      echo "$USER_COMMAND_ALIASES_DIR/$input"
     else
       echo "$USER_COMMAND_ALIASES_DIR"
     fi
@@ -385,11 +423,11 @@ function command_aliases() (
 
   function create_new_alias_files() {
 
-    local target_path target_dir target_name prev_dir='' target_new_paths=()
+    local target_path target_dir='' target_name prev_dir='' target_new_paths=()
     for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
       if [[ -z "$prev_dir" || "$target_dir" == "$prev_dir" ]]; then
         target_dir="$(make_destination "${NEW_ALIAS_SUB_DIRS[$i]}")"
-        __mkdirp "$(dirname "$target_dir")"
+        __mkdirp "$target_dir"
       fi
       target_name="${NEW_ALIAS_NAMES[$i]}"
       target_path="$target_dir/$target_name"
@@ -596,13 +634,14 @@ function command_aliases() (
     local new_alias_name='' new_alias_path='' \
       value=''desc='' sub_path='' confirm_proceed_and_create='' # new_alias_content=''
 
-    #
+    # this is just to make it not complain. not used in this func...
     NEW_ALIAS_ARGS+=("")
 
     NEW_ALIAS_IS_FUNC+=('no')
     NEW_ALIAS_NAMES+=("$(ask --linger "$ask_prefix | What will the NAME be?")")
     NEW_ALIAS_VALUES+=("$(ask --linger "$ask_prefix | What will the VALUE be?")")
     NEW_ALIAS_DESCS+=("$(ask --linger "$ask_prefix | What will the DESC be?")")
+
     # handle sub dir group
     if confirm --ppid=$$ --negative -- "$ask_prefix | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?"; then
       sub_path="$(ask --linger "$ask_prefix | What will the SUB PATH be?")"
@@ -651,26 +690,15 @@ function command_aliases() (
       confirm_proceed_and_create+="[$(short_name_from_path "${NEW_ALIAS_PATHS[0]}")] OR edit alias?"$'\n'
       confirm_proceed_and_create+="$(bat --style numbers --color always --language bash --paging=never <<<"${NEW_ALIAS_CONTENTS[0]}")"}
 
+      # create or update current alias
       if ! confirm --ppid=$$ --positive -- "$confirm_proceed_and_create"; then
-
-        # redo
         local redo_func redo_options=() title="Select which part to edit:"
-        echo-style --bold "Redo !!!"
-
-        # FIX: update these variables to use NEW_* arrs
-
-        redo_options+=(edit_name "Name ($new_alias_name)")
-        redo_options+=(edit_value "Value ($value)")
-        redo_options+=(edit_sub_path "Sub group name ($sub_path)")
-        redo_options+=(edit_desc "Description ($desc)")
-
+        redo_options+=(edit_name "Name (${NEW_ALIAS_NAMES[0]})")
+        redo_options+=(edit_value "Value (${NEW_ALIAS_VALUES[0]})")
+        redo_options+=(edit_sub_path "Sub group name (${NEW_ALIAS_SUB_DIRS[0]})")
+        redo_options+=(edit_desc "Description (${NEW_ALIAS_DESCS[0]})")
         redo_func="$(choose "$title" --label -- "${redo_options[@]}")"
-
         "$redo_func"
-
-        # if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
-        # 	break
-        # fi
       else
         break
       fi
@@ -831,20 +859,12 @@ function command_aliases() (
             build_contents $(("${#NEW_ALIAS_NAMES[@]}" - 1))
           done
 
-          #	log_contents
-
-          # -----
-          # >> CHOOSE: 7 of 100 aliases had naming collisions. Select how to proceed:
-          # ? Create 93 aliases and discard collision?
-          # ? Fix naming collisions and try again?
-          # ? Abort completely ?
-          # ? Edit name/path of all aliases both successful AND failures ?
-          # ----
+          #	log_all_contents
 
           # validate parsed aliases and funcs
           eval_capture --statusvar=status -- validate_aliases_and_capture_failures
 
-          # log_failure_and_success_positions
+          log_failure_and_success_positions
 
           while [[ "${#FAILING_POSITIONS[@]}" -gt 0 ]]; do
             local index=0 choose_title="${#FAILING_POSITIONS[@]} bad / ${#SUCCESS_POSITIONS[@]} good / ${#NEW_ALIAS_NAMES[@]} total | Select below to fix failing issue."
@@ -852,13 +872,22 @@ function command_aliases() (
             # echo "::: FAILING_POSITIONS[@]} :::"
             for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
               local label=''
-              local label_number=$((i + 1))
+              # local label_number=$((i + 1))
               local failing_idx="${FAILING_POSITIONS[i]}"
+
               label+="$(echo-style --error+bold "No.$i : ")"
+
               label+="[$(short_name_from_path "${NEW_ALIAS_PATHS[$failing_idx]}")] FAILED "
+
               label+="fidx $failing_idx -> ${NEW_ALIAS_NAMES[$failing_idx]}"
+
               label+=$'\n'"$(echo-style --dim "REASON: ${FAILING_ALIAS_REASON[$i]}")"
-              label+=$'\n'"$(log_contents "${NEW_ALIAS_CONTENTS[$failing_idx]}")"
+
+              label+=$'\n'"$(log_single_content "$failing_idx")"
+
+              __print_lines "---------------------------------"
+              __print_lines "${label[@]}"
+
               labels_failures+=("$label")
             done
 
@@ -891,7 +920,6 @@ function command_aliases() (
               fi
 
             done
-
 
             # if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${FAILING_ALIAS_PATHS[index]}"$'\n'"Prompt again?"; then
             # 	break
