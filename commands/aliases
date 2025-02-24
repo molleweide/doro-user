@@ -10,20 +10,24 @@
 # URGENT
 #
 #
-# TODO: act_migrate: choose improve choices (**)
-#         - select: update entry (if failure then trim and reload)
-#         - esc: cancel to create only successful parsed DCAs
-#         - ^C: to abort completely
-#
 # TODO: (*) act_migrate: --fix-iterate (*)
-#         - instead of using choose, loop `ask` and fix each failure one by one.
-#             (default is choose menu.)
+#           - each edit func needs to return a status value, so that i can
+#             handle abort
+#           - in each edit func, put the index at the beginnig so it is clearer
+#             what happens.
+#           - Also, list the failure reason inside the edit func.
 #
 # TODO: (*) act_migrate: --include-successful (pertains to both * and **)
 #         - include successful ones so that you can update successful parses
 #           as well
 #
-# TODO: if added new sub dir -> call `environment.s` reload
+# TODO: ( ) act_migrate: --pause
+#           even if all parsed successfuly, always throw up choose so that you
+#           can review before proceeding to create the files
+#
+# TODO: ( ) use action_ui_prefix for all UI prompts
+#
+# TODO: if added new sub dir -> call `environment.sh` reload
 #
 # TODO: fix naming conventions.
 #           - ( ) replace terms
@@ -91,6 +95,7 @@ function command_aliases() (
 	local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
 	local ALLOW_MAX_SUB_DIRS=2
 	# Use indices to get these back
+	local action_ui_prefix=''
 	local NEW_ALIAS_NAMES=()
 	local NEW_ALIAS_SUB_DIRS=()
 	local NEW_ALIAS_VALUES=()
@@ -176,15 +181,19 @@ function command_aliases() (
 	}
 
 	# local option_args=()
-	local option_action='' option_migrate_to_subdir='' option_args=() option_fix_iterate='no' option_include_successful='no'
+	local option_action='' option_quiet='no' option_pause='no' option_migrate_to_subdir='' option_args=() option_fix_iterate='no' option_include_successful='no'
 	while [[ $# -ne 0 ]]; do
 		item="$1"
 		shift
 		case "$item" in
 		'--help' | '-h') help ;;
+		'--no-quiet'* | '--quiet'*)
+			option_quiet="$(get-flag-value --affirmative --fallback="$option_quiet" -- "$item")"
+			;;
 		'--to='*) option_migrate_to_subdir="${item#*=}" ;;
 		'--fix-iterate') option_fix_iterate='yes' ;;               # todo
 		'--include-successful') option_include_successful='yes' ;; # todo
+		'--pause') option_pause='yes' ;;                           # todo; this kinda implies --include-successful
 		'browse') option_action="browse" ;;
 		'new' | 'create') option_action="create" ;;
 		'migrate') option_action="migrate" ;;
@@ -260,6 +269,11 @@ function command_aliases() (
 	function reset_all() {
 		reset_new_alias_arrays
 		reset_status_arrays
+	}
+
+	function success_pos_add() {
+		SUCCESS_POSITIONS+=("$1")
+		SUCCESS_POSITIONS=($(printf "%s\n" "${SUCCESS_POSITIONS[@]}" | sort -n))
 	}
 
 	# local char_classes="A-Za-z0-9"
@@ -387,19 +401,44 @@ function command_aliases() (
 	# =======================================================
 
 	function create_new_alias_files() {
-		local target_path target_dir='' target_name prev_dir='' target_new_paths=()
-		for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
+		local i target_path target_dir='' target_name prev_dir='' target_new_paths=()
+
+		function apply() {
 			if [[ -z "$prev_dir" || "$target_dir" == "$prev_dir" ]]; then
 				target_dir="$(get_dca_sub_dir_target "${NEW_ALIAS_SUB_DIRS[$i]}")"
-				__mkdirp "$target_dir"
+				__mkdirp "$target_dir" >/dev/null
 			fi
 			target_name="${NEW_ALIAS_NAMES[$i]}"
 			target_path="$target_dir/$target_name"
-			echo-style --success "[DEBUG] CREATE: $(short_name_from_path "$i")"
-			echo "${NEW_ALIAS_CONTENTS[$i]}" >"$target_path"
+			__print_lines "${NEW_ALIAS_CONTENTS[$i]}" >"$target_path"
 			target_new_paths+=("$target_path")
-		done
+		}
+
+		if [[ "${1-}" == "--successful" ]]; then
+			for i in "${SUCCESS_POSITIONS[@]}"; do
+				apply
+				# echo-style --success "[DEBUG] CREATE: $(short_name_from_path "$i")"
+				# __print_lines "${NEW_ALIAS_CONTENTS[$i]}" >"$target_path"
+				# target_new_paths+=("$target_path")
+			done
+		else
+			for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
+				apply
+				# target_name="${NEW_ALIAS_NAMES[$i]}"
+				# target_path="$target_dir/$target_name"
+				# echo-style --success "[DEBUG] CREATE: $(short_name_from_path "$i")"
+				# __print_lines "${NEW_ALIAS_CONTENTS[$i]}" >"$target_path"
+				# target_new_paths+=("$target_path")
+			done
+		fi
 		correct_permissions "${target_new_paths[@]}" # bulk correct permissions
+	}
+
+	function validate_single_simple() {
+		if ! name_has_uppercase "$1" && name_has_valid_chars "$1" && name_is_unique "$1"; then
+			return 0
+		fi
+		return 1
 	}
 
 	function validate_aliases_and_capture_failures() {
@@ -480,6 +519,9 @@ function command_aliases() (
 	# EDIT FUNCS
 	#
 	# - ( ) Add ability to create more informative labels by passing, eg. failure reason.
+	#
+	# TODO: these functions should return status on abort, so that i can use that
+	# to break out of editing pipeline in act_migrate
 
 	function edit_name() {
 		local index=${1-0}
@@ -550,7 +592,7 @@ function command_aliases() (
 	}
 
 	function act_create() {
-		local sub_path=''
+		local sub_path='' ask_prefix="ALIASES CREATE"
 		reset_all
 		NEW_ALIAS_IS_FUNC+=('no')
 		NEW_ALIAS_NAMES+=("$(ask --linger --required "$ask_prefix | What will the NAME be?")")
@@ -621,7 +663,7 @@ function command_aliases() (
 	}
 
 	function act_migrate() {
-		local destination_sub_dir interpreter='' inputfile
+		local destination_sub_dir interpreter='' input_file migrate_prefix="ALIASES MIGRATE | "
 		if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_path "$option_migrate_to_subdir"; then
 			echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
 			exit 1
@@ -706,53 +748,65 @@ function command_aliases() (
 					# validate parsed aliases and funcs
 					eval_capture --statusvar=status -- validate_aliases_and_capture_failures
 
-					log_failure_and_success_positions
+					# log_failure_and_success_positions
 
-					while [[ "${#FAILING_POSITIONS[@]}" -gt 0 ]]; do
-						local index=0 choose_title="${#FAILING_POSITIONS[@]} bad / ${#SUCCESS_POSITIONS[@]} good / ${#NEW_ALIAS_NAMES[@]} total | Select below to fix failing issue."
-						local labels_failures=() sel_fail_idx_pos sel_fail_idx_val
-						for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
-							local label='' failing_idx="${FAILING_POSITIONS[i]}"
-							label+="$(echo-style --error+bold "#$i: [$(short_name_from_path "$failing_idx")] REASON: ${FAILING_ALIAS_REASON[$i]}")"
-							label+=$'\n'"$(log_single_content "$failing_idx")"
-							labels_failures+=("$label")
-						done
+					local sel_fail_idx_pos sel_fail_idx_val proceed_with_successful='no'
 
-						sel_fail_idx_pos="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${labels_failures[@]}")"
-						sel_fail_idx_val="${FAILING_POSITIONS[$sel_fail_idx_pos]}"
-
-						# debug_against_failures
-
-						# TODO: act_migrate: choose improve choices (**)
-						#         (x) select: update entry (if failure then trim and reload)
-						#         (*) esc/cancel: create only successful
-						#         (x) ^C: to abort completely
-						#         ---
-						#         ( ) Add the above to choose title
-
-						# TODO: handle cancellation
+          # fix a single failure
+					function rectify() {
 						if [[ -z "$sel_fail_idx_pos" ]]; then
-							:
+							proceed_with_successful='yes'
+							return 1
 						fi
-
 						local fixed='no'
 						while [[ "$fixed" == "no" ]]; do
+						  # TODO: if abort, then just set `sel_fail_idx_pos` to "" and the loop will exit
+						  # >>> this requires edit funcs to return their status on abort.
 							edit_name "$sel_fail_idx_val"
-							if ! name_has_uppercase "$sel_fail_idx_val" && name_has_valid_chars "$sel_fail_idx_val" && name_is_unique "$sel_fail_idx_val"; then
+							if validate_single_simple "$sel_fail_idx_val"; then
 								fixed='yes'
 								trim_failure_arrays "$sel_fail_idx_pos"
-								SUCCESS_POSITIONS+=("$sel_fail_idx_val")
-								SUCCESS_POSITIONS=($(printf "%s\n" "${array[@]}" | sort -n))
+								success_pos_add "$sel_fail_idx_val"
 							fi
 						done
+					}
 
-						# if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${FAILING_ALIAS_PATHS[index]}"$'\n'"Prompt again?"; then
-						# 	break
-						# fi
+					if [[ "$option_fix_iterate" == 'yes' ]]; then
+						local iterations="${#FAILING_POSITIONS[@]}"
+						for ((i = 0; i < "$iterations"; i++)); do
+							sel_fail_idx_pos=0
+							sel_fail_idx_val="${FAILING_POSITIONS[$sel_fail_idx_pos]}"
+							! rectify && break
+						done
+					else
+						while [[ "${#FAILING_POSITIONS[@]}" -gt 0 ]]; do
+							local index=0 choose_title="$migrate_prefix"
+							choose_title+="${#FAILING_POSITIONS[@]} bad / ${#SUCCESS_POSITIONS[@]} good / ${#NEW_ALIAS_NAMES[@]} total | Select below to fix failing issue."
+							choose_title+=$'\n'"ENTER: edit/fix selection | ESC/CANCEL: create validate only | Ctrl-C: Abort"
+							local labels_failures=()
+							for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
+								local label='' failing_idx="${FAILING_POSITIONS[i]}"
+								label+="$(echo-style --error+bold "#$i: [$(short_name_from_path "$failing_idx")] REASON: ${FAILING_ALIAS_REASON[$i]}")"
+								label+=$'\n'"$(log_single_content "$failing_idx")"
+								labels_failures+=("$label")
+							done
+							sel_fail_idx_pos="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${labels_failures[@]}")"
+							sel_fail_idx_val="${FAILING_POSITIONS[$sel_fail_idx_pos]}"
+							# debug_against_failures
+							! rectify && break
+						done
+					fi
 
-					done
+					# if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${FAILING_ALIAS_PATHS[index]}"$'\n'"Prompt again?"; then
+					# 	break
+					# fi
 
-					create_new_alias_files
+					if [[ "$proceed_with_successful" == 'yes' ]]; then
+						echo-style --bold "[User cancelled]: Proceeding to create only valid DCAs.."
+						create_new_alias_files --successful
+					else
+						create_new_alias_files
+					fi
 
 					# =======================================================
 					# HANDLE OTHER SHELLS BELOW
