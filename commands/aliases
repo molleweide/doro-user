@@ -1174,7 +1174,11 @@ function command_aliases() (
 						else
 							echo "apply:successful"
 							current_is_failure='no'
-							selected_review_dca_index="$selected_review_index" #"$(get_success_pos_from_dca_index "$selected_review_index")" # "${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
+							if [[ "$reviewing" == 'successful' ]]; then
+								selected_review_dca_index="$(get_dca_index_from_success_pos "$selected_review_index")" # "${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
+							else
+								selected_review_dca_index="$selected_review_index" #"$(get_success_pos_from_dca_index "$selected_review_index")" # "${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
+							fi
 						fi
 
 						echo "dcai $selected_review_dca_index | sfix $selected_review_failure_index"
@@ -1189,9 +1193,20 @@ function command_aliases() (
 						# w/ASK
 						# todo: --include-successful + --fix-iterate
 						# Only works on failures currently
+						#
+						#
+						# TODO: failures (default)
+						# /Users/hjalmarjakobsson/.local/share/dorothy/user/commands/aliases: line 1165: REVIEW_ARRAY[$selected_review_index]: unbound variable
+
 						local iterations="${#REVIEW_ARRAY[@]}"
 						for ((i = 0; i < "$iterations"; i++)); do
-							selected_review_index="${REVIEW_ARRAY[i]}"
+							selected_review_index='' selected_review_failure_index=''
+							selected_review_index=$i # "${REVIEW_ARRAY[i]}"
+
+							if [[ "$reviewing" == 'failures' ]]; then
+								selected_review_index=0
+							fi
+
 							apply_correct_indices
 							! rectify_or_edit_single && break
 						done
