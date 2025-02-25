@@ -19,8 +19,7 @@
 # ::
 # :: (x) get dca path funcs -> only use indexes
 # ::
-# :: ( ) ADD MORE INFORMATIVE LABELS TO EDIT_* FUNCS
-# ::    ~ (x) get status indices
+# :: (*) improve edit labels
 # ::
 # :: ( ) --include-successful
 # ::
@@ -194,12 +193,15 @@ function command_aliases() (
   # ARGS
 
   # local option_args=()
-  local option_action='' option_test_mode='yes' option_quiet='no' option_pause='no' option_migrate_to_subdir='' option_args=() option_fix_iterate='no' option_include_successful='no'
+  local option_action='' option_test_mode='yes' option_verbose='yes' option_quiet='no' option_pause='no' option_migrate_to_subdir='' option_args=() option_fix_iterate='no' option_include_successful='no'
   while [[ $# -ne 0 ]]; do
     item="$1"
     shift
     case "$item" in
     '--help' | '-h') help ;;
+    '--no-verbose'* | '--verbose'*)
+      option_verbose="$(get-flag-value --affirmative --fallback="$option_verbose" -- "$item")"
+      ;;
     '--no-quiet'* | '--quiet'*)
       option_quiet="$(get-flag-value --affirmative --fallback="$option_quiet" -- "$item")"
       ;;
@@ -581,29 +583,29 @@ function command_aliases() (
   # to break out of editing pipeline in act_migrate
 
   function edit_name() {
-    local index=${1-0} answer failure_pos success_pos
+    local index=${1-0} answer failure_pos success_pos label
+
+    label="======================================================="
+    label+=$'\n'"$AX_UI_PREFIX | NUM ALIASES # ${#NEW_ALIAS_NAMES[@]} | ${#FAILING_POSITIONS[@]} FAILURES | ${#FAILING_POSITIONS[@]} VALID"
 
     failure_pos="$(get_dca_failure_index_pos "$index")"
     success_pos="$(get_dca_success_index_pos "$index")"
 
     if [[ -n "$failure_pos" ]]; then
-      echo "edit: is failure"
+      label+=$'\n'"$(echo-style --error "Rectify name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
+      label+=$'\n'"REASON: Name was invaled for reason X"
+      if [[ "$option_verbose" == 'yes' ]]; then
+        label+=$'\n'"$(log_single_content "$failure_pos")"
+      fi
+      answer="$(ask --linger "$label")"
     elif [[ -n "$success_pos" ]]; then
       echo "edit: is success"
+    else
+      answer="$(ask --linger "$AX_UI_PREFIX Edit name (old: ${NEW_ALIAS_NAMES[index]}) for index ($index):")"
     fi
-
-    # TODO:
-    # ::    - label -> put fail index at beginning ??
-    # ::    - label -> add fail reason
-    # ::    - label -> current content
-    # ::    >>> IMPORTANT for knowing whether or not editing valid or rectifying
-    #
-    answer="$(ask --linger "$AX_UI_PREFIX Edit name (old: ${NEW_ALIAS_NAMES[index]}) for index ($index):")"
-
     if [[ -z "$answer" ]]; then
       return 1
     fi
-
     NEW_ALIAS_NAMES[index]="$answer"
     build_contents
   }
