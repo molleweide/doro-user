@@ -959,13 +959,15 @@ function command_aliases() (
 					local validate_status
 					eval_capture --statusvar=validate_status -- validate_aliases_and_capture_failures
 
-					# log_failure_and_success_positions
-
 					# setup variables for review
-					local selected_review_index selected_review_dca_index proceed_with_successful='no'
-					local reviewing current_is_failure='no'
-					# local -n REVIEW_POSITIONS
 					local -n REVIEW_ARRAY
+					local reviewing \
+					  current_is_failure='no' \
+					  selected_review_index \
+					  selected_review_failure_index \
+					  selected_review_dca_index \
+					  proceed_with_successful='no'
+
 					if [[ "$option_review_both" == 'yes' ]]; then
 						echo "review both"
 						reviewing='both'
@@ -986,7 +988,7 @@ function command_aliases() (
 					function rectify_or_edit_single() {
 						local update_validated='no'
 
-						if [[ -z "$selected_review_index" ]]; then # choose sets output to empty string on cancel
+						if [[ -z "$selected_review_failure_index" ]]; then # choose sets output to empty string on cancel
 							proceed_with_successful='yes'
 							return 1
 						fi
@@ -994,7 +996,7 @@ function command_aliases() (
 						while [[ "$update_validated" == "no" ]]; do
 
 							# on cancel return and exit choose/ask loops below
-							if ! edit_name "$selected_review_dca_index"; then
+							if ! edit_name "$selected_review_index"; then
 								echo "EDIT ABORT"
 								proceed_with_successful='yes'
 								return 1
@@ -1006,7 +1008,7 @@ function command_aliases() (
 								# Only if a failure was rectified,
 								if [[ "$current_is_failure" == 'yes' ]]; then
 
-									trim_failure_arrays "$selected_review_index"
+									trim_failure_arrays "$selected_review_failure_index"
 									success_pos_add "$selected_review_dca_index"
 								fi
 							fi
@@ -1033,11 +1035,11 @@ function command_aliases() (
 						#-------------------------------------------------------
 						# w/CHOOSE
 						while [[ "${#REVIEW_ARRAY[@]}" -gt 0 ]]; do
+							selected_review_index='' selected_review_failure_index=''
 
-							echo "-------------------------------------------------------"
-
-							echo "::::::::: DEBUG BEFORE :::::::::"
-							debug_status_arrays
+							# echo "-------------------------------------------------------"
+							# echo "::::::::: DEBUG BEFORE :::::::::"
+							# debug_status_arrays
 
 							# BUILD CHOOSE
 							local index=0 choose_title="$AX_UI_PREFIX "
@@ -1086,40 +1088,26 @@ function command_aliases() (
 								review_labels+=("$review_label")
 							done
 
-							# CALL CHOOSE
 							selected_review_index="$(choose "$choose_title" --index -- "${review_labels[@]}")"
 
-							#
-							#
-							#
-
-							#
-							# selected_review_dca_index
-							#
+							# ensure correct mapping of indices after selection
 							if [[ "$reviewing" == 'failures' ]]; then
-							  echo "reviewing: assign dca index map"
 								current_is_failure='yes'
 								selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}"
-
 							elif [[ "$reviewing" == 'both' ]] && is_failure "$selected_review_index"; then
 								current_is_failure='yes'
 								selected_review_dca_index="$selected_review_index"
-								selected_review_index="$(get_failure_pos_from_dca_index "$selected_review_index")"
-
+								selected_review_failure_index="$(get_failure_pos_from_dca_index "$selected_review_index")"
 							else
 								current_is_failure='no'
 								selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
 							fi
 
-							#
-							#
-							#
-
-							echo "::::::::: DEBUG AFTER :::::::::"
-							debug_status_arrays
-							echo
-							echo "sel pos = $selected_review_index"
-							echo "sel val = $selected_review_dca_index"
+							# echo "::::::::: DEBUG AFTER :::::::::"
+							# debug_status_arrays
+							# echo
+							# echo "sel pos = $selected_review_failure_index"
+							# echo "sel val = $selected_review_dca_index"
 
 							# break on cancel
 							! rectify_or_edit_single && break
