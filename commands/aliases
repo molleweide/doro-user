@@ -10,19 +10,9 @@
 # URGENT
 #
 # TODO:
-# :: (*) ASK: Abort on <esc> not supported currently.
-# ::   - use --confirm instead and treate empty answer as abort.
-# ::
-# :: (x) act_migrate: esc/cancel create only successful
-# ::
-# :: (x) --fix-iterate
-# ::
-# :: (x) get dca path funcs -> only use indexes
-# ::
-# :: (*) improve edit labels
-# ::
 # :: ( ) --include-successful
-# ::
+# :: ( ) --only-successful
+# :: ( ) --only-failures
 # ::
 # :: ( ) fn ensure_length of string -> should go into core!!
 # ::
@@ -61,6 +51,9 @@
 # TEST: test run/source newly created aliases to see if there are any missing
 # parts that would cause error.
 #
+# TEST:  w/fzf can be reloaded to refresh
+# https://stackoverflow.com/questions/53896277/how-to-remove-a-list-item-from-fzf
+
 # -----------------------------------------------------------------------------
 # NEXT
 #
@@ -205,7 +198,8 @@ function command_aliases() (
 	# ARGS
 
 	# local option_args=()
-	local option_action='' option_test_mode='yes' option_verbose='no' option_quiet='no' option_pause='no' option_migrate_to_subdir='' option_args=() option_fix_iterate='no' option_include_successful='no'
+	local option_action='' option_test_mode='yes' option_verbose='no' option_quiet='no' option_pause='no' option_migrate_to_subdir='' option_args=() option_fix_iterate='no'
+	local option_review_both='no' option_review_successful='no'
 	while [[ $# -ne 0 ]]; do
 		item="$1"
 		shift
@@ -219,7 +213,9 @@ function command_aliases() (
 			;;
 		'--to='*) option_migrate_to_subdir="${item#*=}" ;;
 		'--fix-iterate') option_fix_iterate='yes' ;;
-		'--include-successful') option_include_successful='yes' ;;
+
+		'--review-all') option_review_both='yes' ;;
+		'--review-successful') option_review_successful='yes' ;;
 
 		'--no-test'* | '--test'*)
 			# default to using the test dir
@@ -389,6 +385,11 @@ function command_aliases() (
 			fi
 		done
 	}
+
+	function get_dca_index_from_failure_pos() {
+		printf "%s" "${FAILING_POSITIONS["${1-0}"]}"
+	}
+
 	function get_dca_success_index_pos() {
 		local index="${1-}" success_index
 		if [[ -z "$index" ]]; then
@@ -402,6 +403,18 @@ function command_aliases() (
 				return
 			fi
 		done
+	}
+
+	function get_dca_index_from_success_pos() {
+		printf "%s" "${SUCCESS_POSITIONS["${1-0}"]}"
+	}
+
+	function is_failure() {
+		local index="${1-}" ret
+		ret="$(get_dca_failure_index_pos "$index")"
+		if [[ -n "$ret" ]]; then
+			return 0
+		fi
 	}
 
 	# =======================================================
@@ -921,15 +934,29 @@ function command_aliases() (
 
 					# log_failure_and_success_positions
 
+          # setup variables for review
 					local sel_fail_idx_pos sel_fail_idx_val proceed_with_successful='no'
-
-					# NOTE: Post migrat loop either calls CHOOSE or ASK loop
-					# On cancel:
-					# ~ choose -> returns index or ""
-					# ~ ask -> returns status
+					local reviewing
+					# local -n REVIEW_POSITIONS
+					local -n REVIEW_ARRAY
+					if [[ "$option_review_both" == 'yes' && "$option_review_successful" == 'yes' ]]; then
+					  echo "review both"
+						reviewing='both'
+						REVIEW_ARRAY="NEW_ALIAS_NAMES"
+					elif [[ "$option_review_successful" == 'yes' ]]; then
+					  echo "review successful"
+						reviewing='successful'
+						# REVIEW_POSITIONS=("${SUCCESS_POSITIONS[@]}")
+						REVIEW_ARRAY="SUCCESS_POSITIONS"
+					else
+					  reviewing='failures'
+					  echo "review failures"
+						# REVIEW_POSITIONS=("${FAILING_POSITIONS[@]}")
+						REVIEW_ARRAY="FAILING_POSITIONS"
+					fi
 
 					# fix a single failure
-					function rectify() {
+					function rectify_or_edit_single() {
 						local rectified_current='no'
 						if [[ -z "$sel_fail_idx_pos" ]]; then # choose sets output to empty string on cancel
 							proceed_with_successful='yes'
@@ -950,15 +977,71 @@ function command_aliases() (
 						done
 					}
 
+					# handle parsed aliases
+
 					if [[ "$option_fix_iterate" == 'yes' ]]; then
+						# w/ASK
+						# TODO: --include-successful + --fix-iterate
+						# Only works on failures currently
 						local iterations="${#FAILING_POSITIONS[@]}"
 						for ((i = 0; i < "$iterations"; i++)); do
 							sel_fail_idx_pos=0
 							sel_fail_idx_val="${FAILING_POSITIONS[$sel_fail_idx_pos]}"
-							! rectify && break
+							! rectify_or_edit_single && break
 						done
 					else
+						# w/CHOOSE
+						#
+						# currently we spin the failing indices, and then work on them.
+						# but in order to include both youd have to first loop all,
+						# and then for each check is_failure to determine whether or
+						# not prompt user with GREEN or RED.
+						#
+						# how can i handle this without having to create so many instances
+						# of the while loop
+						#
+						# >>> I could reuse the pattern that I use in the create_ loop
+						# where i instanciate the index above and then perform the
+						# loop on a dynamically created array of values so that I
+						# generate the array to iterate over before i start iterating
+						#
+						# look at {create_new_alias_files} how i
+						#
+						#
+						# Use these vars
+						#   1. REVIEW_POSITIONS
+						#   2. REVIEW_ARRAY
+						#       Needs to be dynamically referenced so I can get the length of
+						#   2. reviewing=<both|failures|successful>
+						#   3. get_dca_index_from_{failure|success}_pos
+						#
+						#   ^ These should allow for managing all combinations easilly.
+						#
+						#
+						# - if [both] or [successful] then REVIEW_POSITIONS will never decrease, which means
+						#   that you'll stay in the review loop until cancel
+						#
+						# - if reviewing [failures] then items will reduce for each rectified.
+						#
+						# -
+
+
+						# while [[ "${#REVIEW_ARRAY[@]}" -gt 0 ]]; do
+						  # if [[ "$reviewing" == 'both' ]] ; then
+						  # else
+						  # fi
+
+							for ((i = 0; i < "${#REVIEW_ARRAY[@]}"; i++)); do
+							  echo "rev: $i"
+							done
+						# done
+						#
+
+						exit
+
 						while [[ "${#FAILING_POSITIONS[@]}" -gt 0 ]]; do
+
+							# BUILD CHOOSE
 							local index=0 choose_title="$AX_UI_PREFIX "
 							choose_title+="${#FAILING_POSITIONS[@]} bad / ${#SUCCESS_POSITIONS[@]} good / ${#NEW_ALIAS_NAMES[@]} total | Select below to fix failing issue."
 							choose_title+=$'\n'"ENTER: edit/fix selection | ESC/CANCEL: create validate only | Ctrl-C: Abort"
@@ -972,10 +1055,14 @@ function command_aliases() (
 								fi
 								labels_failures+=("$label")
 							done
+
+							# CALL CHOOSE
 							sel_fail_idx_pos="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${labels_failures[@]}")"
 							sel_fail_idx_val="${FAILING_POSITIONS[$sel_fail_idx_pos]}"
+
 							# debug_against_failures
-							! rectify && break
+							#
+							! rectify_or_edit_single && break
 						done
 					fi
 
