@@ -19,6 +19,16 @@
 #             maybe loop and check, and skip the "self" index.
 #             >> some kind of custom loop
 #
+# TODO: fix iterate
+# > aliases migrate --verbose --fix-iterate --review-all -- $DOROTHY/user/sources/aliases2_.sh
+# /Users/hjalmarjakobsson/.local/share/dorothy/user/commands/aliases: line 684: x: unbound variable
+#
+# TODO: ( ) test run on my real aliases file.
+#
+# TODO: ( ) support with fabric
+#
+# TODO: ( ) fzf would really be beneficial for this.
+#
 # ----
 #
 # TODO: go back to reviewing
@@ -783,7 +793,6 @@ function command_aliases() (
       echo "No aliases exists."
       return
     fi
-    # __print_lines "${alias_labels[@]}"
     local index=0 choose_title="$AX_UI_PREFIX "
     while :; do
       index="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${alias_labels[@]}")"
@@ -1234,12 +1243,6 @@ function command_aliases() (
               ! rectify_or_edit_single && break
             done
           fi
-
-          # TODO: ( ) if --review-successful and #SUCCESS_POSITIONS == 0, then
-          # exit and print, no valid DCAs, Exiting....
-
-          #-------------------------------------------------------
-          # POST REVIEW
 
           post_review
 
