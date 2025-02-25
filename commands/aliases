@@ -20,10 +20,7 @@
 # :: (x) get dca path funcs -> only use indexes
 # ::
 # :: ( ) ADD MORE INFORMATIVE LABELS TO EDIT_* FUNCS
-# ::    - label -> put fail index at beginning ??
-# ::    - label -> add fail reason
-# ::    - label -> current content
-# ::    >>> IMPORTANT for knowing whether or not editing valid or rectifying
+# ::    ~ (x) get status indices
 # ::
 # :: ( ) --include-successful
 # ::
@@ -364,6 +361,35 @@ function command_aliases() (
     echo "commands${path#*"commands"}"
   }
 
+  function get_dca_failure_index_pos() {
+    local index="${1-}" failure_index
+    if [[ -z "$index" ]]; then
+      return 1 # requires index
+    fi
+    for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
+      failure_index="${FAILING_POSITIONS[$i]}"
+      # check if input index exists amongst failure indices
+      if [[ "$index" == "$failure_index" ]]; then
+        echo "$i"
+        return
+      fi
+    done
+  }
+  function get_dca_success_index_pos() {
+    local index="${1-}" success_index
+    if [[ -z "$index" ]]; then
+      return 1 # requires index
+    fi
+    for ((i = 0; i < "${#SUCCESS_POSITIONS[@]}"; i++)); do
+      success_index="${SUCCESS_POSITIONS[$i]}"
+      # check if input index exists amongst failure indices
+      if [[ "$index" == "$success_index" ]]; then
+        echo "$i"
+        return
+      fi
+    done
+  }
+
   # =======================================================
   # VALIDATORS
 
@@ -555,12 +581,29 @@ function command_aliases() (
   # to break out of editing pipeline in act_migrate
 
   function edit_name() {
-    local index=${1-0} answer
+    local index=${1-0} answer failure_pos success_pos
+
+    failure_pos="$(get_dca_failure_index_pos "$index")"
+    success_pos="$(get_dca_success_index_pos "$index")"
+
+    if [[ -n "$failure_pos" ]]; then
+      echo "edit: is failure"
+    elif [[ -n "$success_pos" ]]; then
+      echo "edit: is success"
+    fi
+
+    # TODO:
+    # ::    - label -> put fail index at beginning ??
+    # ::    - label -> add fail reason
+    # ::    - label -> current content
+    # ::    >>> IMPORTANT for knowing whether or not editing valid or rectifying
+    #
     answer="$(ask --linger "$AX_UI_PREFIX Edit name (old: ${NEW_ALIAS_NAMES[index]}) for index ($index):")"
-    echo "answer [$answer]"
+
     if [[ -z "$answer" ]]; then
       return 1
     fi
+
     NEW_ALIAS_NAMES[index]="$answer"
     build_contents
   }
