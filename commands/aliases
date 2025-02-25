@@ -11,44 +11,41 @@
 # -----------------------------------------------------------------------------
 # URGENT
 #
-# TODO: ( ) --fix-iterate update
-
-# TODO: ( ) ensure you cant use same name.
+# TODO: ( ) ENSURE YOU CANT USE SAME NAME. NO NAME DUPLICATION
 #           check eexisting needs to allso
 #           	if is-needle --needle='dockside' -- "${choices[@]}"; then
 #           >> how should i do this, because doing is-needle on NEW_ALIAS_NAMES
 #             will fail for itself always??
 #             maybe loop and check, and skip the "self" index.
 #             >> some kind of custom loop
-
-# TODO: ( ) ask prompt default to current stinrg.
+#
+# ----
+#
+# TODO: go back to reviewing
+#
+# TODO: in failure reason. say if there is an existing
+#         binary/package OR existing DCA collision.
+#
+# TODO: --review-all
+#         jump to first failure
+#
+# TODO: (*) option: show output during parsing
+#
+# TODO: only add aliases to path if terminal is interactive
+#
+# TODO: add previous line in terminal to alias??
 
 # TODO:
 # ::
-# :: ( ) fn ensure_length of string -> should go into core!!
+# :: ( ) fn ensure_length of string -> should go into core?
 # ::
 # :: ( ) clean group
 # :: ( ) clean single
-# ::
-# :: (*) reload env -> why arent aliases found in current shell?
-#
+
 # -------------------------------------------------------
 # ::
 # :: ( ) ASK: --confirm=empty <<< add support
 # ::
-#
-# FIX: if added new sub dir -> call `environment.sh` reload
-#
-# FIX: fix naming conventions.
-#           - ( ) replace terms
-#               > alias -> dca
-#               >
-#
-# NOTE: ask: <esc> does not seem to cancel prompt.
-#
-# NOTE: VI MODE | EMACS MODE
-# - ( ) show-mode-in-prompt
-#
 #
 # TODO: add custom keybind mappings to choose??
 #
@@ -202,8 +199,10 @@ function command_aliases() (
   # ARGS
 
   # local option_args=()
-  local option_action='' option_test_mode='yes' option_verbose='no' option_quiet='no' option_pause='no' option_migrate_to_subdir='' option_args=() option_fix_iterate='no'
+  local option_action='' option_test_mode='no' option_verbose='no' option_quiet='no'
+  local option_pause='no' option_migrate_to_subdir='' option_args=() option_fix_iterate='no'
   local option_review_both='no' option_review_successful='no'
+  local option_parser_show_code='no'
   while [[ $# -ne 0 ]]; do
     item="$1"
     shift
@@ -220,6 +219,8 @@ function command_aliases() (
 
     '--review-all' | '--all') option_review_both='yes' ;;
     '--review-successful' | '--success') option_review_successful='yes' ;;
+
+    '--parser-show-code') option_parser_show_code='yes' ;;
 
     '--no-test'* | '--test'*)
       # default to using the test dir
@@ -540,25 +541,25 @@ function command_aliases() (
         failure_part_redo_func='edit_name'
         # failure_validate_func=''
         reason="Alias can only be lower case. Your input was [$name]."
-        echo-style --error "$reason"
+        # echo-style --error "$reason"
 
       elif ! name_has_valid_chars "$i"; then
         FAILING_POSITIONS+=("$i")
         failure='yes'
         failure_part_redo_func='edit_name'
         reason="New alias name contains invalid characters. Your input was [$name]. These are valid chars (a-z0-9._-)"
-        echo-style --error "$reason"
+        # echo-style --error "$reason"
 
       elif ! name_is_unique "$i"; then
         FAILING_POSITIONS+=("$i")
         failure='yes'
         failure_part_redo_func='edit_name'
         reason="Alias with name [$name] already exists"
-        echo-style --error "$reason"
+        # echo-style --error "$reason"
 
       else
         SUCCESS_POSITIONS+=("$i")
-        echo-style --success "Successfully validated alias [$(get_dca_short_path "$i")]"
+        # echo-style --success "Successfully validated alias [$(get_dca_short_path "$i")]"
       fi
       if [[ "$failure" == 'yes' ]]; then
         FAILING_ALIAS_REASON+=("$reason")
@@ -663,31 +664,37 @@ function command_aliases() (
   # to break out of editing pipeline in act_migrate
 
   function edit_name() {
-    local index=${1-0} answer failure_pos success_pos label
+    local index=${1-0} answer failure_pos success_pos label current_value
 
     label="======================================================="
     label+=$'\n'"$AX_UI_PREFIX | NUM ALIASES # ${#NEW_ALIAS_NAMES[@]} | ${#FAILING_POSITIONS[@]} FAILURES | ${#SUCCESS_POSITIONS[@]} VALID"
 
+    if [[ "$option_fix_iterate" == 'yes' ]]; then
+      label+=$'\n'"Supply empty string to discard subsequent and proceed to post review"
+    fi
+
     failure_pos="$(get_failure_pos_from_dca_index "$index")"
     success_pos="$(get_success_pos_from_dca_index "$index")"
+    current_value="${NEW_ALIAS_NAMES[index]}"
 
     if [[ -n "$failure_pos" ]]; then
       label+=$'\n'"$(echo-style --error "Rectify name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
-      label+=$'\n'"REASON: Name was invaled for reason X"
+      label+=$'\n'"REASON: ${FAILING_ALIAS_REASON[$failure_pos]}"
       if [[ "$option_verbose" == 'yes' ]]; then
         label+=$'\n'"$(log_single_content "$failure_pos")"
       fi
-      answer="$(ask --linger "$label")"
+      # answer="$(ask --linger --default="$current_value" "$label")"
     elif [[ -n "$success_pos" ]]; then
       label+=$'\n'"$(echo-style --success "Edit name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
       # label+=$'\n'"REASON: Name was invaled for reason X"
       if [[ "$option_verbose" == 'yes' ]]; then
         label+=$'\n'"$(log_single_content "$failure_pos")"
       fi
-      answer="$(ask --linger "$label")"
+      # answer="$(ask --linger --default="$current_value" "$label")"
     else
-      answer="$(ask --linger "$AX_UI_PREFIX Edit name (old: ${NEW_ALIAS_NAMES[index]}) for index ($index):")"
+      label+="$AX_UI_PREFIX Edit name (old: ${NEW_ALIAS_NAMES[index]}) for index ($index):"
     fi
+    answer="$(ask --linger --default="$current_value" "$label")"
     if [[ -z "$answer" ]]; then
       return 1
     fi
@@ -738,6 +745,7 @@ function command_aliases() (
   # =======================================================
   # LIST
 
+  # TODO: only show <group>/<name>
   function act_list() {
     local path alias_paths=() aliases_short=()
 
@@ -745,7 +753,12 @@ function command_aliases() (
 
     for path in "${alias_paths[@]}"; do
       aliases_short+=("$(get_dca_short_path --path "$path")")
+      # aliases_short+=("$(basename "$path")")
     done
+    if [[ "${#aliases_short[@]}" -eq 0 ]]; then
+      echo "No aliases exists."
+      return
+    fi
     __print_lines "${aliases_short[@]}"
   }
   # =======================================================
@@ -766,6 +779,10 @@ function command_aliases() (
       alias_names+=("$header")
       alias_labels+=("$header"$'\n'"$contents")
     done
+    if [[ "${#alias_paths[@]}" -eq 0 ]]; then
+      echo "No aliases exists."
+      return
+    fi
     # __print_lines "${alias_labels[@]}"
     local index=0 choose_title="$AX_UI_PREFIX "
     while :; do
@@ -1013,6 +1030,10 @@ function command_aliases() (
             NEW_ALIAS_DESCS+=("$new_alias_desc")
             NEW_ALIAS_ARGS+=("")
             build_contents $(("${#NEW_ALIAS_NAMES[@]}" - 1))
+
+            if [[ "$option_parser_show_code" == 'yes' ]] ; then
+              :
+            fi
           done
 
           # ----
@@ -1046,6 +1067,9 @@ function command_aliases() (
             NEW_ALIAS_DESCS+=("")
             NEW_ALIAS_ARGS+=("'${arguments[@]}'")
             build_contents $(("${#NEW_ALIAS_NAMES[@]}" - 1))
+            if [[ "$option_parser_show_code" == 'yes' ]] ; then
+              :
+            fi
           done
 
           #	log_all_contents
@@ -1073,66 +1097,69 @@ function command_aliases() (
             proceed_with_successful='no'
 
           if [[ "$option_review_both" == 'yes' ]]; then
-            echo ":review both"
             reviewing='both'
             REVIEW_ARRAY="NEW_ALIAS_NAMES"
           elif [[ "$option_review_successful" == 'yes' ]]; then
-            echo ":review successful"
             reviewing='successful'
-            # REVIEW_POSITIONS=("${SUCCESS_POSITIONS[@]}")
             REVIEW_ARRAY="SUCCESS_POSITIONS"
           else
             reviewing='failures'
-            echo ":review failures"
-            # REVIEW_POSITIONS=("${FAILING_POSITIONS[@]}")
             REVIEW_ARRAY="FAILING_POSITIONS"
           fi
 
-          # fix a single failure
           function rectify_or_edit_single() {
             local update_validated='no'
-
             if [[ -z "$selected_review_index" ]]; then # choose sets output to empty string on cancel
               echo "<cancel>"
               proceed_with_successful='yes'
               return 1
             fi
-
             while [[ "$update_validated" == "no" ]]; do
-
               # on cancel return and exit choose/ask loops below
               if ! edit_name "$selected_review_dca_index"; then
                 echo "EDIT ABORT"
                 proceed_with_successful='yes'
                 return 1
               fi
-
               if validate_single_simple "$selected_review_dca_index"; then
-
                 update_validated='yes'
                 # Only if a failure was rectified,
                 if [[ "$current_is_failure" == 'yes' ]]; then
-
                   trim_failure_arrays "$selected_review_failure_index"
                   success_pos_add "$selected_review_dca_index"
                 fi
               fi
-
             done
           }
 
-          # handle parsed aliases
+          # ensure correct mapping of indices after selection or iteration if
+          # fix iterate
+          function apply_correct_indices() {
+            if [[ "$reviewing" == 'failures' ]]; then
+              current_is_failure='yes'
+              selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}"
+              selected_review_failure_index="$selected_review_index" # "$(get_failure_pos_from_dca_index "$selected_review_index")"
+            elif [[ "$reviewing" == 'both' ]] && is_failure "$selected_review_index"; then
+              current_is_failure='yes'
+              selected_review_dca_index="$selected_review_index"
+              selected_review_failure_index="$(get_failure_pos_from_dca_index "$selected_review_index")"
+            else
+              current_is_failure='no'
+              selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
+            fi
+          }
 
+          # handle parsed aliases
           if [[ "$option_fix_iterate" == 'yes' ]]; then
 
             #-------------------------------------------------------
             # w/ASK
             # todo: --include-successful + --fix-iterate
             # Only works on failures currently
-            local iterations="${#FAILING_POSITIONS[@]}"
+            local iterations="${#REVIEW_ARRAY[@]}"
             for ((i = 0; i < "$iterations"; i++)); do
               selected_review_index=0
-              selected_review_dca_index="${FAILING_POSITIONS[$selected_review_index]}"
+              apply_correct_indices
               ! rectify_or_edit_single && break
             done
           else
@@ -1142,9 +1169,9 @@ function command_aliases() (
             while [[ "${#REVIEW_ARRAY[@]}" -gt 0 ]]; do
               selected_review_index='' selected_review_failure_index=''
 
-              echo "-------------------------------------------------------"
-              echo "::::::::: DEBUG BEFORE :::::::::"
-              debug_status_arrays
+              # echo "-------------------------------------------------------"
+              # echo "::::::::: DEBUG BEFORE :::::::::"
+              # debug_status_arrays
 
               # BUILD CHOOSE
               local index=0 choose_title="$AX_UI_PREFIX "
@@ -1195,25 +1222,13 @@ function command_aliases() (
 
               selected_review_index="$(choose "$choose_title" --index -- "${review_labels[@]}")"
 
-              # ensure correct mapping of indices after selection
-              if [[ "$reviewing" == 'failures' ]]; then
-                current_is_failure='yes'
-                selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}"
-                selected_review_failure_index="$selected_review_index" # "$(get_failure_pos_from_dca_index "$selected_review_index")"
-              elif [[ "$reviewing" == 'both' ]] && is_failure "$selected_review_index"; then
-                current_is_failure='yes'
-                selected_review_dca_index="$selected_review_index"
-                selected_review_failure_index="$(get_failure_pos_from_dca_index "$selected_review_index")"
-              else
-                current_is_failure='no'
-                selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
-              fi
+              apply_correct_indices
 
-              echo "::::::::: DEBUG AFTER :::::::::"
-              debug_status_arrays
-              echo
-              echo "sel pos = $selected_review_failure_index"
-              echo "sel val = $selected_review_dca_index"
+              # echo "::::::::: DEBUG AFTER :::::::::"
+              # debug_status_arrays
+              # echo
+              # echo "sel pos = $selected_review_failure_index"
+              # echo "sel val = $selected_review_dca_index"
 
               # break on cancel
               ! rectify_or_edit_single && break
