@@ -80,7 +80,7 @@ antigen bundle git
 antigen bundle nvm
 antigen bundle pyenv
 antigen bundle rvm
-antigen bundle vi-mode
+# antigen bundle vi-mode
 # echo "zsh cache after bundle OMZ: $ZSH_CACHE_DIR"
 
 # NOTE: replace with https://github.com/Aloxaf/fzf-tab

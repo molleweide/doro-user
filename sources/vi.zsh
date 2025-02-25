@@ -2,11 +2,6 @@
 # ==================================================================
 # configure VI bindings for ZSh
 # ==================================================================
-#
-# Vim style ^W del word backwards
-autoload -U select-word-style
-select-word-style bash
-export WORDCHARS='.-'
 
 # custom cursor
 # function zle-keymap-select () {

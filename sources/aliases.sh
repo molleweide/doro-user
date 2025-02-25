@@ -16,6 +16,25 @@ alias il="zsh -il"
 
 # TEST: -----
 
+# =======================================================
+# shell switching
+#
+
+alias b="bash"
+alias bi="bash -i"
+alias bil="bash -il"
+alias xb="exec bash"
+alias xbi="exec bash -i"
+alias xbil="exec bash -il"
+
+alias zi="zsh -i"
+alias zil="zsh -il"
+alias xz="exec zsh"
+alias xzi="exec zsh -i"
+alias xzil="exec zsh -il"
+
+
+
 # function oz() {
 #   source "$DOROTHY/themes/oz"
 #   echo "Load oz prompt"
@@ -100,9 +119,7 @@ alias il="zsh -il"
 # 	# z="zathura" # linux
 
 # alias xx="zsh -il"
-alias xx="exec zsh"
 alias e="fg"
-alias xxx="exec zsh && zsh -il"
 alias k="clear"
 alias mm="man man"
 alias tt="ttyper"
