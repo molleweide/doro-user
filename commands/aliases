@@ -9,14 +9,9 @@
 # -----------------------------------------------------------------------------
 # URGENT
 #
-# the reason why
+# TODO: ( ) fix successful only
+#           > selecting entry goes directly to post review!!!
 #
-# TODO: ( ) why are duplicate aliases crated for test and regular
-#
-# TODO: (x) review both
-# TODO: ( ) failures only
-# TODO: ( ) successful only
-#           > if no success exists > then it fails
 # TODO: ( ) --fix-iterate update
 
 # TODO: ( ) ensure you cant use same name.
@@ -280,15 +275,24 @@ function command_aliases() (
 
   function debug_status_arrays() {
     echo "-------"
-    for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
-      fv="${FAILING_POSITIONS[i]}"
-      echo "FAILURE: fp $i : $fv -> ALL: ${NEW_ALIAS_NAMES[fv]}"
-    done
+
+    if [[ "${#FAILING_POSITIONS[@]}" -eq 0 ]]; then
+      echo "FAILING_POSITIONS = empty"
+    else
+      for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
+        fv="${FAILING_POSITIONS[i]}"
+        echo "FAILURE: fp $i : $fv -> ALL: ${NEW_ALIAS_NAMES[fv]}"
+      done
+    fi
     echo "-------"
-    for ((i = 0; i < "${#SUCCESS_POSITIONS[@]}"; i++)); do
-      sv="${SUCCESS_POSITIONS[i]}"
-      echo "SUCCESS: sp $i : $sv -> ${NEW_ALIAS_NAMES[sv]}"
-    done
+    if [[ "${#SUCCESS_POSITIONS[@]}" -eq 0 ]]; then
+      echo "SUCCESS_POSITIONS = empty"
+    else
+      for ((i = 0; i < "${#SUCCESS_POSITIONS[@]}"; i++)); do
+        sv="${SUCCESS_POSITIONS[i]}"
+        echo "SUCCESS: sp $i : $sv -> ${NEW_ALIAS_NAMES[sv]}"
+      done
+    fi
     echo "-------"
   }
 
@@ -894,68 +898,69 @@ function command_aliases() (
   # =======================================================
   # MIGRATE
 
-  # TODO: ask keep reviewing failures??
-  function post_review() {
-    local num_failures="${#FAILING_POSITIONS[@]}"
-    local num_successful="${#SUCCESS_POSITIONS[@]}"
+  function act_migrate() {
+    local interpreter='' input_file migrate_prefix="ALIASES MIGRATE |"
+    if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_path "$option_migrate_to_subdir"; then
+      echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
+      exit 1
+    fi
 
-    if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
-      # nothing. exit
-      echo-style --bold "Parser did not pick anything. Exiting..."
-    else
+    function post_review() {
+      echo-style --header "$migrate_prefix POST REVIEW"
 
-      if [[ "$num_successful" -gt 0 ]]; then
+      local num_failures="${#FAILING_POSITIONS[@]}"
+      local num_successful="${#SUCCESS_POSITIONS[@]}"
 
-        if [[ "$num_failures" -gt 0 ]]; then
-          if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
-            echo-style --bold "TODO: Go back to reviewing failures.."
-          fi
-        fi
-
-        # confirm create or exit
-        if ! confirm --ppid=$$ --positive -- "There are successful DCAs parsed. Do you want to go ahead and create them?"; then
-          echo-style --bold "[User cancelled]: Exiting..."
-          exit
-        fi
-
-        # this is just because user can cancel review, with existing failures,
-        # then we only want to create successful ones and exit
-        if [[ "$proceed_with_successful" == 'yes' ]]; then
-          echo-style --bold "Proceeding to create only valid DCAs.."
-          create_new_alias_files --successful
-        else
-          create_new_alias_files
-        fi
-
+      if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
+        # nothing. exit
+        echo-style --bold "Parser did not pick anything. Exiting..."
       else
-        # only failures
 
-        echo-style --bold "$num_failures invalid left."
+        if [[ "$num_successful" -gt 0 ]]; then
 
-        if [[ "$option_review_both" == 'yes' ]]; then
-          echo-style --bold "Option review BOTH but no successful parses. Exiting..."
-        elif [[ "$option_review_successful" == 'yes' ]]; then
-          echo-style --bold "Option review ONLY SUCCESSFUL but no successful parses. Exiting..."
-        else
-          echo-style --bold "Option review ONLY FAILURES (default)"
           if [[ "$num_failures" -gt 0 ]]; then
             if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
               echo-style --bold "TODO: Go back to reviewing failures.."
             fi
           fi
-          echo-style --bold "Exiting..."
+
+          # confirm create or exit
+          if ! confirm --ppid=$$ --positive -- "There are successful DCAs parsed. Do you want to go ahead and create them?"; then
+            echo-style --bold "[User cancelled]: Exiting..."
+            exit
+          fi
+
+          # this is just because user can cancel review, with existing failures,
+          # then we only want to create successful ones and exit
+          local create_opts=()
+          if [[ "$proceed_with_successful" == 'yes' ]]; then
+            echo-style --bold "Proceeding to create only valid DCAs.."
+            create_opts+=(--successful)
+          fi
+
+          create_new_alias_files "${create_opts[@]}"
+
+        else
+          # only failures
+
+          echo-style --bold "$num_failures invalid left."
+
+          if [[ "$option_review_both" == 'yes' ]]; then
+            echo-style --bold "Option review BOTH but no successful parses. Exiting..."
+          elif [[ "$option_review_successful" == 'yes' ]]; then
+            echo-style --bold "Option review ONLY SUCCESSFUL but no successful parses. Exiting..."
+          else
+            echo-style --bold "Option review ONLY FAILURES (default)"
+            if [[ "$num_failures" -gt 0 ]]; then
+              if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
+                echo-style --bold "TODO: Go back to reviewing failures.."
+              fi
+            fi
+            echo-style --bold "Exiting..."
+          fi
         fi
       fi
-    fi
-
-  }
-
-  function act_migrate() {
-    local interpreter='' input_file migrate_prefix="ALIASES MIGRATE | "
-    if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_path "$option_migrate_to_subdir"; then
-      echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
-      exit 1
-    fi
+    }
 
     function migrate_single_file() {
       input_file=$1 interpreter="$(get-interpreter --name -- "$input_file")"
@@ -1058,17 +1063,17 @@ function command_aliases() (
             proceed_with_successful='no'
 
           if [[ "$option_review_both" == 'yes' ]]; then
-            echo "review both"
+            echo ":review both"
             reviewing='both'
             REVIEW_ARRAY="NEW_ALIAS_NAMES"
           elif [[ "$option_review_successful" == 'yes' ]]; then
-            echo "review successful"
+            echo ":review successful"
             reviewing='successful'
             # REVIEW_POSITIONS=("${SUCCESS_POSITIONS[@]}")
             REVIEW_ARRAY="SUCCESS_POSITIONS"
           else
             reviewing='failures'
-            echo "review failures"
+            echo ":review failures"
             # REVIEW_POSITIONS=("${FAILING_POSITIONS[@]}")
             REVIEW_ARRAY="FAILING_POSITIONS"
           fi
@@ -1078,6 +1083,7 @@ function command_aliases() (
             local update_validated='no'
 
             if [[ -z "$selected_review_failure_index" ]]; then # choose sets output to empty string on cancel
+              echo "<cancel>"
               proceed_with_successful='yes'
               return 1
             fi
@@ -1126,9 +1132,9 @@ function command_aliases() (
             while [[ "${#REVIEW_ARRAY[@]}" -gt 0 ]]; do
               selected_review_index='' selected_review_failure_index=''
 
-              # echo "-------------------------------------------------------"
-              # echo "::::::::: DEBUG BEFORE :::::::::"
-              # debug_status_arrays
+              echo "-------------------------------------------------------"
+              echo "::::::::: DEBUG BEFORE :::::::::"
+              debug_status_arrays
 
               # BUILD CHOOSE
               local index=0 choose_title="$AX_UI_PREFIX "
@@ -1183,6 +1189,7 @@ function command_aliases() (
               if [[ "$reviewing" == 'failures' ]]; then
                 current_is_failure='yes'
                 selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}"
+                selected_review_failure_index="$selected_review_index" # "$(get_failure_pos_from_dca_index "$selected_review_index")"
               elif [[ "$reviewing" == 'both' ]] && is_failure "$selected_review_index"; then
                 current_is_failure='yes'
                 selected_review_dca_index="$selected_review_index"
@@ -1192,11 +1199,11 @@ function command_aliases() (
                 selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
               fi
 
-              # echo "::::::::: DEBUG AFTER :::::::::"
-              # debug_status_arrays
-              # echo
-              # echo "sel pos = $selected_review_failure_index"
-              # echo "sel val = $selected_review_dca_index"
+              echo "::::::::: DEBUG AFTER :::::::::"
+              debug_status_arrays
+              echo
+              echo "sel pos = $selected_review_failure_index"
+              echo "sel val = $selected_review_dca_index"
 
               # break on cancel
               ! rectify_or_edit_single && break
