@@ -956,7 +956,7 @@ function command_aliases() (
 
           # setup variables for review
           local selected_review_array_pos selected_review_array_val proceed_with_successful='no'
-          local reviewing
+          local reviewing current_is_failure='no'
           # local -n REVIEW_POSITIONS
           local -n REVIEW_ARRAY
           if [[ "$option_review_both" == 'yes' ]]; then
@@ -977,14 +977,14 @@ function command_aliases() (
 
           # fix a single failure
           function rectify_or_edit_single() {
-            local rectified_current='no'
+            local update_validated='no'
 
             if [[ -z "$selected_review_array_pos" ]]; then # choose sets output to empty string on cancel
               proceed_with_successful='yes'
               return 1
             fi
 
-            while [[ "$rectified_current" == "no" ]]; do
+            while [[ "$update_validated" == "no" ]]; do
 
               # on cancel return and exit choose/ask loops below
               if ! edit_name "$selected_review_array_val"; then
@@ -994,9 +994,14 @@ function command_aliases() (
               fi
 
               if validate_single_simple "$selected_review_array_val"; then
-                rectified_current='yes'
-                trim_failure_arrays "$selected_review_array_pos"
-                success_pos_add "$selected_review_array_val"
+
+                update_validated='yes'
+                # Only if a failure was rectified,
+                if [[ "$current_is_failure" == 'yes' ]]; then
+
+                  trim_failure_arrays "$selected_review_array_pos"
+                  success_pos_add "$selected_review_array_val"
+                fi
               fi
 
             done
@@ -1072,9 +1077,17 @@ function command_aliases() (
               # dca_review_index="${REVIEW_ARRAY[i]}"
 
               if [[ "$reviewing" == 'both' ]]; then
-                :
+                # if both then choose returns DCA index
+                selected_review_array_val="$selected_review_array_pos"
               else
+                # if not both, then the output is the index of the
                 selected_review_array_val="${REVIEW_ARRAY[$selected_review_array_pos]}"
+              fi
+
+              if is_failure "$selected_review_array_val"; then
+                current_is_failure='yes'
+              else
+                current_is_failure='no'
               fi
 
               # debug_against_failures
