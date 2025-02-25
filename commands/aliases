@@ -1,20 +1,25 @@
 #!/usr/bin/env bash
 
 #
+#
 # DOROTHY COMMAND ALIAS (DCA) HELPER
 #
 # This command is compatible with [Bash version 4.0 or later]
+#
 #
 
 # -----------------------------------------------------------------------------
 # URGENT
 #
-# TODO: ( ) fix successful only
-#           > selecting entry goes directly to post review!!!
-#
 # TODO: ( ) --fix-iterate update
 
 # TODO: ( ) ensure you cant use same name.
+#           check eexisting needs to allso
+#           	if is-needle --needle='dockside' -- "${choices[@]}"; then
+#           >> how should i do this, because doing is-needle on NEW_ALIAS_NAMES
+#             will fail for itself always??
+#             maybe loop and check, and skip the "self" index.
+#             >> some kind of custom loop
 
 # TODO: ( ) ask prompt default to current stinrg.
 
@@ -674,7 +679,12 @@ function command_aliases() (
       fi
       answer="$(ask --linger "$label")"
     elif [[ -n "$success_pos" ]]; then
-      echo "edit: is success"
+      label+=$'\n'"$(echo-style --success "Edit name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
+      # label+=$'\n'"REASON: Name was invaled for reason X"
+      if [[ "$option_verbose" == 'yes' ]]; then
+        label+=$'\n'"$(log_single_content "$failure_pos")"
+      fi
+      answer="$(ask --linger "$label")"
     else
       answer="$(ask --linger "$AX_UI_PREFIX Edit name (old: ${NEW_ALIAS_NAMES[index]}) for index ($index):")"
     fi
@@ -1082,7 +1092,7 @@ function command_aliases() (
           function rectify_or_edit_single() {
             local update_validated='no'
 
-            if [[ -z "$selected_review_failure_index" ]]; then # choose sets output to empty string on cancel
+            if [[ -z "$selected_review_index" ]]; then # choose sets output to empty string on cancel
               echo "<cancel>"
               proceed_with_successful='yes'
               return 1
@@ -1091,7 +1101,7 @@ function command_aliases() (
             while [[ "$update_validated" == "no" ]]; do
 
               # on cancel return and exit choose/ask loops below
-              if ! edit_name "$selected_review_index"; then
+              if ! edit_name "$selected_review_dca_index"; then
                 echo "EDIT ABORT"
                 proceed_with_successful='yes'
                 return 1
