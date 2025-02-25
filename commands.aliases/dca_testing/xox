@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-# Name: xuba
+# Name: xox
 # Desc: 
 echo "$@"

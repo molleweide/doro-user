@@ -23,21 +23,18 @@
 # ::    - label -> put fail index at beginning ??
 # ::    - label -> add fail reason
 # ::    - label -> current content
+# ::    >>> IMPORTANT for knowing whether or not editing valid or rectifying
+# ::
+# :: ( ) --include-successful
+# ::
+# :: (*) action: <clean> -> remove (TESTING || ALL || GROUP) aliases
+# ::
+# :: (*) reload env -> why arent aliases found in current shell?
+# ::
 # -------------------------------------------------------
 # ::
 # :: ( ) ASK: --confirm=empty <<< add support
 # ::
-#
-# FIX: (*) act_migrate: --fix-iterate (*)
-#
-# FIX: (*) act_migrate: --include-successful (pertains to both * and **)
-#         - include successful ones so that you can update successful parses
-#           as well
-#
-# FIX: ( ) act_migrate: --pause
-#           even if all parsed successfuly, always throw up choose so that you
-#           can review before proceeding to create the files
-#           - kinda implise --include-successful
 #
 # FIX: if added new sub dir -> call `environment.sh` reload
 #
@@ -81,12 +78,12 @@
 # - ( ) command-aliases
 # - ( ) is-valid-path
 
-# NOTE: Whenever running some such as nvim or ranger, then do
+# Note: Whenever running some such as nvim or ranger, then do
 # `exec ...` so that the command takes over the process, and prevent
 # superfluous shell processes from spawning.
 # >>> test how this will work
 
-# TEST: how functions turned into aliases will work in context of eg.
+# Question: how functions turned into aliases will work in context of eg.
 # handling tmux stuff etc.
 
 # TODO_: (overkill maybe)
@@ -111,6 +108,7 @@ function command_aliases() (
   local ALLOW_MAX_SUB_DIRS=2
   # Use indices to get these back
   local AX_UI_PREFIX="ALIASES "
+  local DID_CREATE='no'
   local NEW_ALIAS_NAMES=()
   local NEW_ALIAS_SUB_DIRS=()
   local NEW_ALIAS_VALUES=()
@@ -199,7 +197,7 @@ function command_aliases() (
   # ARGS
 
   # local option_args=()
-  local option_action='' option_test_mode='no' option_quiet='no' option_pause='no' option_migrate_to_subdir='' option_args=() option_fix_iterate='no' option_include_successful='no'
+  local option_action='' option_test_mode='yes' option_quiet='no' option_pause='no' option_migrate_to_subdir='' option_args=() option_fix_iterate='no' option_include_successful='no'
   while [[ $# -ne 0 ]]; do
     item="$1"
     shift
@@ -209,13 +207,20 @@ function command_aliases() (
       option_quiet="$(get-flag-value --affirmative --fallback="$option_quiet" -- "$item")"
       ;;
     '--to='*) option_migrate_to_subdir="${item#*=}" ;;
-    '--fix-iterate') option_fix_iterate='yes' ;;               # todo
-    '--include-successful') option_include_successful='yes' ;; # todo
-    '--pause') option_pause='yes' ;;                           # todo; this kinda implies --include-successful
-    '--test') option_test_mode='yes' ;;                        # todo; this kinda implies --include-successful
+    '--fix-iterate') option_fix_iterate='yes' ;;
+    '--include-successful') option_include_successful='yes' ;;
+
+    '--no-test'* | '--test'*)
+      # default to using the test dir
+      option_quiet="$(get-flag-value --affirmative --fallback="$option_test_mode" -- "$item")"
+      ;;
     'browse')
       option_action="browse"
       AX_UI_PREFIX+="BROWSE"
+      ;;
+    'clean' | 'remove' | 'rm')
+      option_action="clean"
+      AX_UI_PREFIX+="CLEAN"
       ;;
     'new' | 'create')
       option_action="create"
@@ -488,12 +493,12 @@ function command_aliases() (
     function apply() {
       if [[ -z "$prev_dir" || "$target_dir" == "$prev_dir" ]]; then
         target_dir="$(get_dca_sub_dir_target "$i")"
-        echo "apply target_dir: [$target_dir]"
         __mkdirp "$target_dir" >/dev/null
       fi
       target_name="${NEW_ALIAS_NAMES[$i]}"
       target_path="$target_dir/$target_name"
       __print_lines "${NEW_ALIAS_CONTENTS[$i]}" >"$target_path"
+      DID_CREATE='yes'
       target_new_paths+=("$target_path")
     }
 
@@ -515,6 +520,12 @@ function command_aliases() (
       done
     fi
     correct_permissions "${target_new_paths[@]}" # bulk correct permissions
+
+    if [[ "$DID_CREATE" == 'yes' ]]; then
+      echo "Reloading environment..."
+      source "$DOROTHY/sources/environment.sh"
+    fi
+
   }
 
   # =======================================================
@@ -696,6 +707,14 @@ function command_aliases() (
     if confirm --ppid=$$ --positive -- "Add nother alias?"; then
       act_create
     fi
+  }
+
+  # =======================================================
+  # CLEAN
+
+  function act_clean() {
+    echo "$AX_UI_PREFIX todo..."
+
   }
 
   # =======================================================
@@ -914,6 +933,7 @@ function command_aliases() (
   browse) act_browse ;;
   create) act_create ;;
   migrate) act_migrate ;;
+  clean) act_clean ;;
   esac
 )
 
