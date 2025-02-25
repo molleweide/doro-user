@@ -686,6 +686,8 @@ function command_aliases() (
 			label+=$'\n'"Supply empty string to discard subsequent and proceed to post review"
 		fi
 
+		echo "name in edit: ${NEW_ALIAS_NAMES[$index]}"
+
 		failure_pos="$(get_failure_pos_from_dca_index "$index")"
 		success_pos="$(get_success_pos_from_dca_index "$index")"
 
@@ -1153,32 +1155,30 @@ function command_aliases() (
 						done
 					}
 
-					# # ensure correct mapping of indices after selection or iteration if
-					# # fix iterate
-					# function apply_correct_indices() {
-					# 	echo "apply ($reviewing)  | sri $selected_review_index"
-					# 	if [[ "$reviewing" == 'failures' ]]; then
-					# 		echo "apply:failures"
-					# 		current_is_failure='yes'
-					# 		selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}"
-					# 		selected_review_failure_index="$selected_review_index" # "$(get_failure_pos_from_dca_index "$selected_review_index")"
-					#
-					# 	elif [[ "$reviewing" == 'both' ]] && is_failure "$selected_review_index"; then
-					# 		echo "apply:both"
-					# 		current_is_failure='yes'
-					# 		selected_review_dca_index="$selected_review_index"
-					# 		selected_review_failure_index="$(get_failure_pos_from_dca_index "$selected_review_index")"
-					#
-					# 	else
-					# 		echo "apply:successful"
-					# 		current_is_failure='no'
-					# 		selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
-					# 		# selected_review_failure_index
-					#
-					# 	fi
-					#
-					# 	echo "dcai $selected_review_dca_index | sfix $selected_review_failure_index"
-					# }
+					# ensure correct mapping of indices after selection or iteration if
+					# fix iterate
+					function apply_correct_indices() {
+						echo "apply ($reviewing)  | sri $selected_review_index"
+						if [[ "$reviewing" == 'failures' ]]; then
+							echo "apply:failures"
+							current_is_failure='yes'
+							selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}"
+							selected_review_failure_index="$selected_review_index" # "$(get_failure_pos_from_dca_index "$selected_review_index")"
+
+						elif [[ "$reviewing" == 'both' ]] && is_failure "$selected_review_index"; then
+							echo "apply:both"
+							current_is_failure='yes'
+							selected_review_dca_index="$selected_review_index"
+							selected_review_failure_index="$(get_failure_pos_from_dca_index "$selected_review_index")"
+
+						else
+							echo "apply:successful"
+							current_is_failure='no'
+							selected_review_dca_index="$selected_review_index" #"$(get_success_pos_from_dca_index "$selected_review_index")" # "${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
+						fi
+
+						echo "dcai $selected_review_dca_index | sfix $selected_review_failure_index"
+					}
 
 					# handle parsed aliases
 					if [[ "$option_fix_iterate" == 'yes' ]]; then
@@ -1197,7 +1197,7 @@ function command_aliases() (
 						done
 					else
 
-					  echo ":: ${REVIEW_ARRAY[*]}"
+						echo ":: ${REVIEW_ARRAY[*]}"
 
 						#-------------------------------------------------------
 						# w/CHOOSE
@@ -1257,34 +1257,30 @@ function command_aliases() (
 
 							selected_review_index="$(choose "$choose_title" --index -- "${review_labels[@]}")"
 
-							echo "apply ($reviewing)  | sri $selected_review_index"
-							if [[ "$reviewing" == 'failures' ]]; then
-								echo "apply:failures"
-								current_is_failure='yes'
-								selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}"
-								selected_review_failure_index="$selected_review_index" # "$(get_failure_pos_from_dca_index "$selected_review_index")"
+							# echo "apply ($reviewing)  | sri $selected_review_index"
+							# if [[ "$reviewing" == 'failures' ]]; then
+							# 	echo "apply:failures"
+							# 	current_is_failure='yes'
+							# 	selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}"
+							# 	selected_review_failure_index="$selected_review_index" # "$(get_failure_pos_from_dca_index "$selected_review_index")"
+							# elif [[ "$reviewing" == 'both' ]] && is_failure "$selected_review_index"; then
+							# 	echo "apply:both"
+							# 	current_is_failure='yes'
+							# 	selected_review_dca_index="$selected_review_index"
+							# 	selected_review_failure_index="$(get_failure_pos_from_dca_index "$selected_review_index")"
+							# else
+							# 	echo "apply:successful $"
+							# 	current_is_failure='no'
+							# 	selected_review_dca_index="$(get_success_pos_from_dca_index "$selected_review_index")" # "${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
+							# fi
 
-							elif [[ "$reviewing" == 'both' ]] && is_failure "$selected_review_index"; then
-								echo "apply:both"
-								current_is_failure='yes'
-								selected_review_dca_index="$selected_review_index"
-								selected_review_failure_index="$(get_failure_pos_from_dca_index "$selected_review_index")"
-
-							else
-								echo "apply:successful $"
-								current_is_failure='no'
-								selected_review_dca_index="$(get_success_pos_from_dca_index "$selected_review_index")" # "${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
-								# selected_review_failure_index=
-
-							fi
-
-							# apply_correct_indices
+							apply_correct_indices
 
 							echo "::::::::: DEBUG AFTER :::::::::"
 							debug_status_arrays
 							echo
-							echo "sel pos = $selected_review_failure_index"
-							echo "sel val = $selected_review_dca_index"
+							# echo "sel pos = $selected_review_failure_index"
+							# echo "sel val = $selected_review_dca_index"
 
 							# break on cancel
 							! rectify_or_edit_single && break
