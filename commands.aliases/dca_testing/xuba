@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Name: xuba
+# Desc: 
+echo "$@"

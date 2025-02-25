@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Name: koli
+# Desc: 
+echo "$@"

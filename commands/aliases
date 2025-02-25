@@ -17,7 +17,7 @@
 # ::
 # :: (x) --fix-iterate
 # ::
-# :: ( ) get dca path funcs -> only use indexes
+# :: (x) get dca path funcs -> only use indexes
 # ::
 # :: ( ) ADD MORE INFORMATIVE LABELS TO EDIT_* FUNCS
 # ::    - label -> put fail index at beginning ??
@@ -330,22 +330,25 @@ function command_aliases() (
   }
 
   function get_dca_sub_dir_target() {
-    local input="${1-}" pre=$USER_COMMAND_ALIASES_DIR
+    local index="${1-0}" pre=$USER_COMMAND_ALIASES_DIR sub_path
     if [[ "$option_test_mode" == 'yes' ]]; then
       pre="$pre/dca_testing"
     fi
     if [[ -n "$option_migrate_to_subdir" ]]; then
-      echo "$USER_COMMAND_ALIASES_DIR/$option_migrate_to_subdir"
-    elif [[ -n "$input" ]]; then
-      echo "$USER_COMMAND_ALIASES_DIR/$input"
+      echo "$pre/$option_migrate_to_subdir"
     else
-      echo "$USER_COMMAND_ALIASES_DIR"
+      subpath="${NEW_ALIAS_SUB_DIRS[$index]-}"
+      if [[ -z "$subpath" ]]; then
+        echo "$pre"
+      else
+        echo "$pre/$subpath"
+      fi
     fi
   }
 
   function get_dca_path() {
     local index="${1-0}"
-    echo "$(get_dca_sub_dir_target "${NEW_ALIAS_SUB_DIRS[$index]}")/${NEW_ALIAS_NAMES[$index]}"
+    echo "$(get_dca_sub_dir_target "$index")/${NEW_ALIAS_NAMES[$index]}"
   }
 
   # ${path#*"commands.aliases"} does not work for trimming everything before
@@ -381,6 +384,7 @@ function command_aliases() (
       return 1
     fi
   }
+
   function name_has_uppercase() {
     local index="${1-0}"
     if [[ "${NEW_ALIAS_NAMES[$index]}" =~ [A-Z] ]]; then
@@ -483,7 +487,8 @@ function command_aliases() (
 
     function apply() {
       if [[ -z "$prev_dir" || "$target_dir" == "$prev_dir" ]]; then
-        target_dir="$(get_dca_sub_dir_target "${NEW_ALIAS_SUB_DIRS[$i]}")"
+        target_dir="$(get_dca_sub_dir_target "$i")"
+        echo "apply target_dir: [$target_dir]"
         __mkdirp "$target_dir" >/dev/null
       fi
       target_name="${NEW_ALIAS_NAMES[$i]}"
@@ -697,12 +702,11 @@ function command_aliases() (
   # MIGRATE
 
   function act_migrate() {
-    local destination_sub_dir interpreter='' input_file migrate_prefix="ALIASES MIGRATE | "
+    local interpreter='' input_file migrate_prefix="ALIASES MIGRATE | "
     if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_path "$option_migrate_to_subdir"; then
       echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
       exit 1
     fi
-    destination_sub_dir="$(get_dca_sub_dir_target)"
 
     function migrate_single_file() {
       input_file=$1 interpreter="$(get-interpreter --name -- "$input_file")"
@@ -721,7 +725,7 @@ function command_aliases() (
           local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
           mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
           for line_alias in "${aliases[@]}"; do
-            local new_alias_name='' new_alias_desc='' value='' trailing_comment='' new_alias_path new_alias_content=''
+            local new_alias_name='' new_alias_desc='' value=''
             # handle trim trailing comment
             if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
               line_alias="${BASH_REMATCH[1]}"
@@ -749,7 +753,7 @@ function command_aliases() (
 
           mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
           for new_alias_name in "${function_names[@]}"; do
-            local final='' descriptiven='' body body_trimmed new_alias_name new_alias_path new_alias_content
+            local body body_trimmed new_alias_name
             body="$(bash -c 'source '"$input_file"'; declare -f '"$new_alias_name")"
             body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
             # Capture how many arguments each func snippets takes. This is not perfect but at least it gives some indication.
