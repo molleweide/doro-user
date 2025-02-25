@@ -23,10 +23,21 @@
 # ::
 # :: ( ) --include-successful
 # ::
-# :: (*) action: <clean> -> remove (TESTING || ALL || GROUP) aliases
+# ::
+# :: ( ) fn ensure_length of string -> should go into core!!
+# ::
+# :: ( ) clean group
+# :: ( ) clean single
 # ::
 # :: (*) reload env -> why arent aliases found in current shell?
-# ::
+#
+# -------------------------------------------------------
+# NOTE: --include-successful BRAINSTORMING
+# in choose
+# 1. first loop all indices
+# 2. check if success or failure.
+# 3. build labels based on (2)
+#
 # -------------------------------------------------------
 # ::
 # :: ( ) ASK: --confirm=empty <<< add support
@@ -87,58 +98,59 @@
 #   before the function contents. And also rename the args in the function bodies.
 
 function command_aliases_test() (
-  # Test that aliases are migrated and parsed correctly. Handle:
-  # - surrounding comments properly.
-  # - collect arguments order and naming?
-  # - ensure uniqueness
-  :
+	# Test that aliases are migrated and parsed correctly. Handle:
+	# - surrounding comments properly.
+	# - collect arguments order and naming?
+	# - ensure uniqueness
+	:
 )
 
 function command_aliases() (
-  source "$DOROTHY/sources/bash.bash"
-  __require_array 'mapfile'
+	source "$DOROTHY/sources/bash.bash"
+	__require_array 'mapfile'
 
-  local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
-  local SHEBANG_BASH="#!/usr/bin/env bash"
-  local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
-  local ALLOW_MAX_SUB_DIRS=2
-  # Use indices to get these back
-  local AX_UI_PREFIX="ALIASES "
-  local DID_CREATE='no'
-  local NEW_ALIAS_NAMES=()
-  local NEW_ALIAS_SUB_DIRS=()
-  local NEW_ALIAS_VALUES=()
-  local NEW_ALIAS_DESCS=()
-  local NEW_ALIAS_ARGS=()
-  local NEW_ALIAS_CONTENTS=()
-  local NEW_ALIAS_IS_FUNC=()
-  local FAILING_ALIAS_REASON=()
-  local FAILING_ALIAS_CORRECTION_FUNCS=() # Only used in `act_create`
-  local SUCCESS_POSITIONS=() FAILING_POSITIONS=()
-  local regex_rm_paths_with_files_extension='\.[^/]+$'
-  local supported=(
-    sh
-    bash
-    zsh
-    fish
-  )
-  local supported_posix=(
-    sh
-    bash
-    zsh
-    fish
-  )
-  local supported_non_posix=(
-    nu
-    elvish
-    xonsh
-  )
+	local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
+	local DCA_TEST_DIR_NAME="dca_testing"
+	local SHEBANG_BASH="#!/usr/bin/env bash"
+	local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
+	local ALLOW_MAX_SUB_DIRS=2
+	# Use indices to get these back
+	local AX_UI_PREFIX="ALIASES "
+	local DID_CREATE='no'
+	local NEW_ALIAS_NAMES=()
+	local NEW_ALIAS_SUB_DIRS=()
+	local NEW_ALIAS_VALUES=()
+	local NEW_ALIAS_DESCS=()
+	local NEW_ALIAS_ARGS=()
+	local NEW_ALIAS_CONTENTS=()
+	local NEW_ALIAS_IS_FUNC=()
+	local FAILING_ALIAS_REASON=()
+	local FAILING_ALIAS_CORRECTION_FUNCS=() # Only used in `act_create`
+	local SUCCESS_POSITIONS=() FAILING_POSITIONS=()
+	local regex_rm_paths_with_files_extension='\.[^/]+$'
+	local supported=(
+		sh
+		bash
+		zsh
+		fish
+	)
+	local supported_posix=(
+		sh
+		bash
+		zsh
+		fish
+	)
+	local supported_non_posix=(
+		nu
+		elvish
+		xonsh
+	)
 
-  # =====================================
-  # Arguments
+	# =====================================
+	# Arguments
 
-  function help {
-    cat <<-EOF >/dev/stderr
+	function help {
+		cat <<-EOF >/dev/stderr
 			ABOUT:
 			Helper command for managing "dorothy command aliases" (DCA), which are
 			small executable files that functionally are treated and acts like aliases
@@ -183,810 +195,869 @@ function command_aliases() (
 			    aliases are nicely put in a semantic location.
 
 		EOF
-    if [[ $# -ne 0 ]]; then
-      echo-error "$@"
-    fi
-    return 22 # EINVAL 22 Invalid argument
-  }
-
-  # =======================================================
-  # ARGS
-
-  # local option_args=()
-  local option_action='' option_test_mode='yes' option_verbose='yes' option_quiet='no' option_pause='no' option_migrate_to_subdir='' option_args=() option_fix_iterate='no' option_include_successful='no'
-  while [[ $# -ne 0 ]]; do
-    item="$1"
-    shift
-    case "$item" in
-    '--help' | '-h') help ;;
-    '--no-verbose'* | '--verbose'*)
-      option_verbose="$(get-flag-value --affirmative --fallback="$option_verbose" -- "$item")"
-      ;;
-    '--no-quiet'* | '--quiet'*)
-      option_quiet="$(get-flag-value --affirmative --fallback="$option_quiet" -- "$item")"
-      ;;
-    '--to='*) option_migrate_to_subdir="${item#*=}" ;;
-    '--fix-iterate') option_fix_iterate='yes' ;;
-    '--include-successful') option_include_successful='yes' ;;
-
-    '--no-test'* | '--test'*)
-      # default to using the test dir
-      option_quiet="$(get-flag-value --affirmative --fallback="$option_test_mode" -- "$item")"
-      ;;
-    'browse')
-      option_action="browse"
-      AX_UI_PREFIX+="BROWSE"
-      ;;
-    'clean' | 'remove' | 'rm')
-      option_action="clean"
-      AX_UI_PREFIX+="CLEAN"
-      ;;
-    'new' | 'create')
-      option_action="create"
-      AX_UI_PREFIX+="CREATE"
-      ;;
-    'migrate')
-      option_action="migrate"
-      AX_UI_PREFIX+="MIGRATE"
-      ;;
-      # '--')
-      #   # 	option_args+=("$item" "$@")
-      #   break
-      #   ;;
-      #   # *) option_args+=("$item") ;;
-    '--')
-      option_args+=("$@")
-      shift $#
-      break
-      ;;
-    *)
-      help "Unknown argument was provided"
-      ;;
-    esac
-  done
-
-  AX_UI_PREFIX+=" |"
-
-  # =======================================================
-  # LOG AND DEBUG HELPERS
-
-  function debug_against_failures() {
-
-    echo "-------"
-    for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
-      echo "NEW_ALIAS_NAMES: $i -> ${NEW_ALIAS_NAMES[i]}"
-    done
-    echo "-------"
-    for i in "${FAILING_POSITIONS[@]}"; do
-      echo "FPOS: $i -> ALL: ${NEW_ALIAS_NAMES[i]}"
-    done
-    echo "-------"
-
-  }
-  ###
-
-  function log_failure_and_success_positions() {
-    echo "--- failure positions ---"
-    echo "${FAILING_POSITIONS[@]}"
-    echo "--- success positions ---"
-    echo "${SUCCESS_POSITIONS[@]}"
-    echo "-------"
-  }
-
-  function log_single_content() {
-    local index="${1-0}"
-    bat --style numbers --color always --language bash --paging=never <<<"${NEW_ALIAS_CONTENTS[$index]}"
-  }
-
-  function log_all_contents() {
-    for c in "${NEW_ALIAS_CONTENTS[@]}"; do
-      bat --style numbers --color always --language bash --paging=never <<<"$c"
-    done
-  }
-
-  # =======================================================
-  # ARRAY HELPERS
-
-  function reset_new_alias_arrays() {
-    NEW_ALIAS_NAMES=()
-    NEW_ALIAS_SUB_DIRS=()
-    NEW_ALIAS_CONTENTS=()
-    NEW_ALIAS_VALUES=()
-    NEW_ALIAS_DESCS=()
-    NEW_ALIAS_ARGS=()
-    NEW_ALIAS_IS_FUNC=()
-  }
-
-  function reset_status_arrays() {
-    SUCCESS_POSITIONS=() FAILING_POSITIONS=() FAILING_ALIAS_REASON=()
-  }
-
-  function reset_all() {
-    reset_new_alias_arrays
-    reset_status_arrays
-  }
-
-  function success_pos_add() {
-    SUCCESS_POSITIONS+=("$1")
-    SUCCESS_POSITIONS=($(printf "%s\n" "${SUCCESS_POSITIONS[@]}" | sort -n))
-  }
-
-  # Function to remove an index N from an array
-  function remove_array_index() {
-    local array_name="$1" index="$2"
-    eval "local arr=(\"\${$array_name[@]}\")"
-    eval "$array_name=(\"\${arr[@]:0:$index}\" \"\${arr[@]:$((index + 1))}\")"
-  }
-
-  function trim_failure_arrays() {
-    local index="${1-0}"
-    remove_array_index "FAILING_POSITIONS" "$index"
-    remove_array_index "FAILING_ALIAS_REASON" "$index"
-    remove_array_index "FAILING_ALIAS_CORRECTION_FUNCS" "$index"
-  }
-
-  # =======================================================
-  # GETTERS
-
-  # get paths of existing aliases
-  function get_all_existing_dcas() {
-    find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
-  }
-
-  function get_dca_sub_dir_target() {
-    local index="${1-0}" pre=$USER_COMMAND_ALIASES_DIR sub_path
-    if [[ "$option_test_mode" == 'yes' ]]; then
-      pre="$pre/dca_testing"
-    fi
-    if [[ -n "$option_migrate_to_subdir" ]]; then
-      echo "$pre/$option_migrate_to_subdir"
-    else
-      subpath="${NEW_ALIAS_SUB_DIRS[$index]-}"
-      if [[ -z "$subpath" ]]; then
-        echo "$pre"
-      else
-        echo "$pre/$subpath"
-      fi
-    fi
-  }
-
-  function get_dca_path() {
-    local index="${1-0}"
-    echo "$(get_dca_sub_dir_target "$index")/${NEW_ALIAS_NAMES[$index]}"
-  }
-
-  # ${path#*"commands.aliases"} does not work for trimming everything before
-  # the match pattern. That is why the string looks a bit weird below.
-  function get_dca_short_path() {
-    local index="${1-0}" path
-    path="$(get_dca_path "$index")"
-    echo "commands${path#*"commands"}"
-  }
-
-  function get_dca_failure_index_pos() {
-    local index="${1-}" failure_index
-    if [[ -z "$index" ]]; then
-      return 1 # requires index
-    fi
-    for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
-      failure_index="${FAILING_POSITIONS[$i]}"
-      # check if input index exists amongst failure indices
-      if [[ "$index" == "$failure_index" ]]; then
-        echo "$i"
-        return
-      fi
-    done
-  }
-  function get_dca_success_index_pos() {
-    local index="${1-}" success_index
-    if [[ -z "$index" ]]; then
-      return 1 # requires index
-    fi
-    for ((i = 0; i < "${#SUCCESS_POSITIONS[@]}"; i++)); do
-      success_index="${SUCCESS_POSITIONS[$i]}"
-      # check if input index exists amongst failure indices
-      if [[ "$index" == "$success_index" ]]; then
-        echo "$i"
-        return
-      fi
-    done
-  }
-
-  # =======================================================
-  # VALIDATORS
-
-  # local char_classes="A-Za-z0-9"
-  # local regex='^(/)?([^/\0]+(/)?)+$'
-  # local regex='^/?([A-Za-z0-9._-]+/?)*$'
-  function is_valid_path() {
-    local input=$1
-    local char_classes="[:alpha:][:digit:]"
-    local valid_chars="([$char_classes/]+)"
-    local start='^'
-    local end='$'
-    local regex="$start$valid_chars$end"
-    if [[ ! "$input" =~ $regex ]]; then
-      return 1
-    fi
-  }
-
-  function is_valid_subdir_depth() {
-    local check_str="$1" parts=()
-    IFS='/' read -ra parts <<<"$check_str"
-    if [[ "${#parts[@]}" -gt $ALLOW_MAX_SUB_DIRS ]]; then
-      return 1
-    fi
-  }
-
-  function name_has_uppercase() {
-    local index="${1-0}"
-    if [[ "${NEW_ALIAS_NAMES[$index]}" =~ [A-Z] ]]; then
-      return 0
-    fi
-    return 1
-  }
-
-  function name_has_valid_chars() {
-    local index="${1-0}"
-    local valid_chars="[a-zA-Z0-9._-]"
-    if [[ "${NEW_ALIAS_NAMES[$index]}" =~ $valid_chars ]]; then
-      return 0
-    fi
-    return 1
-  }
-
-  # make check case insensitive; macos filesystem is case insensitive.
-  function name_is_unique() {
-    local index="${1-0}"
-    if which -s "${NEW_ALIAS_NAMES[$index],,}"; then
-      return 1
-    fi
-  }
-
-  function validate_single_simple() {
-    if ! name_has_uppercase "$1" && name_has_valid_chars "$1" && name_is_unique "$1"; then
-      return 0
-    fi
-    return 1
-  }
-
-  function validate_aliases_and_capture_failures() {
-    for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
-      local failure='no' reason='' name="${NEW_ALIAS_NAMES[$i]}"
-      local failure_part_redo_func=''
-      if name_has_uppercase "$i"; then
-        FAILING_POSITIONS+=("$i")
-        failure='yes'
-        failure_part_redo_func='edit_name'
-        # failure_validate_func=''
-        reason="Alias can only be lower case. Your input was [$name]."
-        echo-style --error "$reason"
-
-      elif ! name_has_valid_chars "$i"; then
-        FAILING_POSITIONS+=("$i")
-        failure='yes'
-        failure_part_redo_func='edit_name'
-        reason="New alias name contains invalid characters. Your input was [$name]. These are valid chars (a-z0-9._-)"
-        echo-style --error "$reason"
-
-      elif ! name_is_unique "$i"; then
-        FAILING_POSITIONS+=("$i")
-        failure='yes'
-        failure_part_redo_func='edit_name'
-        reason="Alias with name [$name] already exists"
-        echo-style --error "$reason"
-
-      else
-        SUCCESS_POSITIONS+=("$i")
-        echo-style --success "Successfully validated alias [$(get_dca_short_path "$i")]"
-      fi
-      if [[ "$failure" == 'yes' ]]; then
-        FAILING_ALIAS_REASON+=("$reason")
-        FAILING_ALIAS_CORRECTION_FUNCS+=("$failure_part_redo_func")
-      fi
-    done
-
-    local complete_failure='yes'
-    if [[ "${#SUCCESS_POSITIONS[@]}" == "${#NEW_ALIAS_NAMES[@]}" ]]; then
-      complete_failure='no'
-    fi
-
-    if [[ "$failure" == 'no' ]]; then
-      return 0
-    else
-      if [[ "$complete_failure" == 'yes' ]]; then
-        return 1 # 1 complete failure
-      else
-        return 2 # 2 partial failure. some aliases were validated succeeded
-      fi
-    fi
-  }
-
-  # =======================================================
-  # FILE SYSTEM
-
-  function correct_permissions() {
-    if [[ $# -eq 0 ]]; then
-      local alias_paths=()
-      mapfile -t alias_paths < <(get_all_existing_dcas)
-      fs-own --x -- "${alias_paths[@]}"
-    else
-      fs-own --x --no-quiet -- "$@" # correct permissions for inpus only
-    fi
-  }
-
-  function create_new_alias_files() {
-    local i target_path target_dir='' target_name prev_dir='' target_new_paths=()
-
-    function apply() {
-      if [[ -z "$prev_dir" || "$target_dir" == "$prev_dir" ]]; then
-        target_dir="$(get_dca_sub_dir_target "$i")"
-        __mkdirp "$target_dir" >/dev/null
-      fi
-      target_name="${NEW_ALIAS_NAMES[$i]}"
-      target_path="$target_dir/$target_name"
-      __print_lines "${NEW_ALIAS_CONTENTS[$i]}" >"$target_path"
-      DID_CREATE='yes'
-      target_new_paths+=("$target_path")
-    }
-
-    if [[ "${1-}" == "--successful" ]]; then
-      for i in "${SUCCESS_POSITIONS[@]}"; do
-        apply
-        # echo-style --success "[DEBUG] CREATE: $(get_dca_short_path "$i")"
-        # __print_lines "${NEW_ALIAS_CONTENTS[$i]}" >"$target_path"
-        # target_new_paths+=("$target_path")
-      done
-    else
-      for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
-        apply
-        # target_name="${NEW_ALIAS_NAMES[$i]}"
-        # target_path="$target_dir/$target_name"
-        # echo-style --success "[DEBUG] CREATE: $(get_dca_short_path "$i")"
-        # __print_lines "${NEW_ALIAS_CONTENTS[$i]}" >"$target_path"
-        # target_new_paths+=("$target_path")
-      done
-    fi
-    correct_permissions "${target_new_paths[@]}" # bulk correct permissions
-
-    if [[ "$DID_CREATE" == 'yes' ]]; then
-      echo "Reloading environment..."
-      source "$DOROTHY/sources/environment.sh"
-    fi
-
-  }
-
-  # =======================================================
-  #
-
-  function build_contents() {
-    local index=${1-0} c=''
-    c+="$SHEBANG_BASH"
-    c+=$'\n'"# Name: ${NEW_ALIAS_NAMES[$index]}"
-    c+=$'\n'"# Desc: ${NEW_ALIAS_DESCS[$index]}"
-    if [[ "${NEW_ALIAS_IS_FUNC[$index]}" == 'yes' ]]; then
-      c+=$'\n'"# Args: ${NEW_ALIAS_ARGS[$index]}"
-      c+=$'\n'"${NEW_ALIAS_VALUES[$index]}"
-    else
-      c+=$'\n'"${NEW_ALIAS_VALUES[$index]}"
-      c+=' "$@"'
-    fi
-    NEW_ALIAS_CONTENTS[index]="$c"
-  }
-
-  # =======================================================
-  # EDIT FUNCS
-  #
-  # - ( ) Add ability to create more informative labels by passing, eg. failure reason.
-  #
-  # TODO: these functions should return status on abort, so that i can use that
-  # to break out of editing pipeline in act_migrate
-
-  function edit_name() {
-    local index=${1-0} answer failure_pos success_pos label
-
-    label="======================================================="
-    label+=$'\n'"$AX_UI_PREFIX | NUM ALIASES # ${#NEW_ALIAS_NAMES[@]} | ${#FAILING_POSITIONS[@]} FAILURES | ${#FAILING_POSITIONS[@]} VALID"
-
-    failure_pos="$(get_dca_failure_index_pos "$index")"
-    success_pos="$(get_dca_success_index_pos "$index")"
-
-    if [[ -n "$failure_pos" ]]; then
-      label+=$'\n'"$(echo-style --error "Rectify name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
-      label+=$'\n'"REASON: Name was invaled for reason X"
-      if [[ "$option_verbose" == 'yes' ]]; then
-        label+=$'\n'"$(log_single_content "$failure_pos")"
-      fi
-      answer="$(ask --linger "$label")"
-    elif [[ -n "$success_pos" ]]; then
-      echo "edit: is success"
-    else
-      answer="$(ask --linger "$AX_UI_PREFIX Edit name (old: ${NEW_ALIAS_NAMES[index]}) for index ($index):")"
-    fi
-    if [[ -z "$answer" ]]; then
-      return 1
-    fi
-    NEW_ALIAS_NAMES[index]="$answer"
-    build_contents
-  }
-
-  function edit_value() {
-    local index=${1-0}
-    NEW_ALIAS_VALUES[index]="$(ask --linger "$AX_UI_PREFIX Edit command value (index: $index):")"
-    build_contents
-  }
-
-  function edit_desc() {
-    local index=${1-0}
-    NEW_ALIAS_DESCS[index]="$(ask --linger "$AX_UI_PREFIX Edit new alias description (index: $index):")"
-    build_contents
-  }
-
-  function edit_sub_path() {
-    local index=${1-0}
-    local sub_path
-    while :; do
-      sub_path="$(ask --linger "$AX_UI_PREFIX Redo sub path:")"
-      # path valid | validation is already done in the final validator func.
-      # maybe it can be removed from here...
-      if ! is_valid_path "$sub_path"; then
-        sub_path="$(ask --linger "$AX_UI_PREFIX [$sub_path] is not valid | Input sub path again:")"
-        # This could also go into the validator?
-      elif ! is_valid_subdir_depth "$sub_path"; then
-        sub_path="$(ask --linger "$AX_UI_PREFIX [$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
-        # elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
-        # # this is handled by the redo choose menu
-        # 	sub_path="$(ask --linger "$AX_UI_PREFIX Input subpath again:")"
-      else
-        break
-      fi
-    done
-    NEW_ALIAS_SUB_DIRS[index]="$sub_path"
-    build_contents
-  }
-
-  # =======================================================
-  # =======================================================
-  # =======================================================
-  # ACTIONS
-
-  # =======================================================
-  # BROWSE
-
-  # ( ) choose
-  # ( ) fuzzy-helper
-  # ( ) keybind create new DCA from selection.
-  function act_browse() {
-    local alias_paths=() alias_names=() alias_labels=()
-    mapfile -t alias_paths < <(get_all_existing_dcas)
-    for path in "${alias_paths[@]}"; do
-      local header contents
-      # ${path#*"commands.aliases"} does not work for trimming everything before
-      # the match pattern. That is why the string looks a bit weird below.
-      header="commands${path#*"commands"}"
-      contents="$("${BAT_CMD[@]}" "$path")"
-      alias_names+=("$header")
-      alias_labels+=("$header"$'\n'"$contents")
-    done
-    # __print_lines "${alias_labels[@]}"
-    local index=0 choose_title="$AX_UI_PREFIX "
-    while :; do
-      index="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${alias_labels[@]}")"
-      if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
-        break
-      fi
-    done
-  }
-
-  # =======================================================
-  # CREATE
-
-  function act_create() {
-    local sub_path='' ask_prefix="ALIASES CREATE"
-    reset_all
-    # could these be replaced by the update funcs, and use some kind of default mode?
-    NEW_ALIAS_IS_FUNC+=('no')
-    NEW_ALIAS_NAMES+=("$(ask --linger --confirm "$ask_prefix | What will the NAME be?")")
-    NEW_ALIAS_VALUES+=("$(ask --linger --confirm "$ask_prefix | What will the VALUE be?")")
-    NEW_ALIAS_DESCS+=("$(ask --linger "$ask_prefix | What will the DESC be?")")
-    if confirm --ppid=$$ --negative -- "$ask_prefix | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?"; then
-      sub_path="$(ask --linger "$ask_prefix | What will the SUB PATH be?")"
-      while :; do
-        # path valid
-        if ! is_valid_path "$sub_path"; then
-          sub_path="$(ask --linger "[$sub_path] is not valid | Input sub path again:")"
-          # path maxth depth
-        elif ! is_valid_subdir_depth "$sub_path"; then
-          sub_path="$(ask --linger "[$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
-          # elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
-          # # this is handled by the redo choose menu
-          # 	sub_path="$(ask --linger "Input subpath again:")"
-        else
-          NEW_ALIAS_SUB_DIRS+=("$sub_path")
-          break
-        fi
-      done
-    else
-      NEW_ALIAS_SUB_DIRS+=("")
-    fi
-    build_contents
-    local confirm_or_edit
-    while :; do
-      confirm_or_edit="Go ahead create alias at [$(get_dca_short_path)] OR edit alias?"$'\n'"$(log_single_content)"
-      if ! confirm --ppid=$$ --positive -- "$confirm_or_edit"; then
-        # todo: move title definition into the choose command
-        local redo_func redo_options=() title="$AX_UI_PREFIX Select which part to edit:"
-        redo_options+=(edit_name "Name (${NEW_ALIAS_NAMES[0]})")
-        redo_options+=(edit_value "Value (${NEW_ALIAS_VALUES[0]})")
-        redo_options+=(edit_sub_path "Sub group name (${NEW_ALIAS_SUB_DIRS[0]})")
-        redo_options+=(edit_desc "Description (${NEW_ALIAS_DESCS[0]})")
-        redo_func="$(choose "$title" --label -- "${redo_options[@]}")"
-        "$redo_func"
-      else
-        break
-      fi
-    done
-
-    local failure_redo_func status
-    while :; do
-      eval_capture --statusvar=status -- validate_aliases_and_capture_failures
-      if [[ "$status" -ne 0 ]]; then
-        local label
-        label="[$status] Creating alias [$(get_dca_short_path)] failed with reason:"
-        label+=$'\n'"REASON: ${FAILING_ALIAS_REASON[0]}"
-        label+=$'\n'"Do you want to re-edit failing part?"
-        if confirm --ppid=$$ --positive -- "$label"; then
-          failure_redo_func="${FAILING_ALIAS_CORRECTION_FUNCS[0]}"
-          if [[ -n "$failure_redo_func" && "$failure_redo_func" == "none" ]]; then
-            echo-style --error "CREATE | Could not create alias [$(get_dca_short_path)]. No re-edit func exists for failure. (todo: ignore/discard?)"
-          fi
-          "$failure_redo_func"
-          reset_status_arrays
-        fi
-      else
-        create_new_alias_files # single
-        break
-      fi
-    done
-
-    if confirm --ppid=$$ --positive -- "Add nother alias?"; then
-      act_create
-    fi
-  }
-
-  # =======================================================
-  # CLEAN
-
-  function act_clean() {
-    echo "$AX_UI_PREFIX todo..."
-
-  }
-
-  # =======================================================
-  # MIGRATE
-
-  function act_migrate() {
-    local interpreter='' input_file migrate_prefix="ALIASES MIGRATE | "
-    if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_path "$option_migrate_to_subdir"; then
-      echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
-      exit 1
-    fi
-
-    function migrate_single_file() {
-      input_file=$1 interpreter="$(get-interpreter --name -- "$input_file")"
-      if is-needle "$interpreter" -- "${supported[@]}"; then
-
-        # =======================================================
-        # HANDLE POSIX
-        # =======================================================
-
-        if is-needle "$interpreter" -- "${supported_posix[@]}"; then
-          local aliases=() function_names=()
-
-          # ----
-          # HANDLE POSIX ALIASES
-
-          local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
-          mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
-          for line_alias in "${aliases[@]}"; do
-            local new_alias_name='' new_alias_desc='' value=''
-            # handle trim trailing comment
-            if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
-              line_alias="${BASH_REMATCH[1]}"
-              new_alias_desc="${BASH_REMATCH[2]}"
-            fi
-            # handle split alias
-            if [[ "$line_alias" =~ alias\ ([^=]+)=\"(.*)\" ]]; then
-              new_alias_name="${BASH_REMATCH[1]}"
-              value="${BASH_REMATCH[2]}"
-            elif [[ "$line_alias" =~ alias\ ([^=]+)=\'(.*)\' ]]; then
-              new_alias_name="${BASH_REMATCH[1]}"
-              value="${BASH_REMATCH[2]}"
-            fi
-            NEW_ALIAS_IS_FUNC+=('no')
-            NEW_ALIAS_NAMES+=("$new_alias_name")
-            NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
-            NEW_ALIAS_VALUES+=("$value")
-            NEW_ALIAS_DESCS+=("$new_alias_desc")
-            NEW_ALIAS_ARGS+=("")
-            build_contents $(("${#NEW_ALIAS_NAMES[@]}" - 1))
-          done
-
-          # ----
-          # HANDLE POSIX FUNCTIONS
-
-          mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
-          for new_alias_name in "${function_names[@]}"; do
-            local body body_trimmed new_alias_name
-            body="$(bash -c 'source '"$input_file"'; declare -f '"$new_alias_name")"
-            body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
-            # Capture how many arguments each func snippets takes. This is not perfect but at least it gives some indication.
-            local arguments=() count=0
-            while read -r line; do
-              local line="$line"
-              while [[ "$line" =~ (\$[0-9]+) ]]; do
-                local match="${BASH_REMATCH[0]}"
-                if ! is-needle "$match" -- "${arguments[@]}"; then
-                  arguments+=("$match")
-                fi
-                line="${line/"$match"/}" # Remove the matched part from the line
-                # echo "trim: [$line]"
-                if [[ "$count" == 10 ]]; then
-                  break
-                fi
-              done
-            done <<<"$body_trimmed"
-            NEW_ALIAS_IS_FUNC+=('yes')
-            NEW_ALIAS_NAMES+=("$new_alias_name")
-            NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
-            NEW_ALIAS_VALUES+=("$body_trimmed")
-            NEW_ALIAS_DESCS+=("")
-            NEW_ALIAS_ARGS+=("'${arguments[@]}'")
-            build_contents $(("${#NEW_ALIAS_NAMES[@]}" - 1))
-          done
-
-          #	log_all_contents
-
-          # validate parsed aliases and funcs
-          local validate_status
-          eval_capture --statusvar=validate_status -- validate_aliases_and_capture_failures
-
-          # log_failure_and_success_positions
-
-          local sel_fail_idx_pos sel_fail_idx_val proceed_with_successful='no'
-
-          # NOTE: Post migrat loop either calls CHOOSE or ASK loop
-          # On cancel:
-          # ~ choose -> returns index or ""
-          # ~ ask -> returns status
-
-          # fix a single failure
-          function rectify() {
-            local rectified_current='no'
-            if [[ -z "$sel_fail_idx_pos" ]]; then # choose sets output to empty string on cancel
-              proceed_with_successful='yes'
-              return 1
-            fi
-            while [[ "$rectified_current" == "no" ]]; do
-              # on cancel return and exit choose/ask loops below
-              if ! edit_name "$sel_fail_idx_val"; then
-                echo "EDIT ABORT"
-                proceed_with_successful='yes'
-                return 1
-              fi
-              if validate_single_simple "$sel_fail_idx_val"; then
-                rectified_current='yes'
-                trim_failure_arrays "$sel_fail_idx_pos"
-                success_pos_add "$sel_fail_idx_val"
-              fi
-            done
-          }
-
-          if [[ "$option_fix_iterate" == 'yes' ]]; then
-            local iterations="${#FAILING_POSITIONS[@]}"
-            for ((i = 0; i < "$iterations"; i++)); do
-              sel_fail_idx_pos=0
-              sel_fail_idx_val="${FAILING_POSITIONS[$sel_fail_idx_pos]}"
-              ! rectify && break
-            done
-          else
-            while [[ "${#FAILING_POSITIONS[@]}" -gt 0 ]]; do
-              local index=0 choose_title="$AX_UI_PREFIX "
-              choose_title+="${#FAILING_POSITIONS[@]} bad / ${#SUCCESS_POSITIONS[@]} good / ${#NEW_ALIAS_NAMES[@]} total | Select below to fix failing issue."
-              choose_title+=$'\n'"ENTER: edit/fix selection | ESC/CANCEL: create validate only | Ctrl-C: Abort"
-              local labels_failures=()
-              for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
-                local label='' failing_idx="${FAILING_POSITIONS[i]}"
-                label+="$(echo-style --error+bold "#$i: [$(get_dca_short_path "$failing_idx")] REASON: ${FAILING_ALIAS_REASON[$i]}")"
-                label+=$'\n'"$(log_single_content "$failing_idx")"
-                labels_failures+=("$label")
-              done
-              sel_fail_idx_pos="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${labels_failures[@]}")"
-              sel_fail_idx_val="${FAILING_POSITIONS[$sel_fail_idx_pos]}"
-              # debug_against_failures
-              ! rectify && break
-            done
-          fi
-
-          # if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${FAILING_ALIAS_PATHS[index]}"$'\n'"Prompt again?"; then
-          # 	break
-          # fi
-
-          if [[ "$proceed_with_successful" == 'yes' ]]; then
-            echo-style --bold "[User cancelled]: Proceeding to create only valid DCAs.."
-            create_new_alias_files --successful
-          else
-            create_new_alias_files
-          fi
-
-          # =======================================================
-          # HANDLE OTHER SHELLS BELOW
-          # =======================================================
-
-        elif is-needle "$interpreter" -- "${supported_non_posix[@]}"; then
-          if [[ "$interpreter" == "nu" ]]; then
-            # HANDLE NUSHELL
-            :
-          elif [[ "$interpreter" == "elvish" ]]; then
-            # HANDLE ELVISH
-            :
-          elif [[ "$interpreter" == "xonsh" ]]; then
-            # HANDLE XONSH
-            :
-          fi
-        else
-          echo "Interpreter [$interpreter] not supported"
-        fi
-      fi
-    }
-
-    # remove this to make the <action> go live.
-    # option_args=("$DOROTHY/user/sources/aliases.sh")
-    for migrate_file in "${option_args[@]}"; do
-      migrate_single_file "$migrate_file"
-    done
-  }
-
-  # =======================================================
-  # PREPARE
-
-  if [[ -z "$option_action" ]]; then
-    # help "No action provided"
-    option_action="browse"
-  fi
-
-  # Check before running migration..
-  if [[ -n "$option_migrate_to_subdir" ]]; then
-    if ! is_valid_subdir_depth "$option_migrate_to_subdir"; then
-      echo-style --error "Maximum sub dir depth allowed is [$ALLOW_MAX_SUB_DIRS]"
-      exit
-    fi
-  fi
-
-  # # NOTE: This becomes redundant when checking with `which <dca>`
-  # # Because we collect things here, I can clean up some redundancy below.
-  # collect_existing_alias_info
-
-  # =======================================================
-  # Act
-
-  # This is a better one liner but my linter complains too much about
-  # funcs being unreachable so for now i go with the switch case.
-  # "act_$option_action"
-
-  case "$option_action" in
-  browse) act_browse ;;
-  create) act_create ;;
-  migrate) act_migrate ;;
-  clean) act_clean ;;
-  esac
+		if [[ $# -ne 0 ]]; then
+			echo-error "$@"
+		fi
+		return 22 # EINVAL 22 Invalid argument
+	}
+
+	# =======================================================
+	# ARGS
+
+	# local option_args=()
+	local option_action='' option_test_mode='yes' option_verbose='no' option_quiet='no' option_pause='no' option_migrate_to_subdir='' option_args=() option_fix_iterate='no' option_include_successful='no'
+	while [[ $# -ne 0 ]]; do
+		item="$1"
+		shift
+		case "$item" in
+		'--help' | '-h') help ;;
+		'--no-verbose'* | '--verbose'*)
+			option_verbose="$(get-flag-value --affirmative --fallback="$option_verbose" -- "$item")"
+			;;
+		'--no-quiet'* | '--quiet'*)
+			option_quiet="$(get-flag-value --affirmative --fallback="$option_quiet" -- "$item")"
+			;;
+		'--to='*) option_migrate_to_subdir="${item#*=}" ;;
+		'--fix-iterate') option_fix_iterate='yes' ;;
+		'--include-successful') option_include_successful='yes' ;;
+
+		'--no-test'* | '--test'*)
+			# default to using the test dir
+			option_test_mode="$(get-flag-value --affirmative --fallback="$option_test_mode" -- "$item")"
+			;;
+		'browse')
+			option_action="browse"
+			AX_UI_PREFIX+="BROWSE"
+			;;
+		'clean' | 'remove' | 'rm')
+			option_action="clean"
+			AX_UI_PREFIX+="CLEAN"
+			;;
+		'new' | 'create')
+			option_action="create"
+			AX_UI_PREFIX+="CREATE"
+			;;
+		'migrate')
+			option_action="migrate"
+			AX_UI_PREFIX+="MIGRATE"
+			;;
+			# '--')
+			#   # 	option_args+=("$item" "$@")
+			#   break
+			#   ;;
+			#   # *) option_args+=("$item") ;;
+		'--')
+			option_args+=("$@")
+			shift $#
+			break
+			;;
+		*)
+			help "Unknown argument was provided"
+			;;
+		esac
+	done
+
+	AX_UI_PREFIX+=" |"
+
+	# =======================================================
+	# LOG AND DEBUG HELPERS
+
+	function debug_against_failures() {
+
+		echo "-------"
+		for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
+			echo "NEW_ALIAS_NAMES: $i -> ${NEW_ALIAS_NAMES[i]}"
+		done
+		echo "-------"
+		for i in "${FAILING_POSITIONS[@]}"; do
+			echo "FPOS: $i -> ALL: ${NEW_ALIAS_NAMES[i]}"
+		done
+		echo "-------"
+
+	}
+	###
+
+	function log_failure_and_success_positions() {
+		echo "--- failure positions ---"
+		echo "${FAILING_POSITIONS[@]}"
+		echo "--- success positions ---"
+		echo "${SUCCESS_POSITIONS[@]}"
+		echo "-------"
+	}
+
+	function log_single_content() {
+		local index="${1-0}"
+		bat --style numbers --color always --language bash --paging=never <<<"${NEW_ALIAS_CONTENTS[$index]}"
+	}
+
+	function log_all_contents() {
+		for c in "${NEW_ALIAS_CONTENTS[@]}"; do
+			bat --style numbers --color always --language bash --paging=never <<<"$c"
+		done
+	}
+
+	# =======================================================
+	# ARRAY HELPERS
+
+	function reset_new_alias_arrays() {
+		NEW_ALIAS_NAMES=()
+		NEW_ALIAS_SUB_DIRS=()
+		NEW_ALIAS_CONTENTS=()
+		NEW_ALIAS_VALUES=()
+		NEW_ALIAS_DESCS=()
+		NEW_ALIAS_ARGS=()
+		NEW_ALIAS_IS_FUNC=()
+	}
+
+	function reset_status_arrays() {
+		SUCCESS_POSITIONS=() FAILING_POSITIONS=() FAILING_ALIAS_REASON=()
+	}
+
+	function reset_all() {
+		reset_new_alias_arrays
+		reset_status_arrays
+	}
+
+	function success_pos_add() {
+		SUCCESS_POSITIONS+=("$1")
+		SUCCESS_POSITIONS=($(printf "%s\n" "${SUCCESS_POSITIONS[@]}" | sort -n))
+	}
+
+	# Function to remove an index N from an array
+	function remove_array_index() {
+		local array_name="$1" index="$2"
+		eval "local arr=(\"\${$array_name[@]}\")"
+		eval "$array_name=(\"\${arr[@]:0:$index}\" \"\${arr[@]:$((index + 1))}\")"
+	}
+
+	function trim_failure_arrays() {
+		local index="${1-0}"
+		remove_array_index "FAILING_POSITIONS" "$index"
+		remove_array_index "FAILING_ALIAS_REASON" "$index"
+		remove_array_index "FAILING_ALIAS_CORRECTION_FUNCS" "$index"
+	}
+
+	# =======================================================
+	# GETTERS
+
+	# get paths of existing aliases
+	function get_all_existing_dcas() {
+		find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
+	}
+
+	function get_dca_sub_dir_target() {
+		local index="${1-0}" pre=$USER_COMMAND_ALIASES_DIR sub_path
+		if [[ "$option_test_mode" == 'yes' ]]; then
+			pre="$pre/$DCA_TEST_DIR_NAME"
+		fi
+		if [[ -n "$option_migrate_to_subdir" ]]; then
+			echo "$pre/$option_migrate_to_subdir"
+		else
+			subpath="${NEW_ALIAS_SUB_DIRS[$index]-}"
+			if [[ -z "$subpath" ]]; then
+				echo "$pre"
+			else
+				echo "$pre/$subpath"
+			fi
+		fi
+	}
+
+	function get_dca_path() {
+		local index="${1-0}"
+		echo "$(get_dca_sub_dir_target "$index")/${NEW_ALIAS_NAMES[$index]}"
+	}
+
+	# ${path#*"commands.aliases"} does not work for trimming everything before
+	# the match pattern. That is why the string looks a bit weird below.
+	function get_dca_short_path() {
+		local index="${1-0}" path
+		path="$(get_dca_path "$index")"
+		echo "commands${path#*"commands"}"
+	}
+
+	function get_dca_failure_index_pos() {
+		local index="${1-}" failure_index
+		if [[ -z "$index" ]]; then
+			return 1 # requires index
+		fi
+		for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
+			failure_index="${FAILING_POSITIONS[$i]}"
+			# check if input index exists amongst failure indices
+			if [[ "$index" == "$failure_index" ]]; then
+				echo "$i"
+				return
+			fi
+		done
+	}
+	function get_dca_success_index_pos() {
+		local index="${1-}" success_index
+		if [[ -z "$index" ]]; then
+			return 1 # requires index
+		fi
+		for ((i = 0; i < "${#SUCCESS_POSITIONS[@]}"; i++)); do
+			success_index="${SUCCESS_POSITIONS[$i]}"
+			# check if input index exists amongst failure indices
+			if [[ "$index" == "$success_index" ]]; then
+				echo "$i"
+				return
+			fi
+		done
+	}
+
+	# =======================================================
+	# VALIDATORS
+
+	# local char_classes="A-Za-z0-9"
+	# local regex='^(/)?([^/\0]+(/)?)+$'
+	# local regex='^/?([A-Za-z0-9._-]+/?)*$'
+	function is_valid_path() {
+		local input=$1
+		local char_classes="[:alpha:][:digit:]"
+		local valid_chars="([$char_classes/]+)"
+		local start='^'
+		local end='$'
+		local regex="$start$valid_chars$end"
+		if [[ ! "$input" =~ $regex ]]; then
+			return 1
+		fi
+	}
+
+	function is_valid_subdir_depth() {
+		local check_str="$1" parts=()
+		IFS='/' read -ra parts <<<"$check_str"
+		if [[ "${#parts[@]}" -gt $ALLOW_MAX_SUB_DIRS ]]; then
+			return 1
+		fi
+	}
+
+	function name_has_uppercase() {
+		local index="${1-0}"
+		if [[ "${NEW_ALIAS_NAMES[$index]}" =~ [A-Z] ]]; then
+			return 0
+		fi
+		return 1
+	}
+
+	function name_has_valid_chars() {
+		local index="${1-0}"
+		local valid_chars="[a-zA-Z0-9._-]"
+		if [[ "${NEW_ALIAS_NAMES[$index]}" =~ $valid_chars ]]; then
+			return 0
+		fi
+		return 1
+	}
+
+	# make check case insensitive; macos filesystem is case insensitive.
+	function name_is_unique() {
+		local index="${1-0}"
+		if which -s "${NEW_ALIAS_NAMES[$index],,}"; then
+			return 1
+		fi
+	}
+
+	function validate_single_simple() {
+		if ! name_has_uppercase "$1" && name_has_valid_chars "$1" && name_is_unique "$1"; then
+			return 0
+		fi
+		return 1
+	}
+
+	function validate_aliases_and_capture_failures() {
+		for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
+			local failure='no' reason='' name="${NEW_ALIAS_NAMES[$i]}"
+			local failure_part_redo_func=''
+			if name_has_uppercase "$i"; then
+				FAILING_POSITIONS+=("$i")
+				failure='yes'
+				failure_part_redo_func='edit_name'
+				# failure_validate_func=''
+				reason="Alias can only be lower case. Your input was [$name]."
+				echo-style --error "$reason"
+
+			elif ! name_has_valid_chars "$i"; then
+				FAILING_POSITIONS+=("$i")
+				failure='yes'
+				failure_part_redo_func='edit_name'
+				reason="New alias name contains invalid characters. Your input was [$name]. These are valid chars (a-z0-9._-)"
+				echo-style --error "$reason"
+
+			elif ! name_is_unique "$i"; then
+				FAILING_POSITIONS+=("$i")
+				failure='yes'
+				failure_part_redo_func='edit_name'
+				reason="Alias with name [$name] already exists"
+				echo-style --error "$reason"
+
+			else
+				SUCCESS_POSITIONS+=("$i")
+				echo-style --success "Successfully validated alias [$(get_dca_short_path "$i")]"
+			fi
+			if [[ "$failure" == 'yes' ]]; then
+				FAILING_ALIAS_REASON+=("$reason")
+				FAILING_ALIAS_CORRECTION_FUNCS+=("$failure_part_redo_func")
+			fi
+		done
+
+		local complete_failure='yes'
+		if [[ "${#SUCCESS_POSITIONS[@]}" == "${#NEW_ALIAS_NAMES[@]}" ]]; then
+			complete_failure='no'
+		fi
+
+		if [[ "$failure" == 'no' ]]; then
+			return 0
+		else
+			if [[ "$complete_failure" == 'yes' ]]; then
+				return 1 # 1 complete failure
+			else
+				return 2 # 2 partial failure. some aliases were validated succeeded
+			fi
+		fi
+	}
+
+	# =======================================================
+	# FILE SYSTEM
+
+	function correct_permissions() {
+		if [[ $# -eq 0 ]]; then
+			local alias_paths=()
+			mapfile -t alias_paths < <(get_all_existing_dcas)
+			fs-own --x -- "${alias_paths[@]}"
+		else
+			fs-own --x --no-quiet -- "$@" # correct permissions for inpus only
+		fi
+	}
+
+	function create_new_alias_files() {
+		local i target_path target_dir='' target_name prev_dir='' target_new_paths=()
+
+		function apply() {
+			if [[ -z "$prev_dir" || "$target_dir" == "$prev_dir" ]]; then
+				target_dir="$(get_dca_sub_dir_target "$i")"
+				__mkdirp "$target_dir" >/dev/null
+			fi
+			target_name="${NEW_ALIAS_NAMES[$i]}"
+			target_path="$target_dir/$target_name"
+			__print_lines "${NEW_ALIAS_CONTENTS[$i]}" >"$target_path"
+			DID_CREATE='yes'
+			target_new_paths+=("$target_path")
+		}
+
+		if [[ "${1-}" == "--successful" ]]; then
+			for i in "${SUCCESS_POSITIONS[@]}"; do
+				apply
+				# echo-style --success "[DEBUG] CREATE: $(get_dca_short_path "$i")"
+				# __print_lines "${NEW_ALIAS_CONTENTS[$i]}" >"$target_path"
+				# target_new_paths+=("$target_path")
+			done
+		else
+			for ((i = 0; i < "${#NEW_ALIAS_NAMES[@]}"; i++)); do
+				apply
+				# target_name="${NEW_ALIAS_NAMES[$i]}"
+				# target_path="$target_dir/$target_name"
+				# echo-style --success "[DEBUG] CREATE: $(get_dca_short_path "$i")"
+				# __print_lines "${NEW_ALIAS_CONTENTS[$i]}" >"$target_path"
+				# target_new_paths+=("$target_path")
+			done
+		fi
+		correct_permissions "${target_new_paths[@]}" # bulk correct permissions
+
+		if [[ "$DID_CREATE" == 'yes' ]]; then
+			echo "Reloading environment..."
+			source "$DOROTHY/sources/environment.sh"
+		fi
+
+	}
+
+	# =======================================================
+	#
+
+	function build_contents() {
+		local index=${1-0} c=''
+		c+="$SHEBANG_BASH"
+		c+=$'\n'"# Name: ${NEW_ALIAS_NAMES[$index]}"
+		c+=$'\n'"# Desc: ${NEW_ALIAS_DESCS[$index]}"
+		if [[ "${NEW_ALIAS_IS_FUNC[$index]}" == 'yes' ]]; then
+			c+=$'\n'"# Args: ${NEW_ALIAS_ARGS[$index]}"
+			c+=$'\n'"${NEW_ALIAS_VALUES[$index]}"
+		else
+			c+=$'\n'"${NEW_ALIAS_VALUES[$index]}"
+			c+=' "$@"'
+		fi
+		NEW_ALIAS_CONTENTS[index]="$c"
+	}
+
+	# =======================================================
+	# EDIT FUNCS
+	#
+	# - ( ) Add ability to create more informative labels by passing, eg. failure reason.
+	#
+	# TODO: these functions should return status on abort, so that i can use that
+	# to break out of editing pipeline in act_migrate
+
+	function edit_name() {
+		local index=${1-0} answer failure_pos success_pos label
+
+		label="======================================================="
+		label+=$'\n'"$AX_UI_PREFIX | NUM ALIASES # ${#NEW_ALIAS_NAMES[@]} | ${#FAILING_POSITIONS[@]} FAILURES | ${#FAILING_POSITIONS[@]} VALID"
+
+		failure_pos="$(get_dca_failure_index_pos "$index")"
+		success_pos="$(get_dca_success_index_pos "$index")"
+
+		if [[ -n "$failure_pos" ]]; then
+			label+=$'\n'"$(echo-style --error "Rectify name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
+			label+=$'\n'"REASON: Name was invaled for reason X"
+			if [[ "$option_verbose" == 'yes' ]]; then
+				label+=$'\n'"$(log_single_content "$failure_pos")"
+			fi
+			answer="$(ask --linger "$label")"
+		elif [[ -n "$success_pos" ]]; then
+			echo "edit: is success"
+		else
+			answer="$(ask --linger "$AX_UI_PREFIX Edit name (old: ${NEW_ALIAS_NAMES[index]}) for index ($index):")"
+		fi
+		if [[ -z "$answer" ]]; then
+			return 1
+		fi
+		NEW_ALIAS_NAMES[index]="$answer"
+		build_contents
+	}
+
+	function edit_value() {
+		local index=${1-0}
+		NEW_ALIAS_VALUES[index]="$(ask --linger "$AX_UI_PREFIX Edit command value (index: $index):")"
+		build_contents
+	}
+
+	function edit_desc() {
+		local index=${1-0}
+		NEW_ALIAS_DESCS[index]="$(ask --linger "$AX_UI_PREFIX Edit new alias description (index: $index):")"
+		build_contents
+	}
+
+	function edit_sub_path() {
+		local index=${1-0}
+		local sub_path
+		while :; do
+			sub_path="$(ask --linger "$AX_UI_PREFIX Redo sub path:")"
+			# path valid | validation is already done in the final validator func.
+			# maybe it can be removed from here...
+			if ! is_valid_path "$sub_path"; then
+				sub_path="$(ask --linger "$AX_UI_PREFIX [$sub_path] is not valid | Input sub path again:")"
+				# This could also go into the validator?
+			elif ! is_valid_subdir_depth "$sub_path"; then
+				sub_path="$(ask --linger "$AX_UI_PREFIX [$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
+				# elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
+				# # this is handled by the redo choose menu
+				# 	sub_path="$(ask --linger "$AX_UI_PREFIX Input subpath again:")"
+			else
+				break
+			fi
+		done
+		NEW_ALIAS_SUB_DIRS[index]="$sub_path"
+		build_contents
+	}
+
+	# =======================================================
+	# =======================================================
+	# =======================================================
+	# ACTIONS
+
+	# =======================================================
+	# BROWSE
+
+	# ( ) choose
+	# ( ) fuzzy-helper
+	# ( ) keybind create new DCA from selection.
+	function act_browse() {
+		local alias_paths=() alias_names=() alias_labels=()
+		mapfile -t alias_paths < <(get_all_existing_dcas)
+		for path in "${alias_paths[@]}"; do
+			local header contents
+			# ${path#*"commands.aliases"} does not work for trimming everything before
+			# the match pattern. That is why the string looks a bit weird below.
+			header="commands${path#*"commands"}"
+			contents="$("${BAT_CMD[@]}" "$path")"
+			alias_names+=("$header")
+			alias_labels+=("$header"$'\n'"$contents")
+		done
+		# __print_lines "${alias_labels[@]}"
+		local index=0 choose_title="$AX_UI_PREFIX "
+		while :; do
+			index="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${alias_labels[@]}")"
+			if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
+				break
+			fi
+		done
+	}
+
+	# =======================================================
+	# CREATE
+
+	function act_create() {
+		local sub_path='' ask_prefix="ALIASES CREATE"
+		reset_all
+		# could these be replaced by the update funcs, and use some kind of default mode?
+		NEW_ALIAS_IS_FUNC+=('no')
+		NEW_ALIAS_NAMES+=("$(ask --linger --confirm "$ask_prefix | What will the NAME be?")")
+		NEW_ALIAS_VALUES+=("$(ask --linger --confirm "$ask_prefix | What will the VALUE be?")")
+		NEW_ALIAS_DESCS+=("$(ask --linger "$ask_prefix | What will the DESC be?")")
+		if confirm --ppid=$$ --negative -- "$ask_prefix | Put it in sub path, eg. [commands.aliases/<my>/<dir>]?"; then
+			sub_path="$(ask --linger "$ask_prefix | What will the SUB PATH be?")"
+			while :; do
+				# path valid
+				if ! is_valid_path "$sub_path"; then
+					sub_path="$(ask --linger "[$sub_path] is not valid | Input sub path again:")"
+					# path maxth depth
+				elif ! is_valid_subdir_depth "$sub_path"; then
+					sub_path="$(ask --linger "[$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
+					# elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
+					# # this is handled by the redo choose menu
+					# 	sub_path="$(ask --linger "Input subpath again:")"
+				else
+					NEW_ALIAS_SUB_DIRS+=("$sub_path")
+					break
+				fi
+			done
+		else
+			NEW_ALIAS_SUB_DIRS+=("")
+		fi
+		build_contents
+		local confirm_or_edit
+		while :; do
+			confirm_or_edit="Go ahead create alias at [$(get_dca_short_path)] OR edit alias?"$'\n'"$(log_single_content)"
+			if ! confirm --ppid=$$ --positive -- "$confirm_or_edit"; then
+				# todo: move title definition into the choose command
+				local redo_func redo_options=() title="$AX_UI_PREFIX Select which part to edit:"
+				redo_options+=(edit_name "Name (${NEW_ALIAS_NAMES[0]})")
+				redo_options+=(edit_value "Value (${NEW_ALIAS_VALUES[0]})")
+				redo_options+=(edit_sub_path "Sub group name (${NEW_ALIAS_SUB_DIRS[0]})")
+				redo_options+=(edit_desc "Description (${NEW_ALIAS_DESCS[0]})")
+				redo_func="$(choose "$title" --label -- "${redo_options[@]}")"
+				"$redo_func"
+			else
+				break
+			fi
+		done
+
+		local failure_redo_func status
+		while :; do
+			eval_capture --statusvar=status -- validate_aliases_and_capture_failures
+			if [[ "$status" -ne 0 ]]; then
+				local label
+				label="[$status] Creating alias [$(get_dca_short_path)] failed with reason:"
+				label+=$'\n'"REASON: ${FAILING_ALIAS_REASON[0]}"
+				label+=$'\n'"Do you want to re-edit failing part?"
+				if confirm --ppid=$$ --positive -- "$label"; then
+					failure_redo_func="${FAILING_ALIAS_CORRECTION_FUNCS[0]}"
+					if [[ -n "$failure_redo_func" && "$failure_redo_func" == "none" ]]; then
+						echo-style --error "CREATE | Could not create alias [$(get_dca_short_path)]. No re-edit func exists for failure. (todo: ignore/discard?)"
+					fi
+					"$failure_redo_func"
+					reset_status_arrays
+				fi
+			else
+				create_new_alias_files # single
+				break
+			fi
+		done
+
+		if confirm --ppid=$$ --positive -- "Add nother alias?"; then
+			act_create
+		fi
+	}
+
+	# =======================================================
+	# CLEAN
+
+	function act_clean() {
+		local alias_paths=() alias_names=() alias_labels=()
+
+		# mapfile -t alias_paths < <(get_all_existing_dcas)
+
+		# for path in "${alias_paths[@]}"; do
+		#   local header contents
+		#   # ${path#*"commands.aliases"} does not work for trimming everything before
+		#   # the match pattern. That is why the string looks a bit weird below.
+		#   header="commands${path#*"commands"}"
+		#   contents="$("${BAT_CMD[@]}" "$path")"
+		#   alias_names+=("$header")
+		#   alias_labels+=("$header"$'\n'"$contents")
+		# done
+
+		clean_labels=(
+			test "test dir"
+			all "all"
+			groups "group"
+			single "select single"
+		)
+
+		# __print_lines "${alias_labels[@]}"
+		local index=0 clean_title="$AX_UI_PREFIX Select which category you want to purge:"
+		clean_selection="$(choose "$clean_title" --labels -- "${clean_labels[@]}")"
+		# if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
+		# 	break
+		# fi
+
+		case "$clean_selection" in
+		test)
+			if confirm --ppid=$$ --negative -- "Are you sure you want to purge all TESTING aliases?"; then
+				echo "Purging all TESTING aliases..."
+				local opts=(
+					"rm"
+					"-rdfv"
+					"$USER_COMMAND_ALIASES_DIR/$DCA_TEST_DIR_NAME"/*
+				)
+				rm "${opts[@]}" # purge testing dir/*
+			fi
+			;;
+		all)
+			if confirm --ppid=$$ --negative -- "Are you sure you want to purge ALL aliases?"; then
+				if confirm --ppid=$$ --negative -- "Again, are you really, really sure to remove ALL aliases?"; then
+					echo "Purging all ALL aliases..."
+					local opts=(
+						"-Rfv"
+						"$USER_COMMAND_ALIASES_DIR"/*
+					)
+					rm "${opts[@]}" # purge all aliases
+				fi
+			fi
+			;;
+		groups) echo "purge group todo.." ;;
+		single) echo "purge single todo.." ;;
+		esac
+	}
+
+	# =======================================================
+	# MIGRATE
+
+	function act_migrate() {
+		local interpreter='' input_file migrate_prefix="ALIASES MIGRATE | "
+		if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_path "$option_migrate_to_subdir"; then
+			echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
+			exit 1
+		fi
+
+		function migrate_single_file() {
+			input_file=$1 interpreter="$(get-interpreter --name -- "$input_file")"
+			if is-needle "$interpreter" -- "${supported[@]}"; then
+
+				# TODO: check of contents are posix. test source file and see if it
+				# returns success
+
+				# =======================================================
+				# HANDLE POSIX
+				# =======================================================
+
+				if is-needle "$interpreter" -- "${supported_posix[@]}"; then
+					local aliases=() function_names=()
+
+					# ----
+					# HANDLE POSIX ALIASES
+
+					local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
+					mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
+					for line_alias in "${aliases[@]}"; do
+						local new_alias_name='' new_alias_desc='' value=''
+						# handle trim trailing comment
+						if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
+							line_alias="${BASH_REMATCH[1]}"
+							new_alias_desc="${BASH_REMATCH[2]}"
+						fi
+						# handle split alias
+						if [[ "$line_alias" =~ alias\ ([^=]+)=\"(.*)\" ]]; then
+							new_alias_name="${BASH_REMATCH[1]}"
+							value="${BASH_REMATCH[2]}"
+						elif [[ "$line_alias" =~ alias\ ([^=]+)=\'(.*)\' ]]; then
+							new_alias_name="${BASH_REMATCH[1]}"
+							value="${BASH_REMATCH[2]}"
+						fi
+						NEW_ALIAS_IS_FUNC+=('no')
+						NEW_ALIAS_NAMES+=("$new_alias_name")
+						NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
+						NEW_ALIAS_VALUES+=("$value")
+						NEW_ALIAS_DESCS+=("$new_alias_desc")
+						NEW_ALIAS_ARGS+=("")
+						build_contents $(("${#NEW_ALIAS_NAMES[@]}" - 1))
+					done
+
+					# ----
+					# HANDLE POSIX FUNCTIONS
+
+					mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
+					for new_alias_name in "${function_names[@]}"; do
+						local body body_trimmed new_alias_name
+						body="$(bash -c 'source '"$input_file"'; declare -f '"$new_alias_name")"
+						body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
+						# Capture how many arguments each func snippets takes. This is not perfect but at least it gives some indication.
+						local arguments=() count=0
+						while read -r line; do
+							local line="$line"
+							while [[ "$line" =~ (\$[0-9]+) ]]; do
+								local match="${BASH_REMATCH[0]}"
+								if ! is-needle "$match" -- "${arguments[@]}"; then
+									arguments+=("$match")
+								fi
+								line="${line/"$match"/}" # Remove the matched part from the line
+								# echo "trim: [$line]"
+								if [[ "$count" == 10 ]]; then
+									break
+								fi
+							done
+						done <<<"$body_trimmed"
+						NEW_ALIAS_IS_FUNC+=('yes')
+						NEW_ALIAS_NAMES+=("$new_alias_name")
+						NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
+						NEW_ALIAS_VALUES+=("$body_trimmed")
+						NEW_ALIAS_DESCS+=("")
+						NEW_ALIAS_ARGS+=("'${arguments[@]}'")
+						build_contents $(("${#NEW_ALIAS_NAMES[@]}" - 1))
+					done
+
+					#	log_all_contents
+
+					# validate parsed aliases and funcs
+					local validate_status
+					eval_capture --statusvar=validate_status -- validate_aliases_and_capture_failures
+
+					# log_failure_and_success_positions
+
+					local sel_fail_idx_pos sel_fail_idx_val proceed_with_successful='no'
+
+					# NOTE: Post migrat loop either calls CHOOSE or ASK loop
+					# On cancel:
+					# ~ choose -> returns index or ""
+					# ~ ask -> returns status
+
+					# fix a single failure
+					function rectify() {
+						local rectified_current='no'
+						if [[ -z "$sel_fail_idx_pos" ]]; then # choose sets output to empty string on cancel
+							proceed_with_successful='yes'
+							return 1
+						fi
+						while [[ "$rectified_current" == "no" ]]; do
+							# on cancel return and exit choose/ask loops below
+							if ! edit_name "$sel_fail_idx_val"; then
+								echo "EDIT ABORT"
+								proceed_with_successful='yes'
+								return 1
+							fi
+							if validate_single_simple "$sel_fail_idx_val"; then
+								rectified_current='yes'
+								trim_failure_arrays "$sel_fail_idx_pos"
+								success_pos_add "$sel_fail_idx_val"
+							fi
+						done
+					}
+
+					if [[ "$option_fix_iterate" == 'yes' ]]; then
+						local iterations="${#FAILING_POSITIONS[@]}"
+						for ((i = 0; i < "$iterations"; i++)); do
+							sel_fail_idx_pos=0
+							sel_fail_idx_val="${FAILING_POSITIONS[$sel_fail_idx_pos]}"
+							! rectify && break
+						done
+					else
+						while [[ "${#FAILING_POSITIONS[@]}" -gt 0 ]]; do
+							local index=0 choose_title="$AX_UI_PREFIX "
+							choose_title+="${#FAILING_POSITIONS[@]} bad / ${#SUCCESS_POSITIONS[@]} good / ${#NEW_ALIAS_NAMES[@]} total | Select below to fix failing issue."
+							choose_title+=$'\n'"ENTER: edit/fix selection | ESC/CANCEL: create validate only | Ctrl-C: Abort"
+							local labels_failures=()
+							for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
+								local label='' failing_idx="${FAILING_POSITIONS[i]}"
+								label+="$(echo-style --error+bold "#$i: [$(get_dca_short_path "$failing_idx")] REASON: ${FAILING_ALIAS_REASON[$i]}")"
+
+								if [[ "$option_verbose" == 'yes' ]]; then
+									label+=$'\n'"$(log_single_content "$failing_idx")"
+								fi
+								labels_failures+=("$label")
+							done
+							sel_fail_idx_pos="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${labels_failures[@]}")"
+							sel_fail_idx_val="${FAILING_POSITIONS[$sel_fail_idx_pos]}"
+							# debug_against_failures
+							! rectify && break
+						done
+					fi
+
+					# if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${FAILING_ALIAS_PATHS[index]}"$'\n'"Prompt again?"; then
+					# 	break
+					# fi
+
+					if [[ "$proceed_with_successful" == 'yes' ]]; then
+						echo-style --bold "[User cancelled]: Proceeding to create only valid DCAs.."
+						create_new_alias_files --successful
+					else
+						create_new_alias_files
+					fi
+
+					# =======================================================
+					# HANDLE OTHER SHELLS BELOW
+					# =======================================================
+
+				elif is-needle "$interpreter" -- "${supported_non_posix[@]}"; then
+					if [[ "$interpreter" == "nu" ]]; then
+						# HANDLE NUSHELL
+						:
+					elif [[ "$interpreter" == "elvish" ]]; then
+						# HANDLE ELVISH
+						:
+					elif [[ "$interpreter" == "xonsh" ]]; then
+						# HANDLE XONSH
+						:
+					fi
+				else
+					echo "Interpreter [$interpreter] not supported"
+				fi
+			fi
+		}
+
+		# remove this to make the <action> go live.
+		# option_args=("$DOROTHY/user/sources/aliases.sh")
+		for migrate_file in "${option_args[@]}"; do
+			migrate_single_file "$migrate_file"
+		done
+	}
+
+	# =======================================================
+	# PREPARE
+
+	if [[ -z "$option_action" ]]; then
+		# help "No action provided"
+		option_action="browse"
+	fi
+
+	# Check before running migration..
+	if [[ -n "$option_migrate_to_subdir" ]]; then
+		if ! is_valid_subdir_depth "$option_migrate_to_subdir"; then
+			echo-style --error "Maximum sub dir depth allowed is [$ALLOW_MAX_SUB_DIRS]"
+			exit
+		fi
+	fi
+
+	# # NOTE: This becomes redundant when checking with `which <dca>`
+	# # Because we collect things here, I can clean up some redundancy below.
+	# collect_existing_alias_info
+
+	# =======================================================
+	# Act
+
+	# This is a better one liner but my linter complains too much about
+	# funcs being unreachable so for now i go with the switch case.
+	# "act_$option_action"
+
+	case "$option_action" in
+	browse) act_browse ;;
+	create) act_create ;;
+	migrate) act_migrate ;;
+	clean) act_clean ;;
+	esac
 )
 
 # fire if invoked standalone
 if [[ $0 == "${BASH_SOURCE[0]}" ]]; then
-  if [[ $* == '--test' ]]; then
-    command_aliases_test
-  else
-    command_aliases "$@"
-  fi
+	if [[ $* == '--test' ]]; then
+		command_aliases_test
+	else
+		command_aliases "$@"
+	fi
 fi
