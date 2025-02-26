@@ -3,19 +3,24 @@
 alias x="echo"
 alias xy="echo"
 
+alias nvim="echo"
+alias x="echo"
+
 function ars() {
-  echo "????"
+  echo "$@"
 }
 
 
 
 function xxee() {
-  echo "???? XXX"
+  echo "$@"
 }
 
+alias per.iod="echo"
 alias f="echo"
 alias GG="echo"
 alias a="echo"
+alias un_der="echo"
 alias z="echo"
 alias b="echo"
 alias c="echo"

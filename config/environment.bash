@@ -12,13 +12,21 @@ export LOCATE_PATH
 export DISABLE_AUTO_TITLE
 export TERM
 
-# Add Dorothy Command Aliases (DCA) to path
-path='' alias_dirs=()
-mapfile -t alias_dirs < <(find "$DOROTHY/user/commands.aliases" -type d)
-for p in "${alias_dirs[@]}"; do
-	path+="$p:"
+# # Add Dorothy Command Aliases (DCA) to path
+# path='' alias_dirs=()
+# mapfile -t alias_dirs < <(find "$DOROTHY/user/commands.aliases" -type d)
+# for p in "${alias_dirs[@]}"; do
+#   echo "Add [$p] to path">/dev/tty
+# 	path+="$p:"
+# done
+# PATH="$path$PATH"
+
+DCA_DIR="$DOROTHY/user/commands.aliases"
+PATH+=":$DCA_DIR"
+for d in "$DCA_DIR"/*/; do
+	echo "Add [$d] to path" >/dev/tty
+	PATH+=":$d"
 done
-PATH="$path$PATH"
 
 # DOROTHY_THEME="starship"
 VIRTUAL_ENV_DISABLE_PROMPT=1

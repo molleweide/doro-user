@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-# Name: i
-# Desc: 
+# Name: p.p
+# Desc: testing .
 echo "$@"
