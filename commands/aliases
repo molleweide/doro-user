@@ -7,9 +7,13 @@
 # This command is compatible with [Bash version 4.0 or later]
 #
 #
+#
+# echo --rs=[arst,sts]
 
 # -----------------------------------------------------------------------------
 # URGENT
+#
+# where should the collection of collitions be made?
 #
 # TODO: handle updating naming collision errors.
 #       a. need to check if more than one collision, ie, three or more of same name parsed.
@@ -23,6 +27,8 @@
 # TODO: edit_* info header shows weird numbers?!
 #
 # TODO: some invalid names slip through, eg. `a#`
+#
+# TODO: debug option
 #
 # TODO: ( ) ENSURE YOU CANT USE SAME NAME. NO NAME DUPLICATION
 #     1. requires move failure capturing out into its own function
@@ -54,7 +60,13 @@
 #
 # TODO: ( ) test run on my real aliases file.
 #
-# TODO: ( ) support with fabric
+# TODO: ( ) fabric -> ask for suggestions on good <group> name.
+#               1. Tell it to look at existing DCA groups and current input
+#               2. Suggest if input should go into existing or new group.
+#               3. Give new short name suggestions.
+#
+# TODO: use other methods to parse
+# - treesitter
 #
 # TODO: ( ) fzf would really be beneficial for this.
 #
@@ -149,7 +161,7 @@ function command_aliases() (
 
   # only used if user triggers a failure during review edit prompt.
   local TEMP_FAILURE_REASON=''
-  local TEMP_FAILURE_CORRECTION_FUNCS=''
+  local TEMP_FAILURE_CORRECTION_FUNC=''
 
   # upon validate_all -> handle_validate: count matches and put the count number
   # at the index position of the corresponding DCA indices
@@ -177,6 +189,7 @@ function command_aliases() (
   #   ...
   # )
   local NAMES_COLLISION_MAP=() # type: int || null
+  local GROUP_COLLISION_MAP=() # type: int || null
 
   # (**) Each index encodes the number of a specific collition, AND maps back to
   # their names
@@ -185,6 +198,7 @@ function command_aliases() (
   #   "3:8"
   # )
   local NAMES_COLLISION_COUNT_MAP=() #
+  local GROUP_COLLISION_COUNT_MAP=() #
 
   # ---------------------------------
   # supports
@@ -265,32 +279,35 @@ function command_aliases() (
   # =======================================================
   # ARGS
 
-  # local option_args=()
-  local option_action='' option_test_mode='no' option_review_verbose='no' option_quiet='no'
-  local option_pause='no' option_migrate_to_subdir='' option_args=() option_fix_iterate='no'
-  local option_review_both='no' option_review_successful='no'
-  local option_parsing_verbose='no'
+  local \
+    option_action='' \
+    option_test_mode='no' \
+    option_review_verbose='no' \
+    option_quiet='no' \
+    option_migrate_to_subdir='' \
+    option_args=() \
+    option_fix_iterate='no' \
+    option_review_both='no' \
+    option_review_successful='no' \
+    option_parsing_verbose='no' \
+    option_debug='no'
+
   while [[ $# -ne 0 ]]; do
     item="$1"
     shift
     case "$item" in
     '--help' | '-h') help ;;
-
+    '--debug') option_debug='yes' ;;
     # verbosity
-
     '--no-review-verbose'* | '--review-verbose'*)
       option_review_verbose="$(get-flag-value --affirmative --fallback="$option_review_verbose" -- "$item")"
       ;;
-
     '--parsing-verbose') option_parsing_verbose='yes' ;;
-
     '--verbose')
       option_parsing_verbose='yes'
       option_review_verbose='yes'
       ;;
-
     # ---
-
     '--no-quiet'* | '--quiet'*)
       option_quiet="$(get-flag-value --affirmative --fallback="$option_quiet" -- "$item")"
       ;;
@@ -410,6 +427,11 @@ function command_aliases() (
     local last=$(("${#NEW_ALIAS_NAMES[@]}" - 1))
     __print_lines "-------------------------------------------------------"
     log_single_content "$last" # "${NEW_ALIAS_CONTENTS[$last]}"
+  }
+
+  function logger {
+    # echo "<[${FUNCNAME[0]}]>"
+    echo "<[${FUNCNAME[1]}]>: $*"
   }
 
   # =======================================================
@@ -651,6 +673,7 @@ function command_aliases() (
       echo "handle_validate --temp $1"
     fi
 
+    # check failures
     vi="${1-}"
     name="${NEW_ALIAS_NAMES[$vi]}"
     if name_has_uppercase "$vi"; then
@@ -666,12 +689,12 @@ function command_aliases() (
       failure_part_redo_func='edit_name'
       reason="Name [$name] already exists in path. ('which $name' -> $(which "$name"))"
     elif ! name_is_unique_within "$vi"; then
-      # echo "?? ??"
       failure='yes'
       failure_part_redo_func='edit_name'
       reason="Parsed naming collision for name [$name]"
     fi
 
+    # set arrays
     if [[ "$failure" == 'yes' ]]; then
       if [[ "$option_parsing_verbose" == 'yes' ]]; then
         echo-style --error "$reason"
@@ -683,7 +706,7 @@ function command_aliases() (
       else
         echo "<[ASSIGN TEMP FAILURE]>"
         TEMP_FAILURE_REASON="$reason"
-        TEMP_FAILURE_CORRECTION_FUNCS="$failure_part_redo_func"
+        TEMP_FAILURE_CORRECTION_FUNC="$failure_part_redo_func"
       fi
     else
       SUCCESS_POSITIONS+=("$vi")
@@ -693,7 +716,7 @@ function command_aliases() (
       if [[ "$set_temp" == 'yes' ]]; then
         echo "<[RESET TEMP FAILURE]>"
         TEMP_FAILURE_REASON=""
-        TEMP_FAILURE_CORRECTION_FUNCS=""
+        TEMP_FAILURE_CORRECTION_FUNC=""
       fi
     fi
 
@@ -734,6 +757,72 @@ function command_aliases() (
         return 2 # 2 partial failure. some aliases were validated succeeded
       fi
     fi
+  }
+
+  # =======================================================
+  # COLLISION HELPERS
+
+  function check_name_collisions {
+    logger "start"
+    local i_check name_check y y_name collision encode_count_string collision_counter=0 already_processed=()
+
+    for ((i_check = 0; i_check < "${#NEW_ALIAS_NAMES[@]}"; i_check++)); do
+      name_check="${NEW_ALIAS_NAMES[$i_check]}" collision='no' encode_count_string="$i_check"
+
+      # guard against multiple checks for same name.
+      if is-needle --needle="$name_check" -- "${already_processed[@]}"; then
+        continue
+      fi
+      local match_counter=0
+
+      for ((y = 0; y < "${#NEW_ALIAS_NAMES[@]}"; y++)); do
+
+        if [[ "$name_check" == "${NEW_ALIAS_NAMES[$y]}" ]]; then
+          # echo "$name_check match!!"
+          match_counter=$((match_counter + 1))
+          NAMES_COLLISION_MAP[y]=$collision_counter
+
+          # This should always be the first match of a name, since __already_done guards against checking a name multiple times
+          if [[ "$i_check" == "$y" ]]; then
+            echo "---------------------------------"
+            echo "#$match_counter $name_check [$y]-> match self (${#NEW_ALIAS_NAMES[$y]})"
+            already_processed+=("$name_check")
+            continue # ignore counting itself..
+          else
+            collision='yes'
+            # for each non self match, add to the encode count string
+            encode_count_string+=":$y"
+          fi
+
+        fi
+      done # y
+      if [[ "$collision" == 'yes' ]]; then
+        NAMES_COLLISION_COUNT_MAP+=("$encode_count_string")
+        collision_counter=$((collision_counter + 1))
+      else
+        NAMES_COLLISION_MAP[i_check]=""
+      fi
+    done
+
+    logger "NAMES_COLLISION_MAP"
+    # __print_lines "${NAMES_COLLISION_MAP[@]}"
+    for ((a = 0; a < "${#NEW_ALIAS_NAMES[@]}"; a++)); do
+      if [[ -n "${NAMES_COLLISION_MAP[$a]}" ]]; then
+        __print_lines "#$a: ${NEW_ALIAS_NAMES[$a]} -> ${NAMES_COLLISION_MAP[$a]}"
+      fi
+    done
+
+    logger "NAMES_COLLISION_COUNT_MAP"
+    # __print_lines "${NAMES_COLLISION_COUNT_MAP[@]}"
+    for ((b = 0; b < "${#NAMES_COLLISION_COUNT_MAP[@]}"; b++)); do
+      echo "$b: ${NAMES_COLLISION_COUNT_MAP[$b]}"
+    done
+
+    exit 0
+  }
+
+  function check_group_collisions {
+    logger
   }
 
   # =======================================================
@@ -1267,6 +1356,9 @@ function command_aliases() (
             return
           fi
 
+          check_name_collisions
+          check_group_collisions
+
           # validate parsed aliases and funcs
           local validate_status
           eval_capture --statusvar=validate_status -- validate_all
@@ -1381,7 +1473,6 @@ function command_aliases() (
               # echo "::::::::: DEBUG BEFORE :::::::::"
               # debug_status_arrays
 
-              # BUILD CHOOSE
               local ordinal choose_start_index=0 choose_title="$AX_UI_PREFIX " choose_review_labels=()
 
               choose_title+=" REVIEWING: [$reviewing] | "
