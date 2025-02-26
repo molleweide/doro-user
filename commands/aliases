@@ -36,6 +36,7 @@
 #
 #       BRAINSTORMING: REVIEW CHOOSE
 #
+# TODO: fix iterate -> on empty -> run choose menu to update any component.
 #
 #
 # TODO: on fix naming collision -> remove failure status from all affected
@@ -46,6 +47,8 @@
 #
 # TODO: migrate: Before create, choose if you want to create new DCAs in test dir
 #           to prevent infecting your real DCAs with bad ones.
+#
+# TODO: clear screen for edit_* funcs?
 #
 # FIX: adding sub group -> not accessible post creation. why?? not permitted
 #
@@ -139,6 +142,36 @@ function command_aliases() (
 	# only used if user triggers a failure during review edit prompt.
 	local TEMP_FAILURE_REASON=''
 	local TEMP_FAILURE_CORRECTION_FUNCS=''
+
+  # upon validate_all -> handle_validate: count matches and put the count number
+  # at the index position of the corresponding DCA indices
+  #
+  # NOTE: I need to think about this so I dont have to put mult values for each
+  # match in the tracker array.
+  #
+  # TODO: try: concatenate strings that represent
+
+  # (*) if a DCA has collision, then map it to DCA_COLLISION_TRACKER
+  # example=(
+  #   0
+  #   "nul"
+  #   0
+  #   "nul"
+  #   ...
+  #   "nul"
+  #   0
+  #   "nul"
+  #   ...
+  # )
+  local DCA_HAS_COLLITIONS_MAP=() # type: int || null
+
+  # (*) maps to a position in this array, which is a string that encodes
+  # all DCAs that has a colliton for the same name
+  # example=(
+  #   "0:2:27"    # means that DCAs 0, 5, and 27 collide on the same name
+  # )
+	local DCA_COLLISION_TRACKER=() #
+
 	local supported=(
 		sh
 		bash
