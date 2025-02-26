@@ -15,43 +15,22 @@
 #
 # where should the collection of collitions be made?
 #
-# TODO: handle updating naming collision errors.
-#       a. need to check if more than one collision, ie, three or more of same name parsed.
-#       b. reset failure status of all instances.
-#       c. test
+# TODO: HANDLE UPDATING NAMING COLLISION ERRORS.
+#       (x) collisions are evaluated before review
+#       ( ) validate_* -> use collision arrays in -> [name_is_unique_within]
+#       ( ) properly reduce COLLISION arrays on edit_finished.
 #
-#       >>> use something like
-#       1. PARSED_COLLISIONS_TRACKER
-#       2. PARSED_SUB_GROUP_TRACKER
+# TODO: choose && iterate
+#       -> on empty -> run choose menu to update any component.
+#           >>> reuse choose menu from act_create
 #
-# TODO: edit_* info header shows weird numbers?!
-#
-# TODO: some invalid names slip through, eg. `a#`
-#
-# TODO: debug option
-#
-# TODO: ( ) ENSURE YOU CANT USE SAME NAME. NO NAME DUPLICATION
-#     1. requires move failure capturing out into its own function
-#     2. if created new collision
-#       >>> failure_remove()
-#       >>> failure_add()
-#
-#       BRAINSTORMING: REVIEW ITERATE
-#
-#       handle double removals if fixing a name collision.
-#
-#       BRAINSTORMING: REVIEW CHOOSE
-#
-# TODO: fix iterate -> on empty -> run choose menu to update any component.
-#
+# TODO:
 #
 # TODO: on fix naming collision -> remove failure status from all affected
 #
+# TODO: duplicate collision handling for <group_paths>
 #
-# TODO: prevent [dca name] with [sub dir group] collision
-#             -> name_is_unique_within
-#
-# TODO: migrate: Before create, choose if you want to create new DCAs in test dir
+# TODO: act_migrate: Before create, choose if you want to create new DCAs in test dir
 #           to prevent infecting your real DCAs with bad ones.
 #
 # TODO: clear screen for edit_* funcs?
@@ -357,8 +336,6 @@ function command_aliases() (
     esac
   done
 
-  AX_UI_PREFIX+=" |"
-
   # =======================================================
   # LOG AND DEBUG HELPERS
 
@@ -592,7 +569,7 @@ function command_aliases() (
   # local char_classes="A-Za-z0-9"
   # local regex='^(/)?([^/\0]+(/)?)+$'
   # local regex='^/?([A-Za-z0-9._-]+/?)*$'
-  function is_valid_path() {
+  function is_valid_group_dir() {
     local input=$1
     local char_classes="[:alpha:][:digit:]"
     local valid_chars="([$char_classes/]+)"
@@ -623,7 +600,7 @@ function command_aliases() (
 
   function name_has_valid_chars() {
     local index="${1-0}"
-    if [[ "${NEW_ALIAS_NAMES[$index]}" =~ [$VALID_NAME_CHARS_PATTERN] ]]; then
+    if [[ "${NEW_ALIAS_NAMES[$index]}" =~ ^[$VALID_NAME_CHARS_PATTERN]$ ]]; then
       return 0
     fi
     return 1
@@ -637,6 +614,8 @@ function command_aliases() (
     fi
   }
 
+  # TEST: This should be compatible with [act_create] as well since, it would
+  # exit the loop check.
   function name_is_unique_within() {
     local index="${1-0}" i
     local check_name="${NEW_ALIAS_NAMES[$index]}" match='no'
@@ -764,38 +743,26 @@ function command_aliases() (
 
   function check_name_collisions {
     logger "start"
-    local i_check name_check y y_name collision encode_count_string collision_counter=0 already_processed=()
-
+    local i_check name_check y collision encode_count_string collision_counter=0 already_processed=()
+    NAMES_COLLISION_MAP=()
+    NAMES_COLLISION_COUNT_MAP=()
     for ((i_check = 0; i_check < "${#NEW_ALIAS_NAMES[@]}"; i_check++)); do
       name_check="${NEW_ALIAS_NAMES[$i_check]}" collision='no' encode_count_string="$i_check"
-
-      # guard against multiple checks for same name.
       if is-needle --needle="$name_check" -- "${already_processed[@]}"; then
-        continue
+        continue # guard against multiple checks for same name.
       fi
-      local match_counter=0
-
       for ((y = 0; y < "${#NEW_ALIAS_NAMES[@]}"; y++)); do
-
         if [[ "$name_check" == "${NEW_ALIAS_NAMES[$y]}" ]]; then
-          # echo "$name_check match!!"
-          match_counter=$((match_counter + 1))
           NAMES_COLLISION_MAP[y]=$collision_counter
-
-          # This should always be the first match of a name, since __already_done guards against checking a name multiple times
           if [[ "$i_check" == "$y" ]]; then
-            echo "---------------------------------"
-            echo "#$match_counter $name_check [$y]-> match self (${#NEW_ALIAS_NAMES[$y]})"
             already_processed+=("$name_check")
-            continue # ignore counting itself..
+            continue # first match
           else
-            collision='yes'
-            # for each non self match, add to the encode count string
+            collision='yes' # subsequent matches
             encode_count_string+=":$y"
           fi
-
         fi
-      done # y
+      done
       if [[ "$collision" == 'yes' ]]; then
         NAMES_COLLISION_COUNT_MAP+=("$encode_count_string")
         collision_counter=$((collision_counter + 1))
@@ -806,19 +773,16 @@ function command_aliases() (
 
     logger "NAMES_COLLISION_MAP"
     # __print_lines "${NAMES_COLLISION_MAP[@]}"
-    for ((a = 0; a < "${#NEW_ALIAS_NAMES[@]}"; a++)); do
-      if [[ -n "${NAMES_COLLISION_MAP[$a]}" ]]; then
-        __print_lines "#$a: ${NEW_ALIAS_NAMES[$a]} -> ${NAMES_COLLISION_MAP[$a]}"
-      fi
-    done
-
+    # for ((a = 0; a < "${#NEW_ALIAS_NAMES[@]}"; a++)); do
+    #   if [[ -n "${NAMES_COLLISION_MAP[$a]}" ]]; then
+    #     __print_lines "#$a: ${NEW_ALIAS_NAMES[$a]} -> ${NAMES_COLLISION_MAP[$a]}"
+    #   fi
+    # done
     logger "NAMES_COLLISION_COUNT_MAP"
     # __print_lines "${NAMES_COLLISION_COUNT_MAP[@]}"
-    for ((b = 0; b < "${#NAMES_COLLISION_COUNT_MAP[@]}"; b++)); do
-      echo "$b: ${NAMES_COLLISION_COUNT_MAP[$b]}"
-    done
-
-    exit 0
+    # for ((b = 0; b < "${#NAMES_COLLISION_COUNT_MAP[@]}"; b++)); do
+    #   echo "$b: ${NAMES_COLLISION_COUNT_MAP[$b]}"
+    # done
   }
 
   function check_group_collisions {
@@ -913,7 +877,7 @@ function command_aliases() (
     local index=${1-0} answer failure_pos success_pos label current_value temp_fail='no'
 
     label="======================================================="
-    label+=$'\n'"$AX_UI_PREFIX | NUM ALIASES # ${#NEW_ALIAS_NAMES[@]} | ${#FAILING_POSITIONS[@]} FAILURES | ${#SUCCESS_POSITIONS[@]} VALID"
+    label+=$'\n'"$AX_UI_PREFIX | ${#FAILING_POSITIONS[@]} / ${#NEW_ALIAS_NAMES[@]} FAILURES"
 
     if [[ "$option_fix_iterate" == 'yes' ]]; then
       label+=$'\n'"Supply empty string to discard subsequent and proceed to post review"
@@ -928,8 +892,6 @@ function command_aliases() (
       success_pos="$(get_success_pos_from_dca_index "$index")"
       echo "index $index | fpos $failure_pos | spos $success_pos"
     fi
-
-    # TODO: handle temf_fail
 
     current_value="${NEW_ALIAS_NAMES[$index]}"
 
@@ -983,7 +945,7 @@ function command_aliases() (
       sub_path="$(ask --linger "$AX_UI_PREFIX Redo sub path:")"
       # path valid | validation is already done in the final validator func.
       # maybe it can be removed from here...
-      if ! is_valid_path "$sub_path"; then
+      if ! is_valid_group_dir "$sub_path"; then
         sub_path="$(ask --linger "$AX_UI_PREFIX [$sub_path] is not valid | Input sub path again:")"
         # This could also go into the validator?
       elif ! is_valid_subdir_depth "$sub_path"; then
@@ -997,6 +959,13 @@ function command_aliases() (
     done
     NEW_ALIAS_SUB_DIRS[index]="$sub_path"
     build_contents
+  }
+
+  # =======================================================
+  # EVENTS
+
+  function handle_event {
+    :
   }
 
   # =======================================================
@@ -1069,7 +1038,7 @@ function command_aliases() (
       sub_path="$(ask --linger "$ask_prefix | What will the SUB PATH be?")"
       while :; do
         # path valid
-        if ! is_valid_path "$sub_path"; then
+        if ! is_valid_group_dir "$sub_path"; then
           sub_path="$(ask --linger "[$sub_path] is not valid | Input sub path again:")"
           # path maxth depth
         elif ! is_valid_subdir_depth "$sub_path"; then
@@ -1193,7 +1162,7 @@ function command_aliases() (
 
   function act_migrate() {
     local interpreter='' input_file migrate_prefix="ALIASES MIGRATE |"
-    if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_path "$option_migrate_to_subdir"; then
+    if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_group_dir "$option_migrate_to_subdir"; then
       echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
       exit 1
     fi
@@ -1391,16 +1360,16 @@ function command_aliases() (
             fi
             while [[ "$update_validated" == "no" ]]; do
               # on cancel return and exit choose/ask loops below
+
               if ! edit_name "$selected_review_dca_index"; then
                 proceed_with_successful='yes'
                 return 1
               fi
+
+              # TODO: below could go into [handle_event "edit_finished" ]
+
               if validate_single_simple "$selected_review_dca_index"; then
                 update_validated='yes'
-                #
-                # >> use temp failure statuses
-                #
-                # check for these in edit_* funcs so that
 
                 # TODO: in order to capture naming collisions within, this should
                 # be moved to the [update_status_arrays]
