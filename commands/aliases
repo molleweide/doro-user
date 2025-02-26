@@ -17,7 +17,14 @@
 #       Use this to force error and new reason if user triggers an error in the
 #       review edit_* loop.
 #       A. (x) refactor failure collection into its own func.
-#       B. ( ) assign temp failure info
+#       B. (*) assign temp failure info
+#             - impl feature
+#             - call func in review process >>>> ? from edit itself OR in edit_* ?
+#             - reset TEMP_* arrays
+#
+# TODO: edit_* info header shows weird numbers?!
+#
+# TODO: some invalid names slip through, eg. `a#`
 #
 # TODO: ( ) ENSURE YOU CANT USE SAME NAME. NO NAME DUPLICATION
 #     1. requires move failure capturing out into its own function
@@ -585,31 +592,22 @@ function command_aliases() (
 		:
 	}
 
-	function validate_single_simple() {
-		if ! name_has_uppercase "$1" && name_has_valid_chars "$1" && name_is_unique_in_path "$1" && name_is_unique_within "$1"; then
-			return 0
-		fi
-
-		# TODO: collect TEMP_FAILURE_* info.
-
-		return 1
-	}
-
 	# how could this be made to work with single index.
 	#
 	# >>> take an arg --temp
 
 	# input: dca index
 	function handle_validate() {
-		local failure='no' set_temp='no'
+		local vi name failure='no' set_temp='no' reason='' failure_part_redo_func=''
 
 		if [[ "$1" == "--temp" ]]; then
 			set_temp='yes' # insert status info into TEMP_FAILURE_* instead
 			shift
+			echo "handle_validate --temp $1"
 		fi
 
-		local vi=${1-} name="${NEW_ALIAS_NAMES[$vi]}"
-		local reason='' failure_part_redo_func=''
+		vi="${1-}"
+		name="${NEW_ALIAS_NAMES[$vi]}"
 		if name_has_uppercase "$vi"; then
 			failure='yes'
 			failure_part_redo_func='edit_name'
@@ -638,13 +636,19 @@ function command_aliases() (
 				FAILING_ALIAS_REASON+=("$reason")
 				FAILING_ALIAS_CORRECTION_FUNCS+=("$failure_part_redo_func")
 			else
-				TEMP_FAILURE_REASON+=("$reason")
-				TEMP_FAILURE_CORRECTION_FUNCS+=("$failure_part_redo_func")
+				echo "<[ASSIGN TEMP FAILURE]>"
+				TEMP_FAILURE_REASON="$reason"
+				TEMP_FAILURE_CORRECTION_FUNCS="$failure_part_redo_func"
 			fi
 		else
 			SUCCESS_POSITIONS+=("$vi")
 			if [[ "$option_parsing_verbose" == 'yes' ]]; then
 				echo-style --success "Successfully validated alias [$(get_dca_short_path "$vi")]"
+			fi
+			if [[ "$set_temp" == 'yes' ]]; then
+				echo "<[RESET TEMP FAILURE]>"
+				TEMP_FAILURE_REASON=""
+				TEMP_FAILURE_CORRECTION_FUNCS=""
 			fi
 		fi
 
@@ -653,10 +657,21 @@ function command_aliases() (
 		fi
 	}
 
+	function validate_single_simple() {
+		# if ! name_has_uppercase "$1" && name_has_valid_chars "$1" && name_is_unique_in_path "$1" && name_is_unique_within "$1"; then
+		# 	return 0
+		# fi
+		echo "validate_single_simple | input: $1"
+		if ! handle_validate --temp "$1"; then
+			return 1
+		fi
+		# TODO: collect TEMP_FAILURE_* info.
+		# return 1
+	}
+
 	function validate_all() {
 		local vi had_failure='no'
 		for ((vi = 0; vi < "${#NEW_ALIAS_NAMES[@]}"; vi++)); do
-			# echo "validate index: $vi"
 			if ! handle_validate "$vi"; then
 				had_failure='yes'
 			fi
@@ -761,7 +776,7 @@ function command_aliases() (
 	# to break out of editing pipeline in act_migrate
 
 	function edit_name() {
-		local index=${1-0} answer failure_pos success_pos label current_value
+		local index=${1-0} answer failure_pos success_pos label current_value temp_fail='no'
 
 		label="======================================================="
 		label+=$'\n'"$AX_UI_PREFIX | NUM ALIASES # ${#NEW_ALIAS_NAMES[@]} | ${#FAILING_POSITIONS[@]} FAILURES | ${#SUCCESS_POSITIONS[@]} VALID"
@@ -772,25 +787,36 @@ function command_aliases() (
 
 		echo "name in edit: ${NEW_ALIAS_NAMES[$index]}"
 
-		failure_pos="$(get_failure_pos_from_dca_index "$index")"
-		success_pos="$(get_success_pos_from_dca_index "$index")"
+		if [[ -n "$TEMP_FAILURE_REASON" ]]; then
+			temp_fail='yes'
+		else
+			failure_pos="$(get_failure_pos_from_dca_index "$index")"
+			success_pos="$(get_success_pos_from_dca_index "$index")"
+			echo "index $index | fpos $failure_pos | spos $success_pos"
+		fi
 
-		echo "index $index | fpos $failure_pos | spos $success_pos"
+		# TODO: handle temf_fail
 
 		current_value="${NEW_ALIAS_NAMES[$index]}"
 
-		if [[ -n "$failure_pos" ]]; then
+		if [[ "$temp_fail" == 'yes' ]]; then
+			label+=$'\n'"$(echo-style --error "Rectify name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
+			label+=$'\n'"REASON: $TEMP_FAILURE_REASON"
+			if [[ "$option_review_verbose" == 'yes' ]]; then
+				label+=$'\n'"$(log_single_content "$index")"
+			fi
+		elif [[ -n "$failure_pos" ]]; then
 			label+=$'\n'"$(echo-style --error "Rectify name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
 			label+=$'\n'"REASON: ${FAILING_ALIAS_REASON[$failure_pos]}"
 			if [[ "$option_review_verbose" == 'yes' ]]; then
-				label+=$'\n'"$(log_single_content "$failure_pos")"
+				label+=$'\n'"$(log_single_content "$index")"
 			fi
 			# answer="$(ask --linger --default="$current_value" "$label")"
 		elif [[ -n "$success_pos" ]]; then
 			label+=$'\n'"$(echo-style --success "Edit name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
 			# label+=$'\n'"REASON: Name was invaled for reason X"
 			if [[ "$option_review_verbose" == 'yes' ]]; then
-				label+=$'\n'"$(log_single_content "$failure_pos")"
+				label+=$'\n'"$(log_single_content "$index")"
 			fi
 			# answer="$(ask --linger --default="$current_value" "$label")"
 		else
