@@ -16,16 +16,17 @@ function xxee() {
   echo "$@"
 }
 
-alias per.iod="echo"
 alias f="echo"
 alias GG="echo"
 alias a="echo"
 alias un_der="echo"
 alias z="echo"
+alias x="echo"
 alias b="echo"
 alias c="echo"
 alias e="echo"
 alias n="echo"
+alias x="echo"
 alias i="echo"
 alias o="echo"
 alias d="echo"

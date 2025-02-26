@@ -11,16 +11,14 @@
 # -----------------------------------------------------------------------------
 # URGENT
 #
-# TODO:
+# TODO: handle updating naming collision errors.
+#       a. need to check if more than one collision, ie, three or more of same name parsed.
+#       b. reset failure status of all instances.
+#       c. test
 #
-# TODO: collect TEMP_FAILURE_* info.
-#       Use this to force error and new reason if user triggers an error in the
-#       review edit_* loop.
-#       A. (x) refactor failure collection into its own func.
-#       B. (*) assign temp failure info
-#             - impl feature
-#             - call func in review process >>>> ? from edit itself OR in edit_* ?
-#             - reset TEMP_* arrays
+#       >>> use something like
+#       1. PARSED_COLLISIONS_TRACKER
+#       2. PARSED_SUB_GROUP_TRACKER
 #
 # TODO: edit_* info header shows weird numbers?!
 #
@@ -60,9 +58,6 @@
 # ----
 #
 # TODO: go back to reviewing
-#
-# TODO: in failure reason. say if there is an existing
-#         binary/package OR existing DCA collision.
 #
 # TODO: --review-all
 #         jump to first failure
@@ -619,7 +614,7 @@ function command_aliases() (
 		elif ! name_is_unique_in_path "$vi"; then
 			failure='yes'
 			failure_part_redo_func='edit_name'
-			reason="Name [$name] already exists"
+			reason="Name [$name] already exists in path. ('which $name' -> $(which "$name"))"
 		elif ! name_is_unique_within "$vi"; then
 			# echo "?? ??"
 			failure='yes'
