@@ -16,8 +16,8 @@
 # TODO: collect TEMP_FAILURE_* info.
 #       Use this to force error and new reason if user triggers an error in the
 #       review edit_* loop.
-#       A. refactor failure collection into its own func.
-#       B.
+#       A. (x) refactor failure collection into its own func.
+#       B. ( ) assign temp failure info
 #
 # TODO: ( ) ENSURE YOU CANT USE SAME NAME. NO NAME DUPLICATION
 #     1. requires move failure capturing out into its own function
@@ -595,67 +595,76 @@ function command_aliases() (
 		return 1
 	}
 
-	function validate_aliases_and_capture_failures_post_parsing() {
-		local vi failure='no'
-
-		function handle_validate() {
-			local name="${NEW_ALIAS_NAMES[$vi]}"
-			local reason='' failure_part_redo_func=''
-			if name_has_uppercase "$vi"; then
-				FAILING_POSITIONS+=("$vi")
-				failure='yes'
-				failure_part_redo_func='edit_name'
-				reason="Alias can only be lower case. Your input was [$name]."
-				if [[ "$option_parsing_verbose" == 'yes' ]]; then
-					echo-style --error "$reason"
-				fi
-
-			elif ! name_has_valid_chars "$vi"; then
-				FAILING_POSITIONS+=("$vi")
-				failure='yes'
-				failure_part_redo_func='edit_name'
-				reason="New alias name contains invalid characters. Only valid chars: [$VALID_NAME_CHARS_PATTERN]"
-				if [[ "$option_parsing_verbose" == 'yes' ]]; then
-					echo-style --error "$reason"
-				fi
-
-			elif ! name_is_unique_in_path "$vi"; then
-				FAILING_POSITIONS+=("$vi")
-				failure='yes'
-				failure_part_redo_func='edit_name'
-				reason="Name [$name] already exists"
-				if [[ "$option_parsing_verbose" == 'yes' ]]; then
-					echo-style --error "$reason"
-				fi
-
-			elif ! name_is_unique_within "$vi"; then
-				# echo "?? ??"
-				FAILING_POSITIONS+=("$vi")
-				failure='yes'
-				failure_part_redo_func='edit_name'
-				reason="Parsed naming collision for name [$name]"
-				if [[ "$option_parsing_verbose" == 'yes' ]]; then
-					echo-style --error "$reason"
-				fi
-
-			else
-				SUCCESS_POSITIONS+=("$vi")
-				if [[ "$option_parsing_verbose" == 'yes' ]]; then
-					echo-style --success "Successfully validated alias [$(get_dca_short_path "$vi")]"
-				fi
+	function handle_validate() {
+	  local failure='no'
+		local vi=${1-} name="${NEW_ALIAS_NAMES[$vi]}"
+		local reason='' failure_part_redo_func=''
+		if name_has_uppercase "$vi"; then
+			FAILING_POSITIONS+=("$vi")
+			failure='yes'
+			failure_part_redo_func='edit_name'
+			reason="Alias can only be lower case. Your input was [$name]."
+			if [[ "$option_parsing_verbose" == 'yes' ]]; then
+				echo-style --error "$reason"
 			fi
 
-			if [[ "$failure" == 'yes' ]]; then
-				FAILING_ALIAS_REASON+=("$reason")
-				FAILING_ALIAS_CORRECTION_FUNCS+=("$failure_part_redo_func")
+		elif ! name_has_valid_chars "$vi"; then
+			FAILING_POSITIONS+=("$vi")
+			failure='yes'
+			failure_part_redo_func='edit_name'
+			reason="New alias name contains invalid characters. Only valid chars: [$VALID_NAME_CHARS_PATTERN]"
+			if [[ "$option_parsing_verbose" == 'yes' ]]; then
+				echo-style --error "$reason"
 			fi
-		}
+
+		elif ! name_is_unique_in_path "$vi"; then
+			FAILING_POSITIONS+=("$vi")
+			failure='yes'
+			failure_part_redo_func='edit_name'
+			reason="Name [$name] already exists"
+			if [[ "$option_parsing_verbose" == 'yes' ]]; then
+				echo-style --error "$reason"
+			fi
+
+		elif ! name_is_unique_within "$vi"; then
+			# echo "?? ??"
+			FAILING_POSITIONS+=("$vi")
+			failure='yes'
+			failure_part_redo_func='edit_name'
+			reason="Parsed naming collision for name [$name]"
+			if [[ "$option_parsing_verbose" == 'yes' ]]; then
+				echo-style --error "$reason"
+			fi
+
+		else
+			SUCCESS_POSITIONS+=("$vi")
+			if [[ "$option_parsing_verbose" == 'yes' ]]; then
+				echo-style --success "Successfully validated alias [$(get_dca_short_path "$vi")]"
+			fi
+		fi
+
+		if [[ "$failure" == 'yes' ]]; then
+		  echo ">> adding reason"
+			FAILING_ALIAS_REASON+=("$reason")
+			FAILING_ALIAS_CORRECTION_FUNCS+=("$failure_part_redo_func")
+		fi
+
+		if [[ "$failure" == 'yes' ]]; then
+		  return 1
+		fi
+	}
+
+	function validate_all() {
+		local vi had_failure='no'
 
 		for ((vi = 0; vi < "${#NEW_ALIAS_NAMES[@]}"; vi++)); do
 
 			# -- move below to update status arrays --- #
+			echo "validate index: $vi"
 
-			handle_validate
+			if ! handle_validate "$vi"; then
+			  had_failure='yes'
+			fi
 
 			# local failure='no' reason='' name="${NEW_ALIAS_NAMES[$vi]}"
 			# local failure_part_redo_func=''
@@ -717,7 +726,7 @@ function command_aliases() (
 			complete_failure='no'
 		fi
 
-		if [[ "$failure" == 'no' ]]; then
+		if [[ "$had_failure" == 'no' ]]; then
 			return 0
 		else
 			if [[ "$complete_failure" == 'yes' ]]; then
@@ -997,7 +1006,7 @@ function command_aliases() (
 
 		local failure_redo_func status
 		while :; do
-			eval_capture --statusvar=status -- validate_aliases_and_capture_failures_post_parsing
+			eval_capture --statusvar=status -- validate_all
 
 			echo "validate status = $status"
 
@@ -1250,7 +1259,7 @@ function command_aliases() (
 
 					# validate parsed aliases and funcs
 					local validate_status
-					eval_capture --statusvar=validate_status -- validate_aliases_and_capture_failures_post_parsing
+					eval_capture --statusvar=validate_status -- validate_all
 
 					# setup variables for review
 					local -n REVIEW_ARRAY
