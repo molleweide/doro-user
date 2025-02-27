@@ -11,11 +11,38 @@
 # echo --rs=[arst,sts]
 
 # -----------------------------------------------------------------------------
-# URGENT
 #
-# where should the collection of collitions be made?
+# TODO: ( ) post_review -> confirm: default put new DCAs in testing dir.
 #
-# TODO: HANDLE UPDATING NAMING COLLISION ERRORS.
+# TODO: ( ) ask: prefix alias with exec?
+#
+# TEST: ( ) test run on my real aliases file.
+#
+# FIX: adding sub group -> not accessible post creation. why?? not permitted
+#
+# -----------------------------------------------------------------------------
+# FABRIC
+#
+# TODO: ( ) fabric -> ask for suggestions on good <group> name.
+# | 1. Tell it to look at existing DCA groups and current input
+# | 2. Suggest if input should go into existing or new group.
+# | 3. Give new short name suggestions.
+#
+# TODO: ( ) fabric create DCAs based on description.
+# | 1. Only take description as input
+# | 2. Generate <contents>, <group>, and <name>
+#
+# TODO: Create dorothy DCA fabric-pattern
+#
+# -----------------------------------------------------------------------------
+# IMPROVEMENTS
+#
+# TODO: ( ) -> use NEW_ALIAS_IS_FAILURE=()
+#       | This will make it easier to handle building UI in eg. edit_*
+#
+# TODO: ( ) move dca $index selection to global var.
+#
+# TODO: edit_ show num
 #       ( ) get number of collisions
 #             -> show in the EDIT_ title
 #
@@ -23,51 +50,65 @@
 #       -> on empty -> run choose menu to update any component.
 #           >>> reuse choose menu from act_create
 #
-# TODO:
+# TODO: review_choose <esc> ->
+#     | choose --esc-menu
 #
-# TODO: on fix naming collision -> remove failure status from all affected
+# TODO: on fix naming clash && clash == 2
+# | Then remove the invalid status from both, and redo validate_affected..
 #
-# TODO: act_migrate: Before create, choose if you want to create new DCAs in test dir
-#           to prevent infecting your real DCAs with bad ones.
+# TODO: ASKs: clear screen.
+# | use `echo-clear-lines` ??
 #
-# TODO: clear screen for edit_* funcs?
-#
-# FIX: adding sub group -> not accessible post creation. why?? not permitted
-#
-# TODO: ( ) test run on my real aliases file.
-#
-# TODO: ( ) fabric -> ask for suggestions on good <group> name.
-#               1. Tell it to look at existing DCA groups and current input
-#               2. Suggest if input should go into existing or new group.
-#               3. Give new short name suggestions.
+# TODO: CONFIRMs: clear screen.
+# | use `echo-clear-lines` ??
 #
 # TODO: use other methods to parse
 # - treesitter
 #
+# TODO: ask: purge migration source files?
+#
+# TODO: post_review: choose menu (!=default)
+# | entry: go back to reviewing -> (overrides all other selections)
+# |!entry: put new under /test dir
+# | entry: purge input source files
+# | entry:
+#
 # TODO: ( ) fzf would really be beneficial for this.
+#
+# TODO: ( ) edit DCA contents: use neovim as editor
 #
 # ----
 #
-# TODO: go back to reviewing
+# TODO: post_review: go back to reviewing
+#       -> select: [both | failures | valid]
 #
 # TODO: --review-all
 #         jump to first failure
 #
-# TODO: (*) option: show output during parsing
+# TODO: ( ) environment.sh: only add aliases to path if terminal is interactive
 #
-# TODO: only add aliases to path if terminal is interactive
-#
-# TODO: add previous line in terminal to alias??
+# TODO: ( ) add previous N lines from terminal HISTORY to DCA or FZF select
 #         >> use fzf -> search history -> select put into dca
 #
-# TODO: browser: move selection to subgroup.
+# TODO: BROWSER:
+#         ( ) mult select
+#         ( ) move selection to subgroup.
+#         ( ) rm selection
+#
 
-# TODO:
-# ::
-# :: ( ) fn ensure_length of string -> should go into core?
-# ::
-# :: ( ) clean group
-# :: ( ) clean single
+# TODO: ( ) act_clean group
+# TODO: ( ) act_clean single
+#
+# TODO: ( ) use func [str_ensure_length]
+#
+# TODO: ( ) act_make_dcas_for_self
+#       | try to set up aliases for alias helper itself
+#       - ali:    "aliases $@"
+#       - alic:   "aliases create"
+#       - alim:   "aliases migrate -- $@"
+#       - alimc:  "aliases migrate --verbose --review-all -- $@"
+#       - alimi:  "aliases migrate --review-verbose --review-all --fix-iterate -- $@"
+#
 
 # -------------------------------------------------------
 # ::
@@ -116,7 +157,9 @@ function command_aliases() (
 	local AX_UI_PREFIX="ALIASES"
 	local DO_RELOAD='no'
 
-	local EDIT_ANSWER
+	local DCA_SELECTED='' # use this for selection
+
+	local EDIT_ANSWER=''
 
 	local CMD_STATUS='INIT'
 
@@ -133,6 +176,8 @@ function command_aliases() (
 
 	# ---------------------------------
 	# status trackers
+
+	local NEW_ALIAS_IS_FAILURE=()
 
 	local FAILING_ALIAS_REASON=()
 	local FAILING_ALIAS_CORRECTION_FUNCS=() # Only used in `act_create`
@@ -338,6 +383,7 @@ function command_aliases() (
 	done
 
 	# =======================================================
+	# =======================================================
 	# LOG AND DEBUG HELPERS
 
 	function debug_against_failures() {
@@ -412,12 +458,26 @@ function command_aliases() (
 		echo "<[${FUNCNAME[1]}]>: $*"
 	}
 
+	function debug_post_check_name_collisions {
+		logger "NAMES_COLLISION_MAP"
+		for ((a = 0; a < "${#NEW_ALIAS_NAMES[@]}"; a++)); do
+			if [[ -n "${NAMES_COLLISION_MAP[$a]}" ]]; then
+				__print_lines "#$a: ${NEW_ALIAS_NAMES[$a]} -> ${NAMES_COLLISION_MAP[$a]}"
+			fi
+		done
+		logger "NAMES_COLLISION_COUNT_MAP"
+		for ((b = 0; b < "${#NAMES_COLLISION_COUNT_MAP[@]}"; b++)); do
+			echo "$b: ${NAMES_COLLISION_COUNT_MAP[$b]}"
+		done
+	}
+
   # TODO: print all state vars.
   function debug_state {
     :
   }
 
 
+	# =======================================================
 	# =======================================================
 	# ARRAY HELPERS
 
@@ -459,6 +519,7 @@ function command_aliases() (
 		remove_array_index "FAILING_ALIAS_CORRECTION_FUNCS" "$index"
 	}
 
+	# =======================================================
 	# =======================================================
 	# GETTERS
 
@@ -504,6 +565,16 @@ function command_aliases() (
 
 	}
 
+	# =======================================================
+	# =======================================================
+	# STRING HELPERS
+	#
+
+	function str_ensure_length {
+	  printf "%-${1-20}.${1-20}s" "$2"
+	}
+
+	# =======================================================
 	# =======================================================
 	# DCA INDEX HELPERS
 	#
@@ -570,6 +641,7 @@ function command_aliases() (
 		fi
 	}
 
+	# =======================================================
 	# =======================================================
 	# VALIDATORS
 
@@ -642,6 +714,7 @@ function command_aliases() (
 
 	# function
 
+	# =======================================================
 	# =======================================================
 	# VALIDATE DCAS
 
@@ -750,6 +823,8 @@ function command_aliases() (
 	}
 
 	# =======================================================
+	# =======================================================
+	# =======================================================
 	# COLLISION HELPERS
 
 	function get_number_of_collisions {
@@ -789,19 +864,6 @@ function command_aliases() (
 		NAMES_COLLISION_MAP[index]=""
 	}
 
-	function debug_post_check_name_collisions {
-		logger "NAMES_COLLISION_MAP"
-		for ((a = 0; a < "${#NEW_ALIAS_NAMES[@]}"; a++)); do
-			if [[ -n "${NAMES_COLLISION_MAP[$a]}" ]]; then
-				__print_lines "#$a: ${NEW_ALIAS_NAMES[$a]} -> ${NAMES_COLLISION_MAP[$a]}"
-			fi
-		done
-		logger "NAMES_COLLISION_COUNT_MAP"
-		for ((b = 0; b < "${#NAMES_COLLISION_COUNT_MAP[@]}"; b++)); do
-			echo "$b: ${NAMES_COLLISION_COUNT_MAP[$b]}"
-		done
-	}
-
 	function check_name_collisions {
 		local i_check name_check y collision encode_count_string collision_counter=0 already_processed=()
 		NAMES_COLLISION_MAP=()
@@ -833,6 +895,8 @@ function command_aliases() (
 		# debug_post_check_name_collisions
 	}
 
+	# =======================================================
+	# =======================================================
 	# =======================================================
 	# FILE SYSTEM
 
@@ -892,6 +956,8 @@ function command_aliases() (
 	}
 
 	# =======================================================
+	# =======================================================
+	# =======================================================
 	#
 
 	function build_contents() {
@@ -910,12 +976,16 @@ function command_aliases() (
 	}
 
 	# =======================================================
+	# =======================================================
+	# =======================================================
 	# EDIT FUNCS
 	#
 	# - ( ) Add ability to create more informative labels by passing, eg. failure reason.
 	#
 	# TODO: these functions should return status on abort, so that i can use that
 	# to break out of editing pipeline in act_migrate
+
+	local EDIT_label=''
 
 	function pre_edit__ {
 		:
@@ -933,6 +1003,8 @@ function command_aliases() (
 
 		echo "name in edit: ${NEW_ALIAS_NAMES[$index]}"
 
+		local num_failures="$(get_number_of_collisions "$index")"
+
 		if [[ -n "$TEMP_FAILURE_REASON" ]]; then
 			temp_fail='yes'
 		else
@@ -943,22 +1015,27 @@ function command_aliases() (
 
 		current_value="${NEW_ALIAS_NAMES[$index]}"
 
+		# edit_name | build label
+
 		if [[ "$temp_fail" == 'yes' ]]; then
+    # temp / review
 			label+=$'\n'"$(echo-style --error "Rectify name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
 			label+=$'\n'"REASON: $TEMP_FAILURE_REASON"
 			if [[ "$option_review_verbose" == 'yes' ]]; then
 				label+=$'\n'"$(log_single_content "$index")"
 			fi
+
 		elif [[ -n "$failure_pos" ]]; then
+		  # is failure
 			label+=$'\n'"$(echo-style --error "Rectify name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
 			label+=$'\n'"REASON: ${FAILING_ALIAS_REASON[$failure_pos]}"
 			if [[ "$option_review_verbose" == 'yes' ]]; then
 				label+=$'\n'"$(log_single_content "$index")"
 			fi
-			# answer="$(ask --linger --default="$current_value" "$label")"
+
 		elif [[ -n "$success_pos" ]]; then
+		  # is valid
 			label+=$'\n'"$(echo-style --success "Edit name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
-			# label+=$'\n'"REASON: Name was invaled for reason X"
 			if [[ "$option_review_verbose" == 'yes' ]]; then
 				label+=$'\n'"$(log_single_content "$index")"
 			fi
@@ -1018,6 +1095,8 @@ function command_aliases() (
 		build_contents
 	}
 
+	# =======================================================
+	# =======================================================
 	# =======================================================
 	# EVENTS
 
@@ -1279,6 +1358,13 @@ function command_aliases() (
 					echo-style --bold "[User cancelled]: Exiting..."
 					exit
 				fi
+
+
+        # TODO: Default to creating aliases under [aliases/testing]
+				# if ! confirm --ppid=$$ --positive -- "Put NEW DCAs in /testing dir?"; then
+				# 	# echo-style --bold "[User cancelled]: Exiting..."
+				# 	# exit
+				# fi
 
 				# this is just because user can cancel review, with existing failures,
 				# then we only want to create successful ones and exit
@@ -1648,6 +1734,7 @@ function command_aliases() (
 		done
 	}
 
+	# =======================================================
 	# =======================================================
 	# PREPARE
 
