@@ -113,10 +113,12 @@ function command_aliases() (
 	local VALID_NAME_CHARS_PATTERN="a-zA-Z0-9_-"
 	local regex_rm_paths_with_files_extension='\.[^/]+$'
 	# Use indices to get these back
-	local AX_UI_PREFIX="ALIASES "
+	local AX_UI_PREFIX="ALIASES"
 	local DO_RELOAD='no'
 
 	local EDIT_ANSWER
+
+	local CMD_STATUS='INIT'
 
 	# ---------------------------------
 	# data containers
@@ -301,23 +303,23 @@ function command_aliases() (
 			;;
 		'browse')
 			option_action="browse"
-			AX_UI_PREFIX+="BROWSE"
+			AX_UI_PREFIX+=":BROWSE"
 			;;
 		'clean' | 'remove' | 'rm')
 			option_action="clean"
-			AX_UI_PREFIX+="CLEAN"
+			AX_UI_PREFIX+=":CLEAN"
 			;;
 		'new' | 'create')
 			option_action="create"
-			AX_UI_PREFIX+="CREATE"
+			AX_UI_PREFIX+=":CREATE"
 			;;
 		'migrate')
 			option_action="migrate"
-			AX_UI_PREFIX+="MIGRATE"
+			AX_UI_PREFIX+=":MIGRATE"
 			;;
 		'list')
 			option_action="list"
-			AX_UI_PREFIX+="LIST"
+			AX_UI_PREFIX+=":LIST"
 			;;
 			# '--')
 			#   # 	option_args+=("$item" "$@")
@@ -409,6 +411,12 @@ function command_aliases() (
 		# echo "<[${FUNCNAME[0]}]>"
 		echo "<[${FUNCNAME[1]}]>: $*"
 	}
+
+  # TODO: print all state vars.
+  function debug_state {
+    :
+  }
+
 
 	# =======================================================
 	# ARRAY HELPERS
@@ -744,8 +752,8 @@ function command_aliases() (
 	# =======================================================
 	# COLLISION HELPERS
 
-  function get_number_of_collisions {
-    local index="${1-0}" count=0
+	function get_number_of_collisions {
+		local index="${1-0}" count=0
 		local count_map_idx="${NAMES_COLLISION_MAP[index]}"
 		local count_map_str="${NAMES_COLLISION_COUNT_MAP[count_map_idx]}"
 
@@ -755,10 +763,10 @@ function command_aliases() (
 			if [[ "${arr_split[i]}" == "$index" ]]; then
 				continue
 			fi
-			count=$((count +1))
+			count=$((count + 1))
 		done
 		_print_string "$count"
-  }
+	}
 
 	function remove_collision {
 		local index="$1" arr_split=() concat='' i last map_index sep=':'
@@ -908,6 +916,10 @@ function command_aliases() (
 	#
 	# TODO: these functions should return status on abort, so that i can use that
 	# to break out of editing pipeline in act_migrate
+
+	function pre_edit__ {
+		:
+	}
 
 	function edit_name() {
 		local index=${1-0} answer failure_pos success_pos label current_value temp_fail='no'
@@ -1225,72 +1237,93 @@ function command_aliases() (
 	# =======================================================
 	# MIGRATE
 
+	function post_parsing {
+	  logger
+		# nothing was picked up. review doesnt make sense
+		if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
+			post_review
+			return
+		fi
+
+		check_name_collisions
+
+		# validate parsed aliases and funcs
+		eval_capture --statusvar=validate_status -- validate_all
+	}
+
+	# call this after the parser loop has run it's course.
+	function post_review() {
+	  logger
+		echo-style --header "$migrate_prefix POST REVIEW"
+
+		local num_failures="${#FAILING_POSITIONS[@]}"
+		local num_successful="${#SUCCESS_POSITIONS[@]}"
+
+		if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
+			# nothing. exit
+			echo-style --bold "Parser did not pick anything. Exiting..."
+		else
+
+			if [[ "$num_successful" -gt 0 ]]; then
+
+				if [[ "$num_failures" -gt 0 ]]; then
+					if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
+						echo-style --bold "TODO: Go back to reviewing failures.."
+						do_review
+						return
+					fi
+				fi
+
+				# confirm create or exit
+				if ! confirm --ppid=$$ --positive -- "There are successful DCAs parsed. Do you want to go ahead and create them?"; then
+					echo-style --bold "[User cancelled]: Exiting..."
+					exit
+				fi
+
+				# this is just because user can cancel review, with existing failures,
+				# then we only want to create successful ones and exit
+				local create_opts=()
+				if [[ "$proceed_with_successful" == 'yes' ]]; then
+					echo-style --bold "Proceeding to create only valid DCAs.."
+					create_opts+=(--successful)
+				fi
+
+				# TODO: Choose "Add to TEST dir or REAL positions"
+
+				create_dcas_and_reload_environment "${create_opts[@]}"
+
+			else
+				# only failures
+
+				echo-style --bold "$num_failures invalid left."
+
+				if [[ "$option_review_both" == 'yes' ]]; then
+					echo-style --bold "Option review BOTH but no successful parses. Exiting..."
+				elif [[ "$option_review_successful" == 'yes' ]]; then
+					echo-style --bold "Option review ONLY SUCCESSFUL but no successful parses. Exiting..."
+				else
+					echo-style --bold "Option review ONLY FAILURES (default)"
+					if [[ "$num_failures" -gt 0 ]]; then
+						if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
+							echo-style --bold "TODO: Go back to reviewing failures.."
+						fi
+					fi
+					echo-style --bold "Exiting..."
+				fi
+			fi
+		fi
+	}
+
+	function do_review {
+	  pre_review
+	}
+
 	function act_migrate() {
 		local interpreter='' input_file migrate_prefix="ALIASES MIGRATE |"
 		if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_group_dir "$option_migrate_to_subdir"; then
 			echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
 			exit 1
 		fi
-
-		# call this after the parser loop has run it's course.
-		function post_review() {
-			echo-style --header "$migrate_prefix POST REVIEW"
-
-			local num_failures="${#FAILING_POSITIONS[@]}"
-			local num_successful="${#SUCCESS_POSITIONS[@]}"
-
-			if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
-				# nothing. exit
-				echo-style --bold "Parser did not pick anything. Exiting..."
-			else
-
-				if [[ "$num_successful" -gt 0 ]]; then
-
-					if [[ "$num_failures" -gt 0 ]]; then
-						if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
-							echo-style --bold "TODO: Go back to reviewing failures.."
-						fi
-					fi
-
-					# confirm create or exit
-					if ! confirm --ppid=$$ --positive -- "There are successful DCAs parsed. Do you want to go ahead and create them?"; then
-						echo-style --bold "[User cancelled]: Exiting..."
-						exit
-					fi
-
-					# this is just because user can cancel review, with existing failures,
-					# then we only want to create successful ones and exit
-					local create_opts=()
-					if [[ "$proceed_with_successful" == 'yes' ]]; then
-						echo-style --bold "Proceeding to create only valid DCAs.."
-						create_opts+=(--successful)
-					fi
-
-					# TODO: Choose "Add to TEST dir or REAL positions"
-
-					create_dcas_and_reload_environment "${create_opts[@]}"
-
-				else
-					# only failures
-
-					echo-style --bold "$num_failures invalid left."
-
-					if [[ "$option_review_both" == 'yes' ]]; then
-						echo-style --bold "Option review BOTH but no successful parses. Exiting..."
-					elif [[ "$option_review_successful" == 'yes' ]]; then
-						echo-style --bold "Option review ONLY SUCCESSFUL but no successful parses. Exiting..."
-					else
-						echo-style --bold "Option review ONLY FAILURES (default)"
-						if [[ "$num_failures" -gt 0 ]]; then
-							if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
-								echo-style --bold "TODO: Go back to reviewing failures.."
-							fi
-						fi
-						echo-style --bold "Exiting..."
-					fi
-				fi
-			fi
-		}
 
 		function migrate_single_file() {
 			input_file=$1
@@ -1309,6 +1342,8 @@ function command_aliases() (
 
 					# ----
 					# HANDLE POSIX ALIASES
+
+					# TODO: func [parse_posix__collect_aliases]
 
 					local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
 					mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
@@ -1343,6 +1378,8 @@ function command_aliases() (
 
 					# ----
 					# HANDLE POSIX FUNCTIONS
+
+					# TODO: func [parse_posix__collect_functions]
 
 					mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
 					for new_alias_name in "${function_names[@]}"; do
@@ -1383,26 +1420,33 @@ function command_aliases() (
 
 					# -------------------------------------------------------
 					# POST PARSING
+					#
 
-					# nothing was picked up. review doesnt make sense
-					if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
-						post_review
-						return
-					fi
+					post_parsing
 
-					check_name_collisions
+					# # nothing was picked up. review doesnt make sense
+					# if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
+					# 	post_review
+					# 	return
+					# fi
+					#
+					# check_name_collisions
+					#
+					# # validate parsed aliases and funcs
+					# local validate_status
+					# eval_capture --statusvar=validate_status -- validate_all
 
-					# validate parsed aliases and funcs
-					local validate_status
-					eval_capture --statusvar=validate_status -- validate_all
+          # TODO: func [do_review]
+
+          # TODO: func [pre_review]
 
 					# setup variables for review
 					local -n REVIEW_ARRAY
 					local reviewing='' \
 						current_was_failure_initially='no' \
-						selected_review_index \
-						selected_review_failure_index \
-						selected_review_dca_index \
+						_selected_review_index \
+						REVIEW_SELECTED_FAILURE_INDEX \
+						REVIEW_SELECTED_DCA_INDEX \
 						proceed_with_successful='no'
 
 					if [[ "$option_review_both" == 'yes' ]]; then
@@ -1416,23 +1460,20 @@ function command_aliases() (
 						REVIEW_ARRAY="FAILING_POSITIONS"
 					fi
 
-					function rectify_or_edit_single() {
+					function __review__handle_edit() {
 						local update_validated='no'
-						if [[ -z "$selected_review_index" ]]; then # choose sets output to empty string on cancel
-							proceed_with_successful='yes'
-							return 1
-						fi
+
 						while [[ "$update_validated" == "no" ]]; do
 							# on cancel return and exit choose/ask loops below
 
-							if ! edit_name "$selected_review_dca_index"; then
+							if ! edit_name "$REVIEW_SELECTED_DCA_INDEX"; then
 								proceed_with_successful='yes'
 								return 1
 							fi
 
 							# TODO: below could go into [trigger_event "edit_finished" ]
 
-							if validate_single_simple "$selected_review_dca_index"; then
+							if validate_single_simple "$REVIEW_SELECTED_DCA_INDEX"; then
 								update_validated='yes'
 
 								# updating the name, it will only pass the collision system
@@ -1443,8 +1484,8 @@ function command_aliases() (
 
 								if [[ "$current_was_failure_initially" == 'yes' ]]; then
 									# Only if a failure was rectified,
-									trim_failure_arrays "$selected_review_failure_index"
-									success_pos_add "$selected_review_dca_index"
+									trim_failure_arrays "$REVIEW_SELECTED_FAILURE_INDEX"
+									success_pos_add "$REVIEW_SELECTED_DCA_INDEX"
 								fi
 							fi
 						done
@@ -1452,29 +1493,29 @@ function command_aliases() (
 
 					# ensure correct mapping of indices after selection or iteration if
 					# fix iterate
-					function apply_correct_indices() {
+					function review__apply_correct_indices() {
 						if [[ "$reviewing" == 'failures' ]]; then
 							# echo "apply:failures"
 							current_was_failure_initially='yes'
-							selected_review_dca_index="${REVIEW_ARRAY[$selected_review_index]}"
-							selected_review_failure_index="$selected_review_index" # "$(get_failure_pos_from_dca_index "$selected_review_index")"
+							REVIEW_SELECTED_DCA_INDEX="${REVIEW_ARRAY[$_selected_review_index]}"
+							REVIEW_SELECTED_FAILURE_INDEX="$_selected_review_index" # "$(get_failure_pos_from_dca_index "$_selected_review_index")"
 
-						elif [[ "$reviewing" == 'both' ]] && is_failure "$selected_review_index"; then
+						elif [[ "$reviewing" == 'both' ]] && is_failure "$_selected_review_index"; then
 							# echo "apply:both"
 							current_was_failure_initially='yes'
-							selected_review_dca_index="$selected_review_index"
-							selected_review_failure_index="$(get_failure_pos_from_dca_index "$selected_review_index")"
+							REVIEW_SELECTED_DCA_INDEX="$_selected_review_index"
+							REVIEW_SELECTED_FAILURE_INDEX="$(get_failure_pos_from_dca_index "$_selected_review_index")"
 
 						else
 							# echo "apply:else"
 							current_was_failure_initially='no'
 							if [[ "$reviewing" == 'successful' ]]; then
-								selected_review_dca_index="$(get_dca_index_from_success_pos "$selected_review_index")" # "${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
+								REVIEW_SELECTED_DCA_INDEX="$(get_dca_index_from_success_pos "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
 							else
-								selected_review_dca_index="$selected_review_index" #"$(get_success_pos_from_dca_index "$selected_review_index")" # "${REVIEW_ARRAY[$selected_review_index]}" # selected successful value
+								REVIEW_SELECTED_DCA_INDEX="$_selected_review_index" #"$(get_success_pos_from_dca_index "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
 							fi
 						fi
-						# echo "dcai $selected_review_dca_index | sfix $selected_review_failure_index"
+						# echo "dcai $REVIEW_SELECTED_DCA_INDEX | sfix $REVIEW_SELECTED_FAILURE_INDEX"
 					}
 
 					# handle parsed aliases
@@ -1487,24 +1528,30 @@ function command_aliases() (
 						# FAILURES ONLY:
 						# with fails only each will be stomped out one by one.
 
+						# TODO: func [run_review_iterate]
+
 						# debug_status_arrays
 						local ordinal iterations="${#REVIEW_ARRAY[@]}"
 						for ((ordinal = 0; ordinal < "$iterations"; ordinal++)); do
-							selected_review_index='' selected_review_failure_index=''
-							selected_review_index="$ordinal" # "${REVIEW_ARRAY[i]}"
+							_selected_review_index='' REVIEW_SELECTED_FAILURE_INDEX=''
+							_selected_review_index="$ordinal" # "${REVIEW_ARRAY[i]}"
 							if [[ "$reviewing" == 'failures' ]]; then
-								selected_review_index=0
+								_selected_review_index=0
 							fi
-							apply_correct_indices
-							! rectify_or_edit_single && break
+							review__apply_correct_indices
+
+							# TODO: if false then [post_review]
+							! __review__handle_edit && break
 						done
 					else
 
 						#-------------------------------------------------------
 						# w/CHOOSE
 
+						# TODO: func [run_review_choose]
+
 						while [[ "${#REVIEW_ARRAY[@]}" -gt 0 ]]; do
-							selected_review_index='' selected_review_failure_index=''
+							_selected_review_index='' REVIEW_SELECTED_FAILURE_INDEX=''
 
 							# echo "-------------------------------------------------------"
 							# echo "::::::::: DEBUG BEFORE :::::::::"
@@ -1512,7 +1559,7 @@ function command_aliases() (
 
 							local ordinal choose_start_index=0 choose_title="$AX_UI_PREFIX " choose_review_labels=()
 
-							choose_title+=" REVIEWING: [$reviewing] | "
+							choose_title+="| REVIEWING: [$reviewing] | "
 							choose_title+="${#FAILING_POSITIONS[@]} BAD | ${#SUCCESS_POSITIONS[@]} GOOD / ${#NEW_ALIAS_NAMES[@]} total | Select below to fix failing issue."
 							choose_title+=$'\n'"ENTER: edit/fix selection | ESC/CANCEL: create validate only | Ctrl-C: Abort"
 
@@ -1548,19 +1595,27 @@ function command_aliases() (
 							done
 
 							# --default="$choose_start_index" --match='$INDEX'
-							selected_review_index="$(choose "$choose_title" --index -- "${choose_review_labels[@]}")"
+							_selected_review_index="$(choose "$choose_title" --index -- "${choose_review_labels[@]}")"
 
-							apply_correct_indices
+							review__apply_correct_indices
+
+						if [[ -z "$_selected_review_index" ]]; then # choose sets output to empty string on cancel
+						  logger "chooce cancel"
+							proceed_with_successful='yes'
+							break
+						fi
+            # ^ this only pertains to review_choose
+
 
 							# echo "::::::::: DEBUG AFTER :::::::::"
 							# debug_status_arrays
 							# echo
 
-							# echo "sel pos = $selected_review_failure_index"
-							# echo "sel val = $selected_review_dca_index"
+							# echo "sel pos = $REVIEW_SELECTED_FAILURE_INDEX"
+							# echo "sel val = $REVIEW_SELECTED_DCA_INDEX"
 
-							# break on cancel
-							! rectify_or_edit_single && break
+							# TODO: if false then [post_review]
+							! __review__handle_edit && break
 						done
 					fi
 
