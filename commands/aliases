@@ -11,6 +11,7 @@
 # echo --rs=[arst,sts]
 
 # -----------------------------------------------------------------------------
+# IMPORTANT
 #
 # TODO: ( ) post_review -> confirm: default put new DCAs in testing dir.
 #
@@ -19,6 +20,13 @@
 # TEST: ( ) test run on my real aliases file.
 #
 # FIX: adding sub group -> not accessible post creation. why?? not permitted
+#
+# -----------------------------------------------------------------------------
+# REFACTOR
+#
+# FIX: ( ) move posix parsers into own funcs
+#
+# FIX: ( ) move review process out into own func
 #
 # -----------------------------------------------------------------------------
 # FABRIC
@@ -471,11 +479,10 @@ function command_aliases() (
 		done
 	}
 
-  # TODO: print all state vars.
-  function debug_state {
-    :
-  }
-
+	# TODO: print all state vars.
+	function debug_state {
+		:
+	}
 
 	# =======================================================
 	# =======================================================
@@ -571,7 +578,7 @@ function command_aliases() (
 	#
 
 	function str_ensure_length {
-	  printf "%-${1-20}.${1-20}s" "$2"
+		printf "%-${1-20}.${1-20}s" "$2"
 	}
 
 	# =======================================================
@@ -1018,7 +1025,7 @@ function command_aliases() (
 		# edit_name | build label
 
 		if [[ "$temp_fail" == 'yes' ]]; then
-    # temp / review
+			# temp / review
 			label+=$'\n'"$(echo-style --error "Rectify name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
 			label+=$'\n'"REASON: $TEMP_FAILURE_REASON"
 			if [[ "$option_review_verbose" == 'yes' ]]; then
@@ -1026,7 +1033,7 @@ function command_aliases() (
 			fi
 
 		elif [[ -n "$failure_pos" ]]; then
-		  # is failure
+			# is failure
 			label+=$'\n'"$(echo-style --error "Rectify name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
 			label+=$'\n'"REASON: ${FAILING_ALIAS_REASON[$failure_pos]}"
 			if [[ "$option_review_verbose" == 'yes' ]]; then
@@ -1034,7 +1041,7 @@ function command_aliases() (
 			fi
 
 		elif [[ -n "$success_pos" ]]; then
-		  # is valid
+			# is valid
 			label+=$'\n'"$(echo-style --success "Edit name (currently: ${NEW_ALIAS_NAMES[index]} | DCA index: $index):")"
 			if [[ "$option_review_verbose" == 'yes' ]]; then
 				label+=$'\n'"$(log_single_content "$index")"
@@ -1316,8 +1323,8 @@ function command_aliases() (
 	# =======================================================
 	# MIGRATE
 
-	function post_parsing {
-	  logger
+	function pre_review {
+		logger
 		# nothing was picked up. review doesnt make sense
 		if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
 			post_review
@@ -1328,11 +1335,14 @@ function command_aliases() (
 
 		# validate parsed aliases and funcs
 		eval_capture --statusvar=validate_status -- validate_all
+
+		# TODO: call do review in side
+		# do_review
 	}
 
 	# call this after the parser loop has run it's course.
 	function post_review() {
-	  logger
+		logger
 		echo-style --header "$migrate_prefix POST REVIEW"
 
 		local num_failures="${#FAILING_POSITIONS[@]}"
@@ -1359,8 +1369,7 @@ function command_aliases() (
 					exit
 				fi
 
-
-        # TODO: Default to creating aliases under [aliases/testing]
+				# TODO: Default to creating aliases under [aliases/testing]
 				# if ! confirm --ppid=$$ --positive -- "Put NEW DCAs in /testing dir?"; then
 				# 	# echo-style --bold "[User cancelled]: Exiting..."
 				# 	# exit
@@ -1401,7 +1410,13 @@ function command_aliases() (
 	}
 
 	function do_review {
-	  pre_review
+
+		# TODO: rename [post_parsing] -> [pre_review]
+		pre_review
+
+		# TODO: move all reviewing logic to here, before I refactor any further.
+
+		post_review
 	}
 
 	function act_migrate() {
@@ -1508,6 +1523,7 @@ function command_aliases() (
 					# POST PARSING
 					#
 
+					# TODO: call do review in side
 					post_parsing
 
 					# # nothing was picked up. review doesnt make sense
@@ -1522,9 +1538,9 @@ function command_aliases() (
 					# local validate_status
 					# eval_capture --statusvar=validate_status -- validate_all
 
-          # TODO: func [do_review]
+					# TODO: func [do_review]
 
-          # TODO: func [pre_review]
+					# TODO: func [pre_review]
 
 					# setup variables for review
 					local -n REVIEW_ARRAY
@@ -1685,13 +1701,12 @@ function command_aliases() (
 
 							review__apply_correct_indices
 
-						if [[ -z "$_selected_review_index" ]]; then # choose sets output to empty string on cancel
-						  logger "chooce cancel"
-							proceed_with_successful='yes'
-							break
-						fi
-            # ^ this only pertains to review_choose
-
+							if [[ -z "$_selected_review_index" ]]; then # choose sets output to empty string on cancel
+								logger "chooce cancel"
+								proceed_with_successful='yes'
+								break
+							fi
+							# ^ this only pertains to review_choose
 
 							# echo "::::::::: DEBUG AFTER :::::::::"
 							# debug_status_arrays
@@ -1705,7 +1720,8 @@ function command_aliases() (
 						done
 					fi
 
-					post_review
+					# TODO: remove this and call [do_review] after all parser loops.
+					pre_review
 
 					# =======================================================
 					# HANDLE OTHER SHELLS BELOW
@@ -1728,10 +1744,12 @@ function command_aliases() (
 			fi
 		}
 
-		# each input file
+		# try parse
 		for migrate_file in "${option_args[@]}"; do
 			migrate_single_file "$migrate_file"
 		done
+
+		do_review
 	}
 
 	# =======================================================
@@ -1750,10 +1768,6 @@ function command_aliases() (
 			exit
 		fi
 	fi
-
-	# # NOTE: This becomes redundant when checking with `which <dca>`
-	# # Because we collect things here, I can clean up some redundancy below.
-	# collect_existing_alias_info
 
 	# =======================================================
 	# Act
