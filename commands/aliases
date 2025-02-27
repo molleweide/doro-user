@@ -16,14 +16,8 @@
 # where should the collection of collitions be made?
 #
 # TODO: HANDLE UPDATING NAMING COLLISION ERRORS.
-#       (x) collisions are evaluated before review
-#       (x) validate_* -> use collision arrays in -> [__parsed_name_is_unique]
-#       ( ) properly reduce COLLISION arrays on edit_finished.
-#         ~ initial parsed collisions.
-#         ~ but it does not change
-#
-#
-#       after editing -> fix collisions
+#       ( ) get number of collisions
+#             -> show in the EDIT_ title
 #
 # TODO: choose && iterate
 #       -> on empty -> run choose menu to update any component.
@@ -750,12 +744,27 @@ function command_aliases() (
 	# =======================================================
 	# COLLISION HELPERS
 
+  function get_number_of_collisions {
+    local index="${1-0}" count=0
+		local count_map_idx="${NAMES_COLLISION_MAP[index]}"
+		local count_map_str="${NAMES_COLLISION_COUNT_MAP[count_map_idx]}"
+
+		IFS=':' read -r -a arr_split <<<"$count_map_str"
+		last=$((${#arr_split[@]} - 1))
+		for ((i = 0; i <= "$last"; i++)); do
+			if [[ "${arr_split[i]}" == "$index" ]]; then
+				continue
+			fi
+			count=$((count +1))
+		done
+		_print_string "$count"
+  }
+
 	function remove_collision {
 		local index="$1" arr_split=() concat='' i last map_index sep=':'
 		local count_map_idx="${NAMES_COLLISION_MAP[index]}"
 		local count_map_str="${NAMES_COLLISION_COUNT_MAP[count_map_idx]}"
 		# logger "index:$index -> count_map_idx:$count_map_idx -> count_map_str:$count_map_str"
-		# <[remove_collision]>: index:0 -> count_map_idx:0 -> count_map_str:0:3:5:9:12:18
 		IFS=':' read -r -a arr_split <<<"$count_map_str"
 		last=$((${#arr_split[@]} - 1))
 		for ((i = 0; i <= "$last"; i++)); do
@@ -768,10 +777,8 @@ function command_aliases() (
 			fi
 			concat+="$map_index$sep"
 		done
-		echo "concat = $concat"
 		NAMES_COLLISION_COUNT_MAP[count_map_idx]="$concat"
 		NAMES_COLLISION_MAP[index]=""
-		debug_post_check_name_collisions
 	}
 
 	function debug_post_check_name_collisions {
