@@ -13,7 +13,7 @@
 # -----------------------------------------------------------------------------
 # IMPORTANT
 #
-# TODO: ( ) post_review -> confirm: default put new DCAs in testing dir.
+# TODO: ( ) do_post_review -> confirm: default put new DCAs in testing dir.
 #
 # TODO: ( ) ask: prefix alias with exec?
 #
@@ -42,6 +42,9 @@
 #
 # TODO: Create dorothy DCA fabric-pattern
 #
+# -----------------------------------------------------------------------------
+# HELP
+# - ( ) print supported syntax/interpreters
 # -----------------------------------------------------------------------------
 # IMPROVEMENTS
 #
@@ -75,7 +78,7 @@
 #
 # TODO: ask: purge migration source files?
 #
-# TODO: post_review: choose menu (!=default)
+# TODO: do_post_review: choose menu (!=default)
 # | entry: go back to reviewing -> (overrides all other selections)
 # |!entry: put new under /test dir
 # | entry: purge input source files
@@ -87,7 +90,7 @@
 #
 # ----
 #
-# TODO: post_review: go back to reviewing
+# TODO: do_post_review: go back to reviewing
 #       -> select: [both | failures | valid]
 #
 # TODO: --review-all
@@ -215,7 +218,7 @@ function command_aliases() (
 	#
 	# TODO: try: concatenate strings that represent
 
-  # HACK: HOW TO ACCESS ARRAY INDICES:
+	# HACK: HOW TO ACCESS ARRAY INDICES:
 	# | **Expression**            | **Braces Needed?** | **Why?** |
 	# |---------------------------|-------------------|---------|
 	# | `$var`                    | ❌ No              | Works in simple cases |
@@ -265,13 +268,13 @@ function command_aliases() (
 		zsh
 		fish
 	)
-	local supported_posix=(
+	local SUPPORTED_POSIX=(
 		sh
 		bash
 		zsh
 		fish
 	)
-	local supported_non_posix=(
+	local SUPPORTED_NON_POSIX=(
 		nu
 		elvish
 		xonsh
@@ -412,6 +415,19 @@ function command_aliases() (
 			;;
 		esac
 	done
+
+	if [[ -z "$option_action" ]]; then
+		# help "No action provided"
+		option_action="browse"
+	fi
+
+	# Check before running migration..
+	if [[ -n "$option_migrate_to_subdir" ]]; then
+		if ! is_valid_subdir_depth "$option_migrate_to_subdir"; then
+			echo-style --error "Maximum sub dir depth allowed is [$ALLOW_MAX_SUB_DIRS]"
+			exit
+		fi
+	fi
 
 	# =======================================================
 	# =======================================================
@@ -1346,11 +1362,11 @@ function command_aliases() (
 	# =======================================================
 	# MIGRATE
 
-	function pre_review {
+	function do_review_pre {
 		logger
 		# nothing was picked up. review doesnt make sense
 		if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
-			post_review
+			do_post_review
 			return
 		fi
 
@@ -1358,13 +1374,10 @@ function command_aliases() (
 
 		# validate parsed aliases and funcs
 		eval_capture --statusvar=validate_status -- validate_all
-
-		# TODO: call do review in side
-		# do_review
 	}
 
 	# call this after the parser loop has run it's course.
-	function post_review() {
+	function do_post_review() {
 		logger
 		echo-style --header "$migrate_prefix POST REVIEW"
 
@@ -1433,13 +1446,198 @@ function command_aliases() (
 	}
 
 	function do_review {
+		do_review_pre
 
-		# TODO: rename [post_parsing] -> [pre_review]
-		pre_review
+		# # nothing was picked up. review doesnt make sense
+		# if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
+		# 	do_post_review
+		# 	return
+		# fi
+		#
+		# check_name_collisions
+		#
+		# # validate parsed aliases and funcs
+		# local validate_status
+		# eval_capture --statusvar=validate_status -- validate_all
 
-		# TODO: move all reviewing logic to here, before I refactor any further.
+		# setup variables for review
+		local -n REVIEW_ARRAY
+		local reviewing='' \
+			current_was_failure_initially='no' \
+			_selected_review_index \
+			REVIEW_SELECTED_FAILURE_INDEX \
+			REVIEW_SELECTED_DCA_INDEX \
+			proceed_with_successful='no'
 
-		post_review
+		if [[ "$option_review_both" == 'yes' ]]; then
+			reviewing='both'
+			REVIEW_ARRAY="NEW_ALIAS_NAMES"
+		elif [[ "$option_review_successful" == 'yes' ]]; then
+			reviewing='successful'
+			REVIEW_ARRAY="SUCCESS_POSITIONS"
+		else
+			reviewing='failures'
+			REVIEW_ARRAY="FAILING_POSITIONS"
+		fi
+
+		function __review__handle_edit() {
+			local update_validated='no'
+
+			while [[ "$update_validated" == "no" ]]; do
+				# on cancel return and exit choose/ask loops below
+
+				if ! edit_name "$REVIEW_SELECTED_DCA_INDEX"; then
+					proceed_with_successful='yes'
+					return 1
+				fi
+
+				# TODO: below could go into [trigger_event "edit_finished" ]
+
+				if validate_single_simple "$REVIEW_SELECTED_DCA_INDEX"; then
+					update_validated='yes'
+
+					# updating the name, it will only pass the collision system
+					#
+					# edit -> check if us unique within -> validate
+					#
+					# edit -> trigger
+
+					if [[ "$current_was_failure_initially" == 'yes' ]]; then
+						# Only if a failure was rectified,
+						trim_failure_arrays "$REVIEW_SELECTED_FAILURE_INDEX"
+						success_pos_add "$REVIEW_SELECTED_DCA_INDEX"
+					fi
+				fi
+			done
+		}
+
+		# Ensure correct mapping of indices after selection or iteration if fix iterate
+		function review__apply_correct_indices() {
+			if [[ "$reviewing" == 'failures' ]]; then
+				# echo "apply:failures"
+				current_was_failure_initially='yes'
+				REVIEW_SELECTED_DCA_INDEX="${REVIEW_ARRAY[$_selected_review_index]}"
+				REVIEW_SELECTED_FAILURE_INDEX="$_selected_review_index" # "$(get_failure_pos_from_dca_index "$_selected_review_index")"
+
+			elif [[ "$reviewing" == 'both' ]] && is_failure "$_selected_review_index"; then
+				# echo "apply:both"
+				current_was_failure_initially='yes'
+				REVIEW_SELECTED_DCA_INDEX="$_selected_review_index"
+				REVIEW_SELECTED_FAILURE_INDEX="$(get_failure_pos_from_dca_index "$_selected_review_index")"
+
+			else
+				# echo "apply:else"
+				current_was_failure_initially='no'
+				if [[ "$reviewing" == 'successful' ]]; then
+					REVIEW_SELECTED_DCA_INDEX="$(get_dca_index_from_success_pos "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
+				else
+					REVIEW_SELECTED_DCA_INDEX="$_selected_review_index" #"$(get_success_pos_from_dca_index "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
+				fi
+			fi
+			# echo "dcai $REVIEW_SELECTED_DCA_INDEX | sfix $REVIEW_SELECTED_FAILURE_INDEX"
+		}
+
+		# handle parsed aliases
+		if [[ "$option_fix_iterate" == 'yes' ]]; then
+			# w/ASK --------------------------------------------
+			#
+			# TEST: Does it handle updated statuses correctly?
+			# TEST: Does it handle causing new errors??
+			#
+			# FAILURES ONLY:
+			# with fails only each will be stomped out one by one.
+
+			# TODO: func [run_review_iterate]
+
+			# debug_status_arrays
+			local ordinal iterations="${#REVIEW_ARRAY[@]}"
+			for ((ordinal = 0; ordinal < "$iterations"; ordinal++)); do
+				_selected_review_index='' REVIEW_SELECTED_FAILURE_INDEX=''
+				_selected_review_index="$ordinal" # "${REVIEW_ARRAY[i]}"
+				if [[ "$reviewing" == 'failures' ]]; then
+					_selected_review_index=0
+				fi
+				review__apply_correct_indices
+
+				# TODO: if false then [do_post_review]
+				! __review__handle_edit && break
+			done
+		else
+
+			#-------------------------------------------------------
+			# w/CHOOSE
+
+			# TODO: func [run_review_choose]
+
+			while [[ "${#REVIEW_ARRAY[@]}" -gt 0 ]]; do
+				_selected_review_index='' REVIEW_SELECTED_FAILURE_INDEX=''
+
+				# echo "-------------------------------------------------------"
+				# echo "::::::::: DEBUG BEFORE :::::::::"
+				# debug_status_arrays
+
+				local ordinal choose_start_index=0 choose_title="$AX_UI_PREFIX " choose_review_labels=()
+
+				choose_title+="| REVIEWING: [$reviewing] | "
+				choose_title+="${#FAILING_POSITIONS[@]} BAD | ${#SUCCESS_POSITIONS[@]} GOOD / ${#NEW_ALIAS_NAMES[@]} total | Select below to fix failing issue."
+				choose_title+=$'\n'"ENTER: edit/fix selection | ESC/CANCEL: create validate only | Ctrl-C: Abort"
+
+				for ((ordinal = 0; ordinal < "${#REVIEW_ARRAY[@]}"; ordinal++)); do
+					local review_label='' dca_review_index status_pos
+					if [[ "$reviewing" == 'both' ]]; then
+						dca_review_index=$ordinal
+					else
+						dca_review_index="${REVIEW_ARRAY[$ordinal]}"
+					fi
+					function make_failure_label() {
+						review_label+="$(echo-style --error+bold "#$ordinal: [$(get_dca_short_path "$dca_review_index")] REASON: ${FAILING_ALIAS_REASON[$status_pos]}")"
+					}
+					function make_successful_label() {
+						review_label+="$(echo-style --success+bold "#$ordinal: [$(get_dca_short_path "$dca_review_index")]")"
+					}
+					status_pos="$(get_status_pos_from_dca_index "$dca_review_index")"
+					if [[ "$reviewing" == 'both' ]]; then
+						if is_failure "$dca_review_index"; then
+							make_failure_label
+						else
+							make_successful_label
+						fi
+					elif [[ "$reviewing" == 'failures' ]]; then
+						make_failure_label
+					elif [[ "$reviewing" == 'successful' ]]; then
+						make_successful_label
+					fi
+					if [[ "$option_review_verbose" == 'yes' ]]; then
+						review_label+=$'\n'"$(log_single_content "$dca_review_index")"
+					fi
+					choose_review_labels+=("$review_label")
+				done
+
+				# --default="$choose_start_index" --match='$INDEX'
+				_selected_review_index="$(choose "$choose_title" --index -- "${choose_review_labels[@]}")"
+
+				review__apply_correct_indices
+
+				if [[ -z "$_selected_review_index" ]]; then # choose sets output to empty string on cancel
+					logger "chooce cancel"
+					proceed_with_successful='yes'
+					break
+				fi
+				# ^ this only pertains to review_choose
+
+				# echo "::::::::: DEBUG AFTER :::::::::"
+				# debug_status_arrays
+				# echo
+
+				# echo "sel pos = $REVIEW_SELECTED_FAILURE_INDEX"
+				# echo "sel val = $REVIEW_SELECTED_DCA_INDEX"
+
+				# TODO: if false then [do_post_review]
+				! __review__handle_edit && break
+			done
+		fi
+
+		do_post_review
 	}
 
 	function act_migrate() {
@@ -1449,323 +1647,95 @@ function command_aliases() (
 			exit 1
 		fi
 
+		function parse_posix__collect_aliases {
+			local aliases=()
+			local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
+			mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
+			for line_alias in "${aliases[@]}"; do
+				local new_alias_name='' new_alias_desc='' value=''
+				# handle trim trailing comment
+				if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
+					line_alias="${BASH_REMATCH[1]}"
+					new_alias_desc="${BASH_REMATCH[2]}"
+				fi
+				# handle split alias
+				if [[ "$line_alias" =~ alias\ ([^=]+)=\"(.*)\" ]]; then
+					new_alias_name="${BASH_REMATCH[1]}"
+					value="${BASH_REMATCH[2]}"
+				elif [[ "$line_alias" =~ alias\ ([^=]+)=\'(.*)\' ]]; then
+					new_alias_name="${BASH_REMATCH[1]}"
+					value="${BASH_REMATCH[2]}"
+				fi
+				NEW_ALIAS_IS_FUNC+=('no')
+				NEW_ALIAS_NAMES+=("$new_alias_name")
+				NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
+				NEW_ALIAS_VALUES+=("$value")
+				NEW_ALIAS_DESCS+=("$new_alias_desc")
+				NEW_ALIAS_ARGS+=("")
+				local last=$(("${#NEW_ALIAS_NAMES[@]}" - 1))
+				build_contents "$last"
+				if [[ "$option_parsing_verbose" == 'yes' ]]; then
+					log_during_parsing
+				fi
+			done
+		}
+
+		function parse_posix__collect_functions {
+			local new_alias_name function_names=()
+			mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
+			for new_alias_name in "${function_names[@]}"; do
+				local body body_trimmed #new_alias_name
+				body="$(bash -c 'source '"$input_file"'; declare -f '"$new_alias_name")"
+				body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
+				# Capture how many arguments each func snippets takes. This is not perfect but at least it gives some indication.
+				local arguments=() count=0
+				while read -r line; do
+					local line="$line"
+					while [[ "$line" =~ (\$[0-9]+) ]]; do
+						local match="${BASH_REMATCH[0]}"
+						if ! is-needle "$match" -- "${arguments[@]}"; then
+							arguments+=("$match")
+						fi
+						line="${line/"$match"/}" # Remove the matched part from the line
+						# echo "trim: [$line]"
+						if [[ "$count" == 10 ]]; then
+							break
+						fi
+					done
+				done <<<"$body_trimmed"
+				NEW_ALIAS_IS_FUNC+=('yes')
+				NEW_ALIAS_NAMES+=("$new_alias_name")
+				NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
+				NEW_ALIAS_VALUES+=("$body_trimmed")
+				NEW_ALIAS_DESCS+=("")
+				NEW_ALIAS_ARGS+=("'${arguments[@]}'")
+				local last=$(("${#NEW_ALIAS_NAMES[@]}" - 1))
+				build_contents "$last"
+				if [[ "$option_parsing_verbose" == 'yes' ]]; then
+					log_during_parsing
+				fi
+			done
+		}
+
 		function migrate_single_file() {
 			input_file=$1
 			interpreter="$(get-interpreter --name -- "$input_file")"
 			if is-needle --needle="$interpreter" -- "${supported[@]}"; then
-
-				# TODO: check of contents are posix. test source file and see if it
-				# returns success
-
-				# =======================================================
-				# HANDLE POSIX
-				# =======================================================
-
-				if is-needle "$interpreter" -- "${supported_posix[@]}"; then
-					local aliases=() function_names=()
-
-					# ----
-					# HANDLE POSIX ALIASES
-
-					# TODO: func [parse_posix__collect_aliases]
-
-					local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
-					mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
-					for line_alias in "${aliases[@]}"; do
-						local new_alias_name='' new_alias_desc='' value=''
-						# handle trim trailing comment
-						if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
-							line_alias="${BASH_REMATCH[1]}"
-							new_alias_desc="${BASH_REMATCH[2]}"
-						fi
-						# handle split alias
-						if [[ "$line_alias" =~ alias\ ([^=]+)=\"(.*)\" ]]; then
-							new_alias_name="${BASH_REMATCH[1]}"
-							value="${BASH_REMATCH[2]}"
-						elif [[ "$line_alias" =~ alias\ ([^=]+)=\'(.*)\' ]]; then
-							new_alias_name="${BASH_REMATCH[1]}"
-							value="${BASH_REMATCH[2]}"
-						fi
-						NEW_ALIAS_IS_FUNC+=('no')
-						NEW_ALIAS_NAMES+=("$new_alias_name")
-						NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
-						NEW_ALIAS_VALUES+=("$value")
-						NEW_ALIAS_DESCS+=("$new_alias_desc")
-						NEW_ALIAS_ARGS+=("")
-
-						local last=$(("${#NEW_ALIAS_NAMES[@]}" - 1))
-						build_contents "$last"
-						if [[ "$option_parsing_verbose" == 'yes' ]]; then
-							log_during_parsing
-						fi
-					done
-
-					# ----
-					# HANDLE POSIX FUNCTIONS
-
-					# TODO: func [parse_posix__collect_functions]
-
-					mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
-					for new_alias_name in "${function_names[@]}"; do
-						local body body_trimmed new_alias_name
-						body="$(bash -c 'source '"$input_file"'; declare -f '"$new_alias_name")"
-						body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
-						# Capture how many arguments each func snippets takes. This is not perfect but at least it gives some indication.
-						local arguments=() count=0
-						while read -r line; do
-							local line="$line"
-							while [[ "$line" =~ (\$[0-9]+) ]]; do
-								local match="${BASH_REMATCH[0]}"
-								if ! is-needle "$match" -- "${arguments[@]}"; then
-									arguments+=("$match")
-								fi
-								line="${line/"$match"/}" # Remove the matched part from the line
-								# echo "trim: [$line]"
-								if [[ "$count" == 10 ]]; then
-									break
-								fi
-							done
-						done <<<"$body_trimmed"
-						NEW_ALIAS_IS_FUNC+=('yes')
-						NEW_ALIAS_NAMES+=("$new_alias_name")
-						NEW_ALIAS_SUB_DIRS+=("$option_migrate_to_subdir")
-						NEW_ALIAS_VALUES+=("$body_trimmed")
-						NEW_ALIAS_DESCS+=("")
-						NEW_ALIAS_ARGS+=("'${arguments[@]}'")
-
-						local last=$(("${#NEW_ALIAS_NAMES[@]}" - 1))
-						build_contents "$last"
-						if [[ "$option_parsing_verbose" == 'yes' ]]; then
-							log_during_parsing
-						fi
-					done
-
+				# TODO:: check if contents are posix. test source file and see if it returns success
+				if is-needle "$interpreter" -- "${SUPPORTED_POSIX[@]}"; then
+					parse_posix__collect_aliases
+					parse_posix__collect_functions
 					#	log_all_contents
-
-					# -------------------------------------------------------
-					# POST PARSING
-					#
-
-					# TODO: replace this with [do_review]
-					pre_review
-
-					local nnn
-					nnn=$NEW_ALIAS_NAMES[0] # this is valid but fails
-
-					# # nothing was picked up. review doesnt make sense
-					# if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
-					# 	post_review
-					# 	return
-					# fi
-					#
-					# check_name_collisions
-					#
-					# # validate parsed aliases and funcs
-					# local validate_status
-					# eval_capture --statusvar=validate_status -- validate_all
-
-					# TODO: func [do_review]
-
-					# TODO: func [pre_review]
-
-					# setup variables for review
-					local -n REVIEW_ARRAY
-					local reviewing='' \
-						current_was_failure_initially='no' \
-						_selected_review_index \
-						REVIEW_SELECTED_FAILURE_INDEX \
-						REVIEW_SELECTED_DCA_INDEX \
-						proceed_with_successful='no'
-
-					if [[ "$option_review_both" == 'yes' ]]; then
-						reviewing='both'
-						REVIEW_ARRAY="NEW_ALIAS_NAMES"
-					elif [[ "$option_review_successful" == 'yes' ]]; then
-						reviewing='successful'
-						REVIEW_ARRAY="SUCCESS_POSITIONS"
-					else
-						reviewing='failures'
-						REVIEW_ARRAY="FAILING_POSITIONS"
-					fi
-
-					function __review__handle_edit() {
-						local update_validated='no'
-
-						while [[ "$update_validated" == "no" ]]; do
-							# on cancel return and exit choose/ask loops below
-
-							if ! edit_name "$REVIEW_SELECTED_DCA_INDEX"; then
-								proceed_with_successful='yes'
-								return 1
-							fi
-
-							# TODO: below could go into [trigger_event "edit_finished" ]
-
-							if validate_single_simple "$REVIEW_SELECTED_DCA_INDEX"; then
-								update_validated='yes'
-
-								# updating the name, it will only pass the collision system
-								#
-								# edit -> check if us unique within -> validate
-								#
-								# edit -> trigger
-
-								if [[ "$current_was_failure_initially" == 'yes' ]]; then
-									# Only if a failure was rectified,
-									trim_failure_arrays "$REVIEW_SELECTED_FAILURE_INDEX"
-									success_pos_add "$REVIEW_SELECTED_DCA_INDEX"
-								fi
-							fi
-						done
-					}
-
-					# ensure correct mapping of indices after selection or iteration if
-					# fix iterate
-					function review__apply_correct_indices() {
-						if [[ "$reviewing" == 'failures' ]]; then
-							# echo "apply:failures"
-							current_was_failure_initially='yes'
-							REVIEW_SELECTED_DCA_INDEX="${REVIEW_ARRAY[$_selected_review_index]}"
-							REVIEW_SELECTED_FAILURE_INDEX="$_selected_review_index" # "$(get_failure_pos_from_dca_index "$_selected_review_index")"
-
-						elif [[ "$reviewing" == 'both' ]] && is_failure "$_selected_review_index"; then
-							# echo "apply:both"
-							current_was_failure_initially='yes'
-							REVIEW_SELECTED_DCA_INDEX="$_selected_review_index"
-							REVIEW_SELECTED_FAILURE_INDEX="$(get_failure_pos_from_dca_index "$_selected_review_index")"
-
-						else
-							# echo "apply:else"
-							current_was_failure_initially='no'
-							if [[ "$reviewing" == 'successful' ]]; then
-								REVIEW_SELECTED_DCA_INDEX="$(get_dca_index_from_success_pos "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
-							else
-								REVIEW_SELECTED_DCA_INDEX="$_selected_review_index" #"$(get_success_pos_from_dca_index "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
-							fi
-						fi
-						# echo "dcai $REVIEW_SELECTED_DCA_INDEX | sfix $REVIEW_SELECTED_FAILURE_INDEX"
-					}
-
-					# handle parsed aliases
-					if [[ "$option_fix_iterate" == 'yes' ]]; then
-						# w/ASK --------------------------------------------
-						#
-						# TEST: Does it handle updated statuses correctly?
-						# TEST: Does it handle causing new errors??
-						#
-						# FAILURES ONLY:
-						# with fails only each will be stomped out one by one.
-
-						# TODO: func [run_review_iterate]
-
-						# debug_status_arrays
-						local ordinal iterations="${#REVIEW_ARRAY[@]}"
-						for ((ordinal = 0; ordinal < "$iterations"; ordinal++)); do
-							_selected_review_index='' REVIEW_SELECTED_FAILURE_INDEX=''
-							_selected_review_index="$ordinal" # "${REVIEW_ARRAY[i]}"
-							if [[ "$reviewing" == 'failures' ]]; then
-								_selected_review_index=0
-							fi
-							review__apply_correct_indices
-
-							# TODO: if false then [post_review]
-							! __review__handle_edit && break
-						done
-					else
-
-						#-------------------------------------------------------
-						# w/CHOOSE
-
-						# TODO: func [run_review_choose]
-
-						while [[ "${#REVIEW_ARRAY[@]}" -gt 0 ]]; do
-							_selected_review_index='' REVIEW_SELECTED_FAILURE_INDEX=''
-
-							# echo "-------------------------------------------------------"
-							# echo "::::::::: DEBUG BEFORE :::::::::"
-							# debug_status_arrays
-
-							local ordinal choose_start_index=0 choose_title="$AX_UI_PREFIX " choose_review_labels=()
-
-							choose_title+="| REVIEWING: [$reviewing] | "
-							choose_title+="${#FAILING_POSITIONS[@]} BAD | ${#SUCCESS_POSITIONS[@]} GOOD / ${#NEW_ALIAS_NAMES[@]} total | Select below to fix failing issue."
-							choose_title+=$'\n'"ENTER: edit/fix selection | ESC/CANCEL: create validate only | Ctrl-C: Abort"
-
-							for ((ordinal = 0; ordinal < "${#REVIEW_ARRAY[@]}"; ordinal++)); do
-								local review_label='' dca_review_index status_pos
-								if [[ "$reviewing" == 'both' ]]; then
-									dca_review_index=$ordinal
-								else
-									dca_review_index="${REVIEW_ARRAY[$ordinal]}"
-								fi
-								function make_failure_label() {
-									review_label+="$(echo-style --error+bold "#$ordinal: [$(get_dca_short_path "$dca_review_index")] REASON: ${FAILING_ALIAS_REASON[$status_pos]}")"
-								}
-								function make_successful_label() {
-									review_label+="$(echo-style --success+bold "#$ordinal: [$(get_dca_short_path "$dca_review_index")]")"
-								}
-								status_pos="$(get_status_pos_from_dca_index "$dca_review_index")"
-								if [[ "$reviewing" == 'both' ]]; then
-									if is_failure "$dca_review_index"; then
-										make_failure_label
-									else
-										make_successful_label
-									fi
-								elif [[ "$reviewing" == 'failures' ]]; then
-									make_failure_label
-								elif [[ "$reviewing" == 'successful' ]]; then
-									make_successful_label
-								fi
-								if [[ "$option_review_verbose" == 'yes' ]]; then
-									review_label+=$'\n'"$(log_single_content "$dca_review_index")"
-								fi
-								choose_review_labels+=("$review_label")
-							done
-
-							# --default="$choose_start_index" --match='$INDEX'
-							_selected_review_index="$(choose "$choose_title" --index -- "${choose_review_labels[@]}")"
-
-							review__apply_correct_indices
-
-							if [[ -z "$_selected_review_index" ]]; then # choose sets output to empty string on cancel
-								logger "chooce cancel"
-								proceed_with_successful='yes'
-								break
-							fi
-							# ^ this only pertains to review_choose
-
-							# echo "::::::::: DEBUG AFTER :::::::::"
-							# debug_status_arrays
-							# echo
-
-							# echo "sel pos = $REVIEW_SELECTED_FAILURE_INDEX"
-							# echo "sel val = $REVIEW_SELECTED_DCA_INDEX"
-
-							# TODO: if false then [post_review]
-							! __review__handle_edit && break
-						done
-					fi
-
-					# TODO: remove this and call [do_review] after all parser loops.
-					pre_review
-
-					# =======================================================
-					# HANDLE OTHER SHELLS BELOW
-					# =======================================================
-
-				elif is-needle "$interpreter" -- "${supported_non_posix[@]}"; then
+				elif is-needle "$interpreter" -- "${SUPPORTED_NON_POSIX[@]}"; then
 					if [[ "$interpreter" == "nu" ]]; then
-						# HANDLE NUSHELL
 						:
 					elif [[ "$interpreter" == "elvish" ]]; then
-						# HANDLE ELVISH
 						:
 					elif [[ "$interpreter" == "xonsh" ]]; then
-						# HANDLE XONSH
 						:
 					fi
 				else
-					echo "Interpreter [$interpreter] not supported"
+					help "Interpreter [$interpreter] not supported"
 				fi
 			fi
 		}
@@ -1781,19 +1751,6 @@ function command_aliases() (
 	# =======================================================
 	# =======================================================
 	# PREPARE
-
-	if [[ -z "$option_action" ]]; then
-		# help "No action provided"
-		option_action="browse"
-	fi
-
-	# Check before running migration..
-	if [[ -n "$option_migrate_to_subdir" ]]; then
-		if ! is_valid_subdir_depth "$option_migrate_to_subdir"; then
-			echo-style --error "Maximum sub dir depth allowed is [$ALLOW_MAX_SUB_DIRS]"
-			exit
-		fi
-	fi
 
 	# =======================================================
 	# Act
