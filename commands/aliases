@@ -119,6 +119,10 @@
 #
 
 # -------------------------------------------------------
+# PERFORMANCE
+# ( ) reduce subshells as much as possible.
+# >>> use everything in tracker arrays.
+# -------------------------------------------------------
 # ::
 # :: ( ) ASK: --confirm=empty <<< add support
 # ::
@@ -174,27 +178,34 @@ function command_aliases() (
 	# ---------------------------------
 	# data containers
 
-	local NEW_ALIAS_NAMES=()
-	local NEW_ALIAS_SUB_DIRS=()
-	local NEW_ALIAS_VALUES=()
-	local NEW_ALIAS_DESCS=()
-	local NEW_ALIAS_ARGS=()
-	local NEW_ALIAS_CONTENTS=()
-	local NEW_ALIAS_IS_FUNC=()
+	# NOTE: sketching out state data sturcture. avoiding assoc arrays in order
+	# to be v3 compat.
 
-	# ---------------------------------
+	local INDEX # Get any DCA data by eg. name="${DCA_NAMES[INDEX]}"
+
+	# --------------------------------------------
+
+	local NEW_ALIAS_NAMES=()    #        -> DCA_NAMES (holds name key)
+	local NEW_ALIAS_SUB_DIRS=() #     -> DCA_GROUPS
+	local NEW_ALIAS_VALUES=()   #       -> DCA_PARSED_VALUES
+	local NEW_ALIAS_DESCS=()    #        -> DCA_DESCS
+	local NEW_ALIAS_ARGS=()     #         -> DCA_ARGS
+	local NEW_ALIAS_CONTENTS=() #     -> DCA_RENDERED
+	local NEW_ALIAS_IS_FUNC=()  #      -> DCA_IS_FUNC
+
+	local NEW_ALIAS_IS_FAILURE=() #   -> DCA_IS_VALID
+
 	# status trackers
+	local FAILING_POSITIONS=()              #         -> DCA_INDICES_BAD
+	local SUCCESS_POSITIONS=()              #        ->  DCA_INDICES_GOOD
+	local FAILING_ALIAS_REASON=()           #         -> BAD_INDICES__REASON
+	local FAILING_ALIAS_CORRECTION_FUNCS=() # -> BAD_INDICES__FN_RECTIFY
 
-	local NEW_ALIAS_IS_FAILURE=()
+	# NOTE: TEMP_*: only used if user triggers a failure during review edit prompt.
+	# | Maybe need to rethink this.. bc it was a bit hacky...
 
-	local FAILING_ALIAS_REASON=()
-	local FAILING_ALIAS_CORRECTION_FUNCS=() # Only used in `act_create`
-	local FAILING_POSITIONS=()
-	local SUCCESS_POSITIONS=()
-
-	# only used if user triggers a failure during review edit prompt.
-	local TEMP_FAILURE_REASON=''
-	local TEMP_FAILURE_CORRECTION_FUNC=''
+	local TEMP_FAILURE_REASON=''          #          -> TEMP_BAD__REASON
+	local TEMP_FAILURE_CORRECTION_FUNC='' # -> TEMP_BAD__FN_RECTIFY
 
 	# upon validate_all -> handle_validate: count matches and put the count number
 	# at the index position of the corresponding DCA indices
@@ -203,6 +214,18 @@ function command_aliases() (
 	# match in the tracker array.
 	#
 	# TODO: try: concatenate strings that represent
+
+  # HACK: HOW TO ACCESS ARRAY INDICES:
+	# | **Expression**            | **Braces Needed?** | **Why?** |
+	# |---------------------------|-------------------|---------|
+	# | `$var`                    | ❌ No              | Works in simple cases |
+	# | `${var}`                  | ✅ Yes             | Needed to separate from surrounding text |
+	# | `$array[1]`               | ❌ No              | Only if using a **literal index** |
+	# | `${array[1]}`             | ✅ Yes             | Recommended for clarity |
+	# | `$array[$index]`          | ❌ No              | Works, but **fails in arithmetic** |
+	# | `${array[$index]}`        | ✅ Yes             | Ensures correct expansion |
+	# | `$(( x + 1 ))`            | ❌ No              | Arithmetic expansion allows `$x` directly |
+	# | `$(( $x + 1 ))`           | ❌ No              | Braces **not required** in `$(( ))` |
 
 	# ---------------------------------
 	# collision trackers
@@ -1523,8 +1546,11 @@ function command_aliases() (
 					# POST PARSING
 					#
 
-					# TODO: call do review in side
-					post_parsing
+					# TODO: replace this with [do_review]
+					pre_review
+
+					local nnn
+					nnn=$NEW_ALIAS_NAMES[0] # this is valid but fails
 
 					# # nothing was picked up. review doesnt make sense
 					# if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
