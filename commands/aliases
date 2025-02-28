@@ -13,6 +13,8 @@
 # -----------------------------------------------------------------------------
 # IMPORTANT
 #
+# TODO: ( ) ensure migrate default always creates in the testing dir
+#
 # BUG: fix bugs after latest refactor.
 #
 # TODO: ( ) do_review_post -> confirm: default put new DCAs in testing dir.
@@ -118,15 +120,6 @@
 # TODO: ( ) act_clean single
 #
 # TODO: ( ) use func [str_ensure_length]
-#
-# TODO: ( ) act_make_dcas_for_self
-#       | try to set up aliases for alias helper itself
-#       - ali:    "aliases $@"
-#       - alic:   "aliases create"
-#       - alim:   "aliases migrate -- $@"
-#       - alimc:  "aliases migrate --verbose --review-all -- $@"
-#       - alimi:  "aliases migrate --review-verbose --review-all --fix-iterate -- $@"
-#
 
 # -------------------------------------------------------
 # PERFORMANCE
@@ -145,17 +138,6 @@
 # TEST:  w/fzf can be reloaded to refresh
 # https://stackoverflow.com/questions/53896277/how-to-remove-a-list-item-from-fzf
 
-# -----------------------------------------------------------------------------
-# NEXT
-#
-# ( ) Use fabric
-# ( ) Analyze existing DCAs and check which could be improved with `exec`
-#
-
-# (overkill maybe)
-# - Capture the args and rename them to better names and inject this as a line
-#   before the function contents. And also rename the args in the function bodies.
-
 function command_aliases_test() (
 	# Test that aliases are migrated and parsed correctly. Handle:
 	# - surrounding comments properly.
@@ -169,7 +151,8 @@ function command_aliases() (
 	__require_array 'mapfile'
 
 	local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
-	local DCA_TEST_DIR_NAME="dca_testing"
+	local DCA_TEST_DIR_NAME="__dca_testing"
+	local DCA_EVALUATE_DIR_NAME="__dca_evaluate"
 	local SHEBANG_BASH="#!/usr/bin/env bash"
 	local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
 	local ALLOW_MAX_SUB_DIRS=2
@@ -287,15 +270,15 @@ function command_aliases() (
 		xonsh
 	)
 
-  # Predefined/recommended mnemonic aliases for making working with this command more ergonomic.
-  # These will be used when creating "internal" aliases for this command itself.
+	# Predefined/recommended mnemonic aliases for making working with this command more ergonomic.
+	# These will be used when creating "internal" aliases for this command itself.
 	local DCA_SELF=(
-      ali    'aliases'
-      alic   'aliases create'
-      alim   'aliases migrate --'
-      alimc  'aliases migrate --verbose --review-all --'
-      alimi  'aliases migrate --review-verbose --review-all --fix-iterate --'
-)
+		ali 'aliases'
+		alic 'aliases create'
+		alim 'aliases migrate --'
+		alimc 'aliases migrate --verbose --review-all --'
+		alimi 'aliases migrate --review-verbose --review-all --fix-iterate --'
+	)
 
 	# =====================================
 	# Arguments
@@ -303,6 +286,7 @@ function command_aliases() (
 	function help {
 		cat <<-EOF >/dev/stderr
 			ABOUT:
+
 			Helper command for managing "dorothy command aliases" (DCA), which are
 			small executable files that functionally are treated and acts like aliases
 			but are much easier to handle. Aliases are stupid and difficult to handle.
@@ -312,6 +296,7 @@ function command_aliases() (
 			any aliases that you are acustomed to.
 
 			USAGE:
+
 			aliases [...<options] [<action>] [-- [...<input>]]
 
 			ACTIONS:
@@ -323,14 +308,16 @@ function command_aliases() (
 
 			aliases clean
 
+			    Purge DCAs. Choose catogory and how to proceed from a UI.
 
 			aliases migrate -- [...<alias_file>]
 
-			    Parse old aliases/functions from <source> and move them into standalone
-			    DCAs under "user/commands.aliases/*". Migrate can take multiple files
-			    at once.
+			    Parse old aliases/functions from <source> and move them into
+			    standalone DCAs under "user/commands.aliases/*". Migrate can take
+			    multiple files at once.
 
 			aliases merge
+
 			    Run this when you are satisfied with DCAs in the evaluation dir,
 
 			aliases new
@@ -343,20 +330,24 @@ function command_aliases() (
 			    Iterate all DCAs and check which ones do not contain initial
 			    descriptive comments.
 
-      aliases list
+			aliases list
 
-      aliases self | own -- [...<dorothy-command>]
-          If an existing dorothy command, ie. not DCA, has an array called
-          DCA_SELF, then these are used to generate pre-defined DCAs for that
-          specific command, eg. if a command uses a lot of flags and options to
-          achive a specific UI, then use [aliases own -- <that-command>] to
-          generate the more ergonomic DCAs for that command.
+			    List either, testing, evaluate, regular, or all DCAs.
+
+			aliases self -- [...<dorothy-command>]
+
+			    If an existing dorothy command, ie. not DCA, has an array called
+			    DCA_SELF, then these are used to generate pre-defined DCAs for that
+			    specific command, eg. if a command uses a lot of flags and options to
+			    achive a specific UI, then use [aliases own -- <that-command>] to
+			    generate the more ergonomic DCAs for that command.
 
 			OPTIONS:
 
 			--debug
 
 			--to=<path>
+
 			    This option perstains to migrating <source> file.
 			    If you are migrating a aliases of a specific type, eg. git aliases,
 			    then you can specify path == "git/log", and then aliases will be
@@ -366,26 +357,33 @@ function command_aliases() (
 			--review
 			--review-all
 			--review-successful
+			    When migrating, choose which to review and ignore rest. It defaults
+			    to only reviewing invalid and assumes you want to create all valid
+			    DCAs.
 
 			--[no]-test
-      --evaluate
-      --regular
-          There are [3] types of states DCAs can exist in. Testing, evaluation,
-          and regular. When migrating aliases it can be nice to put dummies into
-          a test dir, and serious migration aliases into an evaluation state,
-          before merging any of these into your regular DCAs so that you dont
-          garble your regularly used dcas with unwanted garbage.
+			--evaluate
+			--regular
+			    There are [3] types of states DCAs can exist in. Testing, evaluation,
+			    and regular. When migrating aliases it can be nice to put dummies
+			    into a test dir, and serious migration aliases into an evaluation
+			    state, before merging any of these into your regular DCAs so that you
+			    dont garble your regularly used dcas with unwanted garbage.
 
-      --verbose
-      --review-verbose
-      --parsing-verbose
-          Select which states of the migration process that should print the
-          parsed contents to tty.
+			--verbose
+			--review-verbose
+			--parsing-verbose
+			    Select which states of the migration process that should print the
+			    parsed contents to tty.
 
 			--fix-iterate
 			--iterate
 			    Ignore reviewing newly created DCas via UI menu and directly enter
 			    a review process loop where you can fix or discard parsed DCAs.
+
+			--rename-args
+			    If a function is parsed, prompt to rename func args for better
+			    legibillity.
 
 			--untest
 			    Move DCAs from test dir to their real dir when you feel you feel
@@ -396,26 +394,26 @@ function command_aliases() (
 			--list-testing
 			--list-evaluate
 
-      --ask-prefix
-          With dcas it is resource efficient to run commands with the [exec]
-          command. Therefore you can opt-in to be prompted to inject an [exec]
-          call before your aliases.
+			--ask-prefix
+			    With dcas it is resource efficient to run commands with the [exec]
+			    command. Therefore you can opt-in to be prompted to inject an [exec]
+			    call before your aliases.
 
-      --llm-first
-        In the [aliases create] loop, instead of coming up with the dcas yourself,
-        have an LLM generate the data for the dcas. You'll be prompted for a
-        description, and [aliases] will generate a short short name, description,
-        and contents, which you can then affirm or manually edit, and then
-        continue with the next iteration.
+			--llm-first
+			    In the [aliases create] loop, instead of coming up with the dcas
+			    yourself, have an LLM generate the data for the dcas. You'll be
+			    prompted for a description, and [aliases] will generate a short short
+			    name, description, and contents, which you can then affirm or
+			    manually edit, and then continue with the next iteration.
 
-      --llm-contents
-        Here, in the create loop, you're first asked for the name and the
-        description, and LLM generates the contents of the DCA.
+			--llm-contents
+			    Here, in the create loop, you're first asked for the name and the
+			    description, and LLM generates the contents of the DCA.
 
-      --doctor
-          Check if any existing aliases are colliding with existing external commands
-          in path, eg. if you install a new package and a DCA hides the new package
-          in path, or vice-versa.
+			--doctor
+			    Check if any existing aliases are colliding with existing external
+			    commands in path, eg. if you install a new package and a DCA hides
+			    the new package in path, or vice-versa.
 
 		EOF
 		if [[ $# -ne 0 ]]; then
@@ -975,7 +973,7 @@ function command_aliases() (
 			fi
 			count=$((count + 1))
 		done
-		_print_string "$count"
+		__print_string "$count"
 	}
 
 	function remove_collision {
@@ -1483,17 +1481,17 @@ function command_aliases() (
 				if [[ "$num_failures" -gt 0 ]]; then
 					if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
 
-					  # TODO: GO BACK TO REVIEWING
-					  # |________________________________________________
-					  # | [ALIASES:MIGRATE] - Select how/what to review |
-					  # |------------------------------------------------
-					  # |     - iterate all
-					  # |     - iterate only invalid
-					  # |     - iterate (already) valid
-					  # |     - overview: all
-					  # |     - overview: only invalid
-					  # |     - overview: only (already) valid
-					  # |------------------------------------------------
+						# TODO: GO BACK TO REVIEWING
+						# |________________________________________________
+						# | [ALIASES:MIGRATE] - Select how/what to review |
+						# |------------------------------------------------
+						# |     - iterate all
+						# |     - iterate only invalid
+						# |     - iterate (already) valid
+						# |     - overview: all
+						# |     - overview: only invalid
+						# |     - overview: only (already) valid
+						# |------------------------------------------------
 						echo-style --bold "TODO: Go back to reviewing failures.."
 						do_review
 						return
