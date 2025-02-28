@@ -13,7 +13,7 @@
 # -----------------------------------------------------------------------------
 # IMPORTANT
 #
-# TODO: ( ) ensure migrate default always creates in the testing dir
+# FIX: ( ) adding sub group -> not accessible post creation. why?? not permitted
 #
 # BUG: fix bugs after latest refactor.
 #
@@ -25,9 +25,10 @@
 #
 # TODO: ( ) ask: prefix alias with exec?
 #
+# TEST: act_create: w/failures and see how the re-edit process works
+#
 # TEST: ( ) test run on my real aliases file.
 #
-# FIX: adding sub group -> not accessible post creation. why?? not permitted
 #
 # -----------------------------------------------------------------------------
 # REFACTOR
@@ -306,7 +307,7 @@ function command_aliases() (
 			    Browse aliases in a convenient manner, eg. show/list/edit/remove/dupl/etc.
 			    This is default if run standalone.
 
-			aliases clean
+			aliases clean | plurge
 
 			    Purge DCAs. Choose catogory and how to proceed from a UI.
 
@@ -320,12 +321,9 @@ function command_aliases() (
 
 			    Run this when you are satisfied with DCAs in the evaluation dir,
 
-			aliases new
-			aliases create
+			aliases new | create
 
 			    Prompt to create new aliase, and put them under (*)
-
-			aliases ensure annotated
 
 			    Iterate all DCAs and check which ones do not contain initial
 			    descriptive comments.
@@ -363,7 +361,7 @@ function command_aliases() (
 
 			--[no]-test
 			--evaluate
-			--regular
+			--regular (default)
 			    There are [3] types of states DCAs can exist in. Testing, evaluation,
 			    and regular. When migrating aliases it can be nice to put dummies
 			    into a test dir, and serious migration aliases into an evaluation
@@ -411,6 +409,8 @@ function command_aliases() (
 			    description, and LLM generates the contents of the DCA.
 
 			--doctor
+			--doctor-collisions
+			--doctor-annotate
 			    Check if any existing aliases are colliding with existing external
 			    commands in path, eg. if you install a new package and a DCA hides
 			    the new package in path, or vice-versa.
@@ -427,7 +427,8 @@ function command_aliases() (
 
 	local \
 		option_action='' \
-		option_test_mode='no' \
+		option_test_mode='yes' \
+		option_evaluate='no' \
 		option_review_verbose='no' \
 		option_quiet='no' \
 		option_migrate_to_subdir='' \
@@ -467,6 +468,8 @@ function command_aliases() (
 			# default to using the test dir
 			option_test_mode="$(get-flag-value --affirmative --fallback="$option_test_mode" -- "$item")"
 			;;
+		'--evaluate') option_evaluate='yes' ;;
+
 		'browse')
 			option_action="browse"
 			AX_UI_PREFIX+=":BROWSE"
@@ -626,6 +629,7 @@ function command_aliases() (
 
 	function reset_status_arrays() {
 		SUCCESS_POSITIONS=() FAILING_POSITIONS=() FAILING_ALIAS_REASON=()
+		NAMES_COLLISION_MAP=() NAMES_COLLISION_COUNT_MAP=()
 	}
 
 	function reset_all() {
@@ -663,18 +667,17 @@ function command_aliases() (
 
 	function get_dca_sub_dir_target() {
 		local index="${1-0}" pre=$USER_COMMAND_ALIASES_DIR sub_path
-		if [[ "$option_test_mode" == 'yes' ]]; then
+		if [[ "$option_evaluate" == 'yes' ]]; then
+			pre="$pre/$DCA_EVALUATE_DIR_NAME"
+		elif [[ "$option_test_mode" == 'yes' ]]; then
 			pre="$pre/$DCA_TEST_DIR_NAME"
 		fi
-		if [[ -n "$option_migrate_to_subdir" ]]; then
-			echo "$pre/$option_migrate_to_subdir"
+		subpath=${NEW_ALIAS_SUB_DIRS[$index]}
+		logger "subpath = $subpath" >/dev/tty
+		if [[ -z "$subpath" ]]; then
+			__print_string "$pre"
 		else
-			subpath="${NEW_ALIAS_SUB_DIRS[$index]-}"
-			if [[ -z "$subpath" ]]; then
-				echo "$pre"
-			else
-				echo "$pre/$subpath"
-			fi
+			__print_string "$pre/$subpath"
 		fi
 	}
 
@@ -1001,6 +1004,11 @@ function command_aliases() (
 		local i_check name_check y collision encode_count_string collision_counter=0 already_processed=()
 		NAMES_COLLISION_MAP=()
 		NAMES_COLLISION_COUNT_MAP=()
+
+		if [[ "${#NEW_ALIAS_NAMES[@]}" -lt 2 ]]; then
+			NAMES_COLLISION_MAP+=("")
+		fi
+
 		for ((i_check = 0; i_check < "${#NEW_ALIAS_NAMES[@]}"; i_check++)); do
 			name_check="${NEW_ALIAS_NAMES[$i_check]}" collision='no' encode_count_string="$i_check"
 			if is-needle --needle="$name_check" -- "${already_processed[@]}"; then
@@ -1042,12 +1050,15 @@ function command_aliases() (
 	}
 
 	function correct_permissions() {
+		logger
 		if [[ $# -eq 0 ]]; then
 			local alias_paths=()
 			mapfile -t alias_paths < <(get_all_existing_dcas)
 			fs-own --x -- "${alias_paths[@]}"
 		else
 			# echo "add permissions to: $*"
+			# logger "correct perm for:"
+			# __print_lines "$@"
 			fs-own --x --no-quiet -- "$@" # correct permissions for inpus only
 		fi
 	}
@@ -1076,6 +1087,10 @@ function command_aliases() (
 				apply
 			done
 		fi
+
+		echo "target_new_paths?"
+		echo "${target_new_paths[@]}"
+
 		correct_permissions "${target_new_paths[@]}" # bulk correct permissions
 	}
 
@@ -1360,7 +1375,7 @@ function command_aliases() (
 				break
 			fi
 		done
-
+		check_name_collisions
 		local failure_redo_func status
 		while :; do
 			eval_capture --statusvar=status -- validate_all
@@ -1379,6 +1394,7 @@ function command_aliases() (
 					fi
 					"$failure_redo_func"
 					reset_status_arrays
+					check_name_collisions
 				fi
 			else
 				create_dcas_without_reload
