@@ -10,10 +10,19 @@
 #
 # echo --rs=[arst,sts]
 
+# ISSUE: I need to study the fs-own command so I understand how the permissions
+# work
+
 # -----------------------------------------------------------------------------
-# IMPORTANT
+# IMPORTAN
 #
-# FIX: ( ) adding sub group -> not accessible post creation. why?? not permitted
+# TODO: act_clean: suppert removing __evalute dirs
+#
+# TEST: add my own aliases w/--test
+# TEST: add my own aliases w/--evaluate
+# TEST: remove only evaluate
+#
+# fix: ensure TEST and EVALUATE dirs are added to permissions.
 #
 # BUG: fix bugs after latest refactor.
 #
@@ -673,11 +682,11 @@ function command_aliases() (
 			pre="$pre/$DCA_TEST_DIR_NAME"
 		fi
 		subpath=${NEW_ALIAS_SUB_DIRS[$index]}
-		logger "subpath = $subpath" >/dev/tty
+		# logger "subpath = $subpath" >/dev/tty
 		if [[ -z "$subpath" ]]; then
 			__print_string "$pre"
 		else
-			__print_string "$pre/$subpath"
+			__print_string "$pre/__group/$subpath"
 		fi
 	}
 
@@ -1043,12 +1052,17 @@ function command_aliases() (
 
 	function reload_environment() {
 		if [[ "$DO_RELOAD" == 'yes' ]]; then
+			echo "Updating permissions..."
+			fs-own --permissions="+Xrw" --recursive --no-quiet -- "$USER_COMMAND_ALIASES_DIR"
+			fs-own --x --recursive --no-quiet -- "$USER_COMMAND_ALIASES_DIR"
 			echo "Reloading environment..."
 			source "$DOROTHY/sources/environment.sh"
 			DO_RELOAD='no'
 		fi
 	}
 
+	# This function should be unnecessary now since setting recursive perms above
+	# will be better to use.
 	function correct_permissions() {
 		logger
 		if [[ $# -eq 0 ]]; then
@@ -1088,10 +1102,10 @@ function command_aliases() (
 			done
 		fi
 
-		echo "target_new_paths?"
-		echo "${target_new_paths[@]}"
+		# echo "target_new_paths?"
+		# echo "${target_new_paths[@]}"
 
-		correct_permissions "${target_new_paths[@]}" # bulk correct permissions
+		# correct_permissions "${target_new_paths[@]}" # bulk correct permissions
 	}
 
 	function create_dcas_without_reload() {
@@ -1871,6 +1885,23 @@ function command_aliases() (
 	# =======================================================
 	# =======================================================
 	# PREPARE
+
+	# fs-own --X --no-quiet -- "$@" # correct permissions for inpus only
+	#
+	# make everything readable and writable, make directories accessible
+	# fs-own --permissions='+Xrw' --optional --recursive -- "$DOROTHY"
+
+	if [[ ! -d "$USER_COMMAND_ALIASES_DIR" ]]; then
+		__mkdirp "$USER_COMMAND_ALIASES_DIR"
+		fs-own --permissions="+Xrw" --recursive --quiet -- "$USER_COMMAND_ALIASES_DIR"
+	fi
+
+	# if [[ ! -d "$USER_COMMAND_ALIASES_DIR/$DCA_TEST_DIR_NAME" ]]; then
+	# 	__mkdirp "$USER_COMMAND_ALIASES_DIR/$DCA_TEST_DIR_NAME"
+	# fi
+	# if [[ ! -d "$USER_COMMAND_ALIASES_DIR/$DCA_EVALUATE_DIR_NAME" ]]; then
+	# 	__mkdirp "$USER_COMMAND_ALIASES_DIR/$DDCA_EVALUATE_DIR_NAME"
+	# fi
 
 	# =======================================================
 	# Act

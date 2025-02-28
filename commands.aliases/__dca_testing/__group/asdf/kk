@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-# Name: aki
-# Desc: aki
+# Name: kk
+# Desc: kk
 echo "$@"
