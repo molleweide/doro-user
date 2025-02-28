@@ -13,7 +13,13 @@
 # -----------------------------------------------------------------------------
 # IMPORTANT
 #
-# TODO: ( ) do_post_review -> confirm: default put new DCAs in testing dir.
+# BUG: fix bugs after latest refactor.
+#
+# TODO: ( ) do_review_post -> confirm: default put new DCAs in testing dir.
+#
+# TODO: review_post
+#       -> on empty -> run choose menu to update any component.
+#           >>> reuse choose menu from act_create
 #
 # TODO: ( ) ask: prefix alias with exec?
 #
@@ -27,6 +33,9 @@
 # FIX: ( ) move posix parsers into own funcs
 #
 # FIX: ( ) move review process out into own func
+#
+# FIX: ( ) improve array indexing syntax and get comfortable with the different
+# | ways of writing array indexing
 #
 # -----------------------------------------------------------------------------
 # FABRIC
@@ -57,10 +66,6 @@
 #       ( ) get number of collisions
 #             -> show in the EDIT_ title
 #
-# TODO: choose && iterate
-#       -> on empty -> run choose menu to update any component.
-#           >>> reuse choose menu from act_create
-#
 # TODO: review_choose <esc> ->
 #     | choose --esc-menu
 #
@@ -76,9 +81,11 @@
 # TODO: use other methods to parse
 # - treesitter
 #
+# TODO: migrate: multi select which (valid) dcas to create
+#
 # TODO: ask: purge migration source files?
 #
-# TODO: do_post_review: choose menu (!=default)
+# TODO: do_review_post: choose menu (!=default)
 # | entry: go back to reviewing -> (overrides all other selections)
 # |!entry: put new under /test dir
 # | entry: purge input source files
@@ -90,7 +97,7 @@
 #
 # ----
 #
-# TODO: do_post_review: go back to reviewing
+# TODO: do_review_post: go back to reviewing
 #       -> select: [both | failures | valid]
 #
 # TODO: --review-all
@@ -295,38 +302,98 @@ function command_aliases() (
 			any aliases that you are acustomed to.
 
 			USAGE:
-			command-aliases [...<options] [<action>] [-- [...<input>]]
+			aliases [...<options] [<action>] [-- [...<input>]]
 
 			ACTIONS:
 
-			command-aliases browse
+			aliases browse
 
 			    Browse aliases in a convenient manner, eg. show/list/edit/remove/dupl/etc.
 			    This is default if run standalone.
 
-			command-aliases migrate -- [...<alias_file>]
+			aliases clean
+
+
+			aliases migrate -- [...<alias_file>]
 
 			    Parse old aliases/functions from <source> and move them into standalone
 			    DCAs under "user/commands.aliases/*". Migrate can take multiple files
 			    at once.
 
-			command-aliases new
-			command-aliases create
+			aliases merge
+			    Run this when you are satisfied with DCAs in the evaluation dir,
+
+			aliases new
+			aliases create
 
 			    Prompt to create new aliase, and put them under (*)
 
-			command-aliases ensure annotated
+			aliases ensure annotated
 
 			    Iterate all DCAs and check which ones do not contain initial
 			    descriptive comments.
 
+      aliases list
+
 			OPTIONS:
 
+			--debug
+
 			--to=<path>
+			    This option perstains to migrating <source> file.
 			    If you are migrating a aliases of a specific type, eg. git aliases,
 			    then you can specify path == "git/log", and then aliases will be
 			    migrated into [commands.aliases/git/log*], so that all your logging
 			    aliases are nicely put in a semantic location.
+
+			--review
+			--review-all
+			--review-successful
+
+			--[no]-test
+      --evaluate
+      --regular
+          There are [3] types of states DCAs can exist in. Testing, evaluation,
+          and regular. When migrating aliases it can be nice to put dummies into
+          a test dir, and serious migration aliases into an evaluation state,
+          before merging any of these into your regular DCAs so that you dont
+          garble your regularly used dcas with unwanted garbage.
+
+      --verbose
+      --review-verbose
+      --parsing-verbose
+          Select which states of the migration process that should print the
+          parsed contents to tty.
+
+			--fix-iterate
+			--iterate
+			    Ignore reviewing newly created DCas via UI menu and directly enter
+			    a review process loop where you can fix or discard parsed DCAs.
+
+			--untest
+			    Move DCAs from test dir to their real dir when you feel you feel
+			    satisfied and have tried out the newly created DCAs.
+
+			--list
+			--list-real
+			--list-testing
+			--list-evaluate
+
+      --ask-prefix
+          With dcas it is resource efficient to run commands with the [exec]
+          command. Therefore you can opt-in to be prompted to inject an [exec]
+          call before your aliases.
+
+      --fabric-first
+        In the [aliases create] loop, instead of coming up with the dcas yourself,
+        have an LLM generate the data for the dcas. You'll be prompted for a
+        description, and [aliases] will generate a short short name, description,
+        and contents, which you can then affirm or manually edit, and then
+        continue with the next iteration.
+
+      --fabric-contents
+        Here, in the create loop, you're first asked for the name and the
+        description, and LLM generates the contents of the DCA.
 
 		EOF
 		if [[ $# -ne 0 ]]; then
@@ -1366,7 +1433,7 @@ function command_aliases() (
 		logger
 		# nothing was picked up. review doesnt make sense
 		if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
-			do_post_review
+			do_review_post
 			return
 		fi
 
@@ -1377,7 +1444,7 @@ function command_aliases() (
 	}
 
 	# call this after the parser loop has run it's course.
-	function do_post_review() {
+	function do_review_post() {
 		logger
 		echo-style --header "$migrate_prefix POST REVIEW"
 
@@ -1393,6 +1460,18 @@ function command_aliases() (
 
 				if [[ "$num_failures" -gt 0 ]]; then
 					if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
+
+					  # TODO: GO BACK TO REVIEWING
+					  # |________________________________________________
+					  # | [ALIASES:MIGRATE] - Select how/what to review |
+					  # |------------------------------------------------
+					  # |     - iterate all
+					  # |     - iterate only invalid
+					  # |     - iterate (already) valid
+					  # |     - overview: all
+					  # |     - overview: only invalid
+					  # |     - overview: only (already) valid
+					  # |------------------------------------------------
 						echo-style --bold "TODO: Go back to reviewing failures.."
 						do_review
 						return
@@ -1450,7 +1529,7 @@ function command_aliases() (
 
 		# # nothing was picked up. review doesnt make sense
 		# if [[ "${#NEW_ALIAS_NAMES[@]}" -eq 0 ]]; then
-		# 	do_post_review
+		# 	do_review_post
 		# 	return
 		# fi
 		#
@@ -1537,6 +1616,10 @@ function command_aliases() (
 			# echo "dcai $REVIEW_SELECTED_DCA_INDEX | sfix $REVIEW_SELECTED_FAILURE_INDEX"
 		}
 
+		#
+		# REVIEW: UI ASK (ITERATE)
+		#
+
 		# handle parsed aliases
 		if [[ "$option_fix_iterate" == 'yes' ]]; then
 			# w/ASK --------------------------------------------
@@ -1559,13 +1642,14 @@ function command_aliases() (
 				fi
 				review__apply_correct_indices
 
-				# TODO: if false then [do_post_review]
+				# TODO: if false then [do_review_post]
 				! __review__handle_edit && break
 			done
 		else
 
-			#-------------------------------------------------------
-			# w/CHOOSE
+			#
+			# REVIEW: UI CHOOSE (MENU)
+			#
 
 			# TODO: func [run_review_choose]
 
@@ -1632,12 +1716,12 @@ function command_aliases() (
 				# echo "sel pos = $REVIEW_SELECTED_FAILURE_INDEX"
 				# echo "sel val = $REVIEW_SELECTED_DCA_INDEX"
 
-				# TODO: if false then [do_post_review]
+				# TODO: if false then [do_review_post]
 				! __review__handle_edit && break
 			done
 		fi
 
-		do_post_review
+		do_review_post
 	}
 
 	function act_migrate() {
