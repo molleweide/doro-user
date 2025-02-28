@@ -161,8 +161,8 @@ function command_aliases() (
 	__require_array 'mapfile'
 
 	local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
-	local DCA_TEST_DIR_NAME="__dca_testing"
-	local DCA_EVALUATE_DIR_NAME="__dca_evaluate"
+	local DCA_TEST_DIR_NAME="__testing"
+	local DCA_EVALUATE_DIR_NAME="__evaluate"
 	local SHEBANG_BASH="#!/usr/bin/env bash"
 	local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
 	local ALLOW_MAX_SUB_DIRS=2
@@ -305,6 +305,37 @@ function command_aliases() (
 			cross shell compatible which allows you to switch shell and still use
 			any aliases that you are acustomed to.
 
+			DCAs are hosted in a set of special dirs: (1) Your regular DCAs that you
+			use daily are stored in the root dir. (2) Then there is a testing dir where
+			newly parsed DCAs are created so you dont mix them with (1), and then
+			there is also a third dir (3) called evaluate where you might also
+			put new DCAs when parsing from a source file to specifically give the
+			intent that these aliases are being tried and evaluated and then you
+			can elevate them to (1) if you feel that they are any good. Examples
+			of groups can be that you would want to put eg. all your git DCAs in
+			a single dir and then all DCAs pertaining to some other thing in another
+			group. The following shows a listing of all the special dirs and * represents
+			DCAs potentially filling up the respective dir.
+
+			commands.aliases/*
+			commands.aliases/__group/<name>/*
+			commands.aliases/__testing/*
+			commands.aliases/__testing/__group/<name>/*
+			commands.aliases/__evaluate/*
+			commands.aliases/__evaluate/__group/<name>/*
+
+			The reason for the above is:
+			1. Avoid naming conflicts where a DCA has the same name as a group.
+			2. Avoid mixing unwanted DCAs with the ones you use daily.
+			3. Making it easy for you as a user to quickly create new DCAs and then
+			bulk discard them if you didnt like them without ever accidentally
+			messing up the ones you use daily.
+
+			By default new DCAs are always added to the testing dir if not otherwise
+			specified so that you can go ahead and play around as much as you like.
+			Or migrate as many old style alias files as you like without messing
+			with your regular and daily used DCAs.
+
 			USAGE:
 
 			aliases [...<options] [<action>] [-- [...<input>]]
@@ -324,7 +355,9 @@ function command_aliases() (
 
 			    Parse old aliases/functions from <source> and move them into
 			    standalone DCAs under "user/commands.aliases/*". Migrate can take
-			    multiple files at once.
+			    multiple files at once. It always defaults to putting new DCas in
+			    the [commands.aliases/__testing/*] dir so that you will not mix
+			    unwanted DCAs with your DCAs that you use daily
 
 			aliases merge
 
@@ -1295,6 +1328,7 @@ function command_aliases() (
 	# LIST
 
 	# TODO: only show <group>/<name>
+	# TODO: type/group/all/etc...
 	function act_list() {
 		local path alias_paths=() aliases_short=()
 
@@ -1316,6 +1350,12 @@ function command_aliases() (
 	# ( ) choose
 	# ( ) fuzzy-helper
 	# ( ) keybind create new DCA from selection.
+	# TODO: Choose which type to display:
+	# | 1. [ regular | testing | evaluate ]
+	# | 2. Which group to show?
+	# | 3. Mix groups and single DCAs in the same view?
+	# | On choose <esc> cancel go to menu where you can either close or select
+	# | another type/group to display.
 	function act_browse() {
 		local path alias_paths=() alias_names=() alias_labels=()
 		mapfile -t alias_paths < <(get_all_existing_dcas)
@@ -1426,20 +1466,9 @@ function command_aliases() (
 	# =======================================================
 	# CLEAN
 
+  # TODO: same as with browse. select which type/group/single to remove.
 	function act_clean() {
 		local alias_paths=() alias_names=() alias_labels=()
-
-		# mapfile -t alias_paths < <(get_all_existing_dcas)
-
-		# for path in "${alias_paths[@]}"; do
-		#   local header contents
-		#   # ${path#*"commands.aliases"} does not work for trimming everything before
-		#   # the match pattern. That is why the string looks a bit weird below.
-		#   header="commands${path#*"commands"}"
-		#   contents="$("${BAT_CMD[@]}" "$path")"
-		#   alias_names+=("$header")
-		#   alias_labels+=("$header"$'\n'"$contents")
-		# done
 
 		clean_labels=(
 			test "test dir"
