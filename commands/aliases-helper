@@ -63,8 +63,6 @@
 # -----------------------------------------------------------------------------
 # IMPROVEMENTS
 #
-# TODO: support checking for aliases in all supported shells on the system.
-#
 # TODO: ( ) -> use DCA_IS_VALID=()
 #       | This will make it easier to handle building UI in eg. edit_*
 #
@@ -124,8 +122,6 @@
 
 # TODO: ( ) act_clean group
 # TODO: ( ) act_clean single
-#
-# TODO: ( ) use func [str_ensure_length]
 
 # -------------------------------------------------------
 # PERFORMANCE
@@ -190,21 +186,22 @@ function command_aliases() (
   # the value is empty string, then the data value should be interpreted as
   # nil or false
 
-  local DCA_NAMES=()               # The command names
-  local DCA_GROUPS=()              # The path segment used for the group
-  local DCA_DIRS=()                #
-  local DCA_PATHS=()               #
-  local DCA_PATHS_SHORT=()         # Only used for displaying
-  local DCA_VALUES=()              #
-  local DCA_DESCS=()               #
-  local DCA_ARGS=()                #
-  local DCA_CONTENTS=()            # The code body of the new dca
-  local DCA_IS_FUNC=()             #
-  local DCA_IS_VALID=()            #   -> DCA_IS_VALID
-  local FAILING_POSITIONS=()       #         -> DCA_INDICES_BAD
-  local SUCCESS_POSITIONS=()       #        ->  DCA_INDICES_GOOD
-  local INVALID_REASON=()          #         -> BAD_INDICES__REASON
-  local INVALID_CORRECTION_FUNC=() # -> BAD_INDICES__FN_RECTIFY
+  local DCA_NAMES=()                 # The command names
+  local DCA_GROUPS=()                # The path segment used for the group
+  local DCA_DIRS=()                  #
+  local DCA_PATHS=()                 #
+  local DCA_PATHS_SHORT=()           # Only used for displaying
+  local DCA_PATHS_SHORT_FORMATTED=() # Used for choose entries
+  local DCA_VALUES=()                #
+  local DCA_DESCS=()                 #
+  local DCA_ARGS=()                  #
+  local DCA_CONTENTS=()              # The code body of the new dca
+  local DCA_IS_FUNC=()               #
+  local DCA_IS_VALID=()              #   -> DCA_IS_VALID
+  local FAILING_POSITIONS=()         #         -> DCA_INDICES_BAD
+  local SUCCESS_POSITIONS=()         #        ->  DCA_INDICES_GOOD
+  local INVALID_REASON=()            #         -> BAD_INDICES__REASON
+  local INVALID_CORRECTION_FUNC=()   # -> BAD_INDICES__FN_RECTIFY
 
   # NOTE: TEMP_*: only used if user triggers a failure during review edit prompt.
   # | Maybe need to rethink this.. bc it was a bit hacky...
@@ -661,6 +658,7 @@ function command_aliases() (
     DCA_DIRS=()
     DCA_PATHS=()
     DCA_PATHS_SHORT=()
+    DCA_PATHS_SHORT_FORMATTED=()
     DCA_CONTENTS=()
     DCA_VALUES=()
     DCA_DESCS=()
@@ -708,7 +706,7 @@ function command_aliases() (
 
   function make_dca_path() {
     local index="${1-$INDEX}"
-    DCA_PATHS[index]="${DCA_DIRS[$index]}/${DCA_NAMES[$index]}"]
+    DCA_PATHS[index]="${DCA_DIRS[$index]}/${DCA_NAMES[$index]}"
   }
 
   function make_dca_dir() {
@@ -732,8 +730,8 @@ function command_aliases() (
 
   function make_dca_path_short() {
     local index="${1-INDEX}" path
-      path="${DCA_PATHS[index]}"
-      DCA_PATHS_SHORT[index]="${path#*"commands.aliases/"}"
+    path="${DCA_PATHS[index]}"
+    DCA_PATHS_SHORT[index]="${path#*"commands.aliases/"}"
   }
 
   # During parsing, this func requires an index to be supplied so that the
@@ -743,6 +741,7 @@ function command_aliases() (
     make_dca_dir "$index"
     make_dca_path "$index"
     make_dca_path_short "$index"
+    # make_dca_path_short_formatted # maybe put in [update_tertiary_data]
     make_contents "$index"
   }
 
@@ -876,10 +875,12 @@ function command_aliases() (
     return 1
   }
 
-  # NOTE: Unfortunately this does not capture all names, since all names are not
-  # loaded in non-interactive mode. It would be possible to check for names
-  # in all existing shells but this would probably be a bit slow. But maybe
-  # worth it...
+  function name_is_unique_across_installed_shells {
+    # Ensure that name does not exist in other shells than bash..
+    # Eval for <shell> -il and check existens.
+    :
+  }
+
   function name_is_unique_in_path() {
     local index="${1-0}"
     if which -s "${DCA_NAMES[$index],,}"; then
@@ -1763,7 +1764,7 @@ function command_aliases() (
         # echo "::::::::: DEBUG BEFORE :::::::::"
         # debug_status_arrays
 
-        local ordinal choose_start_index=0 choose_title="$AX_UI_PREFIX " choose_review_labels=()
+        local ordinal choose_start_index=0 choose_title="$AX_UI_PREFIX " choose_review_labels=() short_path_formatted
 
         choose_title+="| REVIEWING: [$reviewing] | "
         choose_title+="${#FAILING_POSITIONS[@]} BAD | ${#SUCCESS_POSITIONS[@]} GOOD / ${#DCA_NAMES[@]} total | Select below to fix failing issue."
@@ -1776,11 +1777,14 @@ function command_aliases() (
           else
             dca_review_index="${REVIEW_ARRAY[$ordinal]}"
           fi
+
+          local short_path_formatted="$(str_ensure_length 40 "[${DCA_PATHS_SHORT[$dca_review_index]}]")"
+
           function make_failure_label() {
-            review_label+="$(echo-style --error+bold "#$ordinal: [${DCA_PATHS_SHORT[$dca_review_index]}] REASON: ${INVALID_REASON[$status_pos]}")"
+            review_label+="$(echo-style --error+bold "#$ordinal: $short_path_formatted REASON: ${INVALID_REASON[$status_pos]}")"
           }
           function make_successful_label() {
-            review_label+="$(echo-style --success+bold "#$ordinal: [${DCA_PATHS_SHORT[$dca_review_index]}]")"
+            review_label+="$(echo-style --success+bold "#$ordinal: $short_path_formatted")"
           }
           status_pos="$(get_status_pos_from_dca_index "$dca_review_index")"
           if [[ "$reviewing" == 'both' ]]; then
@@ -1904,7 +1908,6 @@ function command_aliases() (
         DCA_VALUES+=("$body_trimmed")
         DCA_DESCS+=("")
         DCA_ARGS+=("'${arguments[@]}'")
-
 
         local last=$(("${#DCA_NAMES[@]}" - 1))
         update_secondary_data "$last"
