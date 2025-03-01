@@ -707,34 +707,71 @@ function command_aliases() (
     remove_array_index "INVALID_CORRECTION_FUNC" "$index"
   }
 
-  # TODO: During parsing this will be done in a loop without INDEX. Therefore
-  # this func needs to take an optional arg
-  function update_secondary_data {
-    if [[ $# -ne 0 ]]; then
-      # supplied index
-      # make_dca_dir "$1"
-      # make_dca_path "$1"
-      # make_dca_path_short "$1"
-      make_contents "$1"
-    else
-      # use INDEX
-      # make_dca_dir
-      # make_dca_path
-      # make_dca_path_short
-      make_contents
+  # =======================================================
+  # =======================================================
+  # HANDLE SECONDARY DATA
+  #
+
+  function make_dca_path() {
+    local index="${1-INDEX}"
+    # echo "$(get_dca_sub_dir_target "$index")/${DCA_NAMES[$index]}"
+    DCA_PATHS[index]="${DCA_DIRS[index]}/${DCA_NAMES[index]}"]
+  }
+
+  function make_dca_dir() {
+    local index="${1-$INDEX}" pre=$USER_COMMAND_ALIASES_DIR sub_path
+
+    if [[ "$option_evaluate" == 'yes' ]]; then
+      pre="$pre/$DCA_EVALUATE_DIR_NAME"
+    elif [[ "$option_test_mode" == 'yes' ]]; then
+      pre="$pre/$DCA_TEST_DIR_NAME"
     fi
+    subpath=${DCA_GROUPS[$index]}
+    # logger "subpath = $subpath" >/dev/tty
+    if [[ -z "$subpath" ]]; then
+      # __print_string "$pre"
+      DCA_DIRS[index]="$pre"
+    else
+      # __print_string "$pre/__group/$subpath"
+      DCA_DIRS[index]="$pre/__group/$subpath"
+    fi
+  }
+
+  function make_dca_path_short() {
+    local index="${1-INDEX}" path
+    if [[ "$index" == "--path" ]]; then
+      __print_lines "${2#*"commands.aliases/"}"
+    else
+      path="${DCA_PATHS[index]}"
+      __print_string "${path#*"commands.aliases/"}"
+    fi
+  }
+
+  # During parsing, this func requires an index to be supplied so that the
+  # last index can be generated on each loop.
+  function update_secondary_data {
+    local index
+
+    if [[ -n "${1-}" ]]; then
+      index=$1
+    fi
+
+    make_dca_dir "$1"
+    make_dca_path "$1"
+    make_dca_path_short "$1"
+    make_contents "$1"
   }
 
   # =======================================================
   # =======================================================
-  # GETTERS
+  # EXTERNAL DATA GETTERS
+  #
 
   # get paths of existing aliases
   function get_all_existing_dcas() {
     find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
   }
 
-  # TODO: move this into "update_array_data"
   function get_dca_sub_dir_target() {
     local index="${1-0}" pre=$USER_COMMAND_ALIASES_DIR sub_path
     if [[ "$option_evaluate" == 'yes' ]]; then
@@ -760,16 +797,15 @@ function command_aliases() (
   # the match pattern. That is why the string looks a bit weird below.
   function get_dca_short_path() {
     local index="${1-0}" path
-
     if [[ "$index" == "--path" ]]; then
       # echo "?">/dev/tty
       # __print_lines "commands${2#*"commands"}"
       __print_lines "${2#*"commands.aliases/"}"
     else
-      path="$(get_dca_path "$index")"
-      echo "${path#*"commands.aliases/"}"
+      # path="$(get_dca_path "$index")"
+      path="${DCA_PATHS[index]}"
+      __print_string "${path#*"commands.aliases/"}"
     fi
-
   }
 
   # =======================================================
@@ -1138,7 +1174,7 @@ function command_aliases() (
 
     function apply() {
       if [[ -z "$prev_dir" || "$target_dir" != "$prev_dir" ]]; then
-        target_dir="$(get_dca_sub_dir_target "$i")"
+        target_dir="${DCA_DIRS[i]}"
         __mkdirp "$target_dir" >/dev/null
         prev_dir="$target_dir"
       fi
@@ -1168,7 +1204,7 @@ function command_aliases() (
   #
 
   function make_contents() {
-    local index=${1-0} c=''
+    local index=$1 c=''
     c+="$SHEBANG_BASH"
     c+=$'\n'"# Name: ${DCA_NAMES[$index]}"
     c+=$'\n'"# Desc: ${DCA_DESCS[$index]}"
@@ -1262,23 +1298,25 @@ function command_aliases() (
 
     __trigger_event "EDIT_NAME_FINISHED" "$index" "$answer"
 
-
     # DCA_NAMES[index]="$answer"
     # make_contents
   }
 
+  # # FIX: update to current impl
   function edit_value() {
     local index=${1-0}
     DCA_VALUES[index]="$(ask --linger "$AX_UI_PREFIX Edit command value (index: $index):")"
     make_contents
   }
 
+  # # FIX: update to current impl
   function edit_desc() {
     local index=${1-0}
     DCA_DESCS[index]="$(ask --linger "$AX_UI_PREFIX Edit new alias description (index: $index):")"
     make_contents
   }
 
+  # # FIX: update to current impl
   function edit_sub_path() {
     local index=${1-0}
     local sub_path
@@ -1331,7 +1369,7 @@ function command_aliases() (
 
       DCA_NAMES[index]="$new_name"
 
-      update_secondary_data  "$index"
+      update_secondary_data "$index"
       ;;
     # "REVIEW_PRE") ;;
     *)
@@ -1355,15 +1393,16 @@ function command_aliases() (
 
     mapfile -t alias_paths < <(get_all_existing_dcas)
 
-    for path in "${alias_paths[@]}"; do
-      aliases_short+=("$(get_dca_short_path --path "$path")")
-      # aliases_short+=("$(basename "$path")")
-    done
+    # for path in "${alias_paths[@]}"; do
+    #   aliases_short+=("$(get_dca_short_path --path "$path")")
+    #   # aliases_short+=("$(basename "$path")")
+    # done
+
     if [[ "${#aliases_short[@]}" -eq 0 ]]; then
       echo "No aliases exists."
       return
     fi
-    __print_lines "${aliases_short[@]}"
+    __print_lines "${alias_paths[@]}"
   }
   # =======================================================
   # BROWSE
