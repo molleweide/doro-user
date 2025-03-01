@@ -21,16 +21,7 @@
 # | But in the review process, then the index is changing based on selection
 # | or current iteration in fix loop, therefore this value has to be set.
 #
-# - (x) Ensure <cancel> fails gracefully in both [create] and [parse]
 #
-# TODO: (*) Ensure data arrays are always reset/populated before `getting`.
-# 1. impement populating these.
-# 2. update all getters.
-#
-# TODO: ( ) Then, migrate to using the INDEX for getting everywhere.
-#
-# TODO: populate all new data arrays and use the $INDEX var to "get" data.
-# -> [update_secondary_data]
 #
 # TODO: ( ) do_review_post -> confirm: default put new DCAs in testing dir.
 #
@@ -49,6 +40,8 @@
 # TEST: add my own aliases w/--test
 # TEST: add my own aliases w/--evaluate
 # TEST: remove only evaluate
+#
+# PERF: obtain all fn bodies in bulk - works bc we dont care about order.
 
 # -----------------------------------------------------------------------------
 # FABRIC
@@ -631,6 +624,7 @@ function command_aliases() (
   function log_during_parsing() {
     local last=$(("${#DCA_NAMES[@]}" - 1))
     __print_lines "-------------------------------------------------------"
+    __print_lines "log_during_parsing: $last"
     log_single_content "$last" # "${DCA_CONTENTS[$last]}"
   }
 
@@ -713,9 +707,8 @@ function command_aliases() (
   #
 
   function make_dca_path() {
-    local index="${1-INDEX}"
-    # echo "$(get_dca_sub_dir_target "$index")/${DCA_NAMES[$index]}"
-    DCA_PATHS[index]="${DCA_DIRS[index]}/${DCA_NAMES[index]}"]
+    local index="${1-$INDEX}"
+    DCA_PATHS[index]="${DCA_DIRS[$index]}/${DCA_NAMES[$index]}"]
   }
 
   function make_dca_dir() {
@@ -730,31 +723,27 @@ function command_aliases() (
     # logger "subpath = $subpath" >/dev/tty
     if [[ -z "$subpath" ]]; then
       # __print_string "$pre"
-      DCA_DIRS[index]="$pre"
+      DCA_DIRS[$index]="$pre"
     else
       # __print_string "$pre/__group/$subpath"
-      DCA_DIRS[index]="$pre/__group/$subpath"
+      DCA_DIRS[$index]="$pre/__group/$subpath"
     fi
   }
 
   function make_dca_path_short() {
     local index="${1-INDEX}" path
-    if [[ "$index" == "--path" ]]; then
-      __print_lines "${2#*"commands.aliases/"}"
-    else
       path="${DCA_PATHS[index]}"
-      __print_string "${path#*"commands.aliases/"}"
-    fi
+      DCA_PATHS_SHORT[index]="${path#*"commands.aliases/"}"
   }
 
   # During parsing, this func requires an index to be supplied so that the
   # last index can be generated on each loop.
   function update_secondary_data {
     local index="${1-INDEX}"
-    make_dca_dir "$INDEX"
-    make_dca_path "$INDEX"
-    make_dca_path_short "$INDEX"
-    make_contents "$INDEX"
+    make_dca_dir "$index"
+    make_dca_path "$index"
+    make_dca_path_short "$index"
+    make_contents "$index"
   }
 
   # =======================================================
@@ -765,42 +754,6 @@ function command_aliases() (
   # get paths of existing aliases
   function get_all_existing_dcas() {
     find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
-  }
-
-  function get_dca_sub_dir_target() {
-    local index="${1-0}" pre=$USER_COMMAND_ALIASES_DIR sub_path
-    if [[ "$option_evaluate" == 'yes' ]]; then
-      pre="$pre/$DCA_EVALUATE_DIR_NAME"
-    elif [[ "$option_test_mode" == 'yes' ]]; then
-      pre="$pre/$DCA_TEST_DIR_NAME"
-    fi
-    subpath=${DCA_GROUPS[$index]}
-    # logger "subpath = $subpath" >/dev/tty
-    if [[ -z "$subpath" ]]; then
-      __print_string "$pre"
-    else
-      __print_string "$pre/__group/$subpath"
-    fi
-  }
-
-  function get_dca_path() {
-    local index="${1-0}"
-    echo "$(get_dca_sub_dir_target "$index")/${DCA_NAMES[$index]}"
-  }
-
-  # ${path#*"commands.aliases"} does not work for trimming everything before
-  # the match pattern. That is why the string looks a bit weird below.
-  function get_dca_short_path() {
-    local index="${1-0}" path
-    if [[ "$index" == "--path" ]]; then
-      # echo "?">/dev/tty
-      # __print_lines "commands${2#*"commands"}"
-      __print_lines "${2#*"commands.aliases/"}"
-    else
-      # path="$(get_dca_path "$index")"
-      path="${DCA_PATHS[index]}"
-      __print_string "${path#*"commands.aliases/"}"
-    fi
   }
 
   # =======================================================
@@ -1018,7 +971,7 @@ function command_aliases() (
       SUCCESS_POSITIONS+=("$vi")
       DCA_IS_VALID[$vi]='yes'
       if [[ "$option_parsing_verbose" == 'yes' ]]; then
-        echo-style --success "Successfully validated alias [$(get_dca_short_path "$vi")]"
+        echo-style --success "Successfully validated alias [${DCA_PATHS_SHORT[$vi]}]"
       fi
       if [[ "$set_temp" == 'yes' ]]; then
         # echo "<[RESET TEMP FAILURE]>"
@@ -1472,7 +1425,7 @@ function command_aliases() (
     update_secondary_data
 
     while :; do
-      prompt_confirm_or_edit="Go ahead create alias at [$(get_dca_short_path)] OR edit alias?"$'\n'"$(log_single_content)"
+      prompt_confirm_or_edit="Go ahead create alias at [${DCA_PATHS_SHORT[$INDEX]}] OR edit alias?"$'\n'"$(log_single_content)"
       if ! confirm --ppid=$$ --positive -- "$prompt_confirm_or_edit"; then
         # todo: move title definition into the choose command
         local redo_func redo_options=() title="$AX_UI_PREFIX Select which part to edit:"
@@ -1497,7 +1450,7 @@ function command_aliases() (
       eval_capture --statusvar=status -- validate_all
       if [[ "$status" -ne 0 ]]; then
         local label
-        label="[$status] Creating alias [$(get_dca_short_path)] failed with reason:"
+        label="[$status] Creating alias [${DCA_PATHS_SHORT[$INDEX]}] failed with reason:"
         label+=$'\n'"REASON: ${INVALID_REASON[0]}"
         label+=$'\n'"Do you want to re-edit failing part?"
         if confirm --ppid=$$ --positive -- "$label"; then
@@ -1824,10 +1777,10 @@ function command_aliases() (
             dca_review_index="${REVIEW_ARRAY[$ordinal]}"
           fi
           function make_failure_label() {
-            review_label+="$(echo-style --error+bold "#$ordinal: [$(get_dca_short_path "$dca_review_index")] REASON: ${INVALID_REASON[$status_pos]}")"
+            review_label+="$(echo-style --error+bold "#$ordinal: [${DCA_PATHS_SHORT[$dca_review_index]}] REASON: ${INVALID_REASON[$status_pos]}")"
           }
           function make_successful_label() {
-            review_label+="$(echo-style --success+bold "#$ordinal: [$(get_dca_short_path "$dca_review_index")]")"
+            review_label+="$(echo-style --success+bold "#$ordinal: [${DCA_PATHS_SHORT[$dca_review_index]}]")"
           }
           status_pos="$(get_status_pos_from_dca_index "$dca_review_index")"
           if [[ "$reviewing" == 'both' ]]; then
@@ -1906,9 +1859,9 @@ function command_aliases() (
         DCA_VALUES+=("$value")
         DCA_DESCS+=("$new_alias_desc")
         DCA_ARGS+=("")
-        local last=$(("${#DCA_NAMES[@]}" - 1))
 
-        update_secondary_data $(("${#DCA_NAMES[@]}" - 1))
+        local last=$(("${#DCA_NAMES[@]}" - 1))
+        update_secondary_data "$last"
 
         if [[ "$option_parsing_verbose" == 'yes' ]]; then
           log_during_parsing
@@ -1921,6 +1874,9 @@ function command_aliases() (
       mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
 
       # PERF: Shouldnt I be able to parse all func bodies in one go??
+      #
+      # >> In _doc_helper we wanted the correct order that functions are
+      # defined in but here that does not matter so we could just bulk parse.
 
       for new_alias_name in "${function_names[@]}"; do
         local body body_trimmed #new_alias_name
@@ -1948,7 +1904,10 @@ function command_aliases() (
         DCA_VALUES+=("$body_trimmed")
         DCA_DESCS+=("")
         DCA_ARGS+=("'${arguments[@]}'")
-        update_secondary_data $(("${#DCA_NAMES[@]}" - 1))
+
+
+        local last=$(("${#DCA_NAMES[@]}" - 1))
+        update_secondary_data "$last"
 
         if [[ "$option_parsing_verbose" == 'yes' ]]; then
           log_during_parsing
