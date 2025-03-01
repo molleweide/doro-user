@@ -16,14 +16,17 @@
 # -----------------------------------------------------------------------------
 # IMPORTANT
 #
-# TODO: set the $INDEX variable everytime something is selected or being
-# worked on.
+# 1. review -> make selection -> set INDEX -> edit_* -> validate_ ->
+# | In act_create, we are always working with index 0, so it can be default.
+# | But in the review process, then the index is changing based on selection
+# | or current iteration in fix loop, therefore this value has to be set.
 #
-# 1. mv [compute_naming_collisions] into handle_validate
-# 2. make selection -> set INDEX -> edit_* -> validate_ ->
+# TODO: __trigger_event: return false on cancel (empty string answer.)
+# TODO: Ensure data arrays are always reset/populated before `getting`.
+# TODO: Then, migrate to using the INDEX for getting everywhere.
 #
 # TODO: populate all new data arrays and use the $INDEX var to "get" data.
-# -> [update_additional_array_data]
+# -> [update_dependent_data_arrays]
 #
 # TODO: ( ) do_review_post -> confirm: default put new DCAs in testing dir.
 #
@@ -177,11 +180,8 @@ function command_aliases() (
 	# ---------------------------------
 	# data containers
 
-	# NOTE: sketching out state data sturcture. avoiding assoc arrays in order
-	# to be v3 compat.
-
 	# NOTE: Current selection index used to obtain data
-	local INDEX # Get any DCA data by eg. name="${DCA_NAMES[INDEX]}"
+	local INDEX=0 # Get any DCA data by eg. name="${DCA_NAMES[INDEX]}"
 
 	# --------------------------------------------
 	#
@@ -703,10 +703,24 @@ function command_aliases() (
 		remove_array_index "INVALID_CORRECTION_FUNC" "$index"
 	}
 
-	function update_additional_array_data {
-		local DCA_DIRS=()        #
-		local DCA_PATHS=()       #
-		local DCA_PATHS_SHORT=() # Only used for displaying
+	# TODO: During parsing this will be done in a loop without INDEX. Therefore
+	# this func needs to take an optional arg
+	function update_dependent_data_arrays {
+	  :
+		# if [[ $# -ne 0 ]]; then
+		# 	# supplied index
+		# 	# local index=${1-0} c=''
+		# 	make_dca_dir "$1"
+		# 	make_dca_path "$1"
+		# 	make_dca_path_short "$1"
+		# 	make_contents "$1"
+		# else
+		# 	# use INDEX
+		# 	make_dca_dir
+		# 	make_dca_path
+		# 	make_dca_path_short
+		# 	make_contents
+		# fi
 	}
 
 	# =======================================================
@@ -767,7 +781,7 @@ function command_aliases() (
 
 	# =======================================================
 	# =======================================================
-	# DCA INDEX HELPERS
+	# DCA HELPERS
 	#
 
 	# DCA index -> failure position
@@ -887,8 +901,10 @@ function command_aliases() (
 		fi
 	}
 
+	# This function is named in past tense since the evaluation of internal
+	# collitions always is made before validation. See "EDIT_NAME_FINISHED".
 	# input: dca index -> bool
-	function __parsed_name_is_unique() {
+	function __parsed_name_was_unique() {
 		if [[ -n "${NAMES_COLLISION_MAP[${1-0}]}" ]]; then return 1; fi
 	}
 
@@ -944,7 +960,7 @@ function command_aliases() (
 			failure='yes'
 			failure_part_redo_func='edit_name'
 			reason="Name [$name] already exists in path. ('which $name' -> $(which "$name"))"
-		elif ! __parsed_name_is_unique "$vi"; then
+		elif ! __parsed_name_was_unique "$vi"; then
 			failure='yes'
 			failure_part_redo_func='edit_name'
 			reason="Parsed naming collision for name [$name]"
@@ -984,7 +1000,7 @@ function command_aliases() (
 	}
 
 	function validate_single_simple() {
-		# if ! name_has_uppercase "$1" && name_has_valid_chars "$1" && name_is_unique_in_path "$1" && __parsed_name_is_unique "$1"; then
+		# if ! name_has_uppercase "$1" && name_has_valid_chars "$1" && name_is_unique_in_path "$1" && __parsed_name_was_unique "$1"; then
 		# 	return 0
 		# fi
 		# echo "validate_single_simple | input: $1"
@@ -1027,7 +1043,10 @@ function command_aliases() (
 	function get_number_of_collisions {
 		local index="${1-0}" count=0
 		local count_map_idx="${NAMES_COLLISION_MAP[index]}"
-		local count_map_str="${NAMES_COLLISION_COUNT_MAP[count_map_idx]}"
+
+		[[ -z "$count_map_idx" ]] && __print_string $count && return
+
+		local count_map_str="${NAMES_COLLISION_COUNT_MAP[$count_map_idx]}"
 
 		IFS=':' read -r -a arr_split <<<"$count_map_str"
 		last=$((${#arr_split[@]} - 1))
@@ -1231,14 +1250,17 @@ function command_aliases() (
 		fi
 		answer="$(ask --linger --default="$current_value" "$label")"
 
+		# TODO: now that we migrate to using the INDEX var, then just update the
+		# DCA_NAMES[INDEX] instead.
 		EDIT_ANSWER="$answer"
 
-		trigger_event "EDIT_NAME_FINISHED" "$index"
+		__trigger_event "EDIT_NAME_FINISHED" "$index"
 
 		# FIX: it annoys me that i need
 		# ~ set the answer to a global shared variable
 		#
 
+		# TODO: instead, __trigger_event could return false upon cancel,
 		if [[ -z "$answer" ]]; then
 			return 1
 		fi
@@ -1286,7 +1308,7 @@ function command_aliases() (
 	# =======================================================
 	# EVENTS
 
-	function trigger_event {
+	function __trigger_event {
 		local event=${1-} index
 
 		if [[ $# -eq 0 ]]; then
@@ -1295,15 +1317,27 @@ function command_aliases() (
 		shift
 
 		case "$event" in
+		"EDIT_PRE") ;;
 		"EDIT_NAME_FINISHED")
 			index="${1-}"
+
 			[[ -z "$EDIT_ANSWER" ]] && return
-			if __name_is_unique "$index"; then
+
+			# only need to do this if there actually was a collision.
+			# [[ ]]
+			if ! __parsed_name_was_unique && __name_is_unique "$index"; then
 				remove_collision "$index"
 			fi
+
+			# local DCA_DIRS=()        #
+			# local DCA_PATHS=()       #
+			# local DCA_PATHS_SHORT=() # Only used for displaying
+
 			DCA_NAMES[index]="$EDIT_ANSWER"
+
 			build_contents
 			;;
+		"REVIEW_PRE") ;;
 		*)
 			logger "ERROR: Un recognized event name."
 			;;
@@ -1376,7 +1410,7 @@ function command_aliases() (
 	# CREATE
 
 	function act_create() {
-		local sub_path='' ask_prefix="ALIASES CREATE"
+		local sub_path='' ask_prefix="ALIASES CREATE" prompt_confirm_or_edit
 		reset_all
 		# could these be replaced by the update funcs, and use some kind of default mode?
 		DCA_IS_FUNC+=('no')
@@ -1404,10 +1438,11 @@ function command_aliases() (
 			DCA_GROUPS+=("")
 		fi
 		build_contents
-		local confirm_or_edit
+		update_dependent_data_arrays
+
 		while :; do
-			confirm_or_edit="Go ahead create alias at [$(get_dca_short_path)] OR edit alias?"$'\n'"$(log_single_content)"
-			if ! confirm --ppid=$$ --positive -- "$confirm_or_edit"; then
+			prompt_confirm_or_edit="Go ahead create alias at [$(get_dca_short_path)] OR edit alias?"$'\n'"$(log_single_content)"
+			if ! confirm --ppid=$$ --positive -- "$prompt_confirm_or_edit"; then
 				# todo: move title definition into the choose command
 				local redo_func redo_options=() title="$AX_UI_PREFIX Select which part to edit:"
 				redo_options+=(edit_name "Name (${DCA_NAMES[0]})")
@@ -1420,28 +1455,27 @@ function command_aliases() (
 				break
 			fi
 		done
-		# compute_naming_collisions
-		update_additional_array_data
+
 		local failure_redo_func status
 		while :; do
 			eval_capture --statusvar=status -- validate_all
-
-			echo "validate status = $status"
-
 			if [[ "$status" -ne 0 ]]; then
 				local label
 				label="[$status] Creating alias [$(get_dca_short_path)] failed with reason:"
 				label+=$'\n'"REASON: ${INVALID_REASON[0]}"
 				label+=$'\n'"Do you want to re-edit failing part?"
 				if confirm --ppid=$$ --positive -- "$label"; then
-					failure_redo_func="${INVALID_CORRECTION_FUNC[0]}"
-					if [[ -n "$failure_redo_func" && "$failure_redo_func" == "none" ]]; then
-						echo-style --error "CREATE | Could not create alias [$(get_dca_short_path)]. No re-edit func exists for failure. (todo: ignore/discard?)"
-					fi
-					"$failure_redo_func"
+					# failure_redo_func="${INVALID_CORRECTION_FUNC[0]}"
+					# if [[ -n "$failure_redo_func" && "$failure_redo_func" == "none" ]]; then
+					# 	echo-style --error "CREATE | Could not create alias [$(get_dca_short_path)]. No re-edit func exists for failure. (todo: ignore/discard?)"
+					# fi
+					# "$failure_redo_func"
+					"${INVALID_CORRECTION_FUNC[0]}"
 					reset_status_arrays
-					# compute_naming_collisions
-					update_additional_array_data
+
+					# TODO: move this into EDIT_NAME_FINISHED
+					update_dependent_data_arrays
+
 				fi
 			else
 				create_dca_files
@@ -1621,8 +1655,6 @@ function command_aliases() (
 			current_was_failure_initially='no' \
 			_selected_review_index
 
-		local REVIEW_SELECTED_DCA_INDEX # Use the INDEX var here instead
-
 		local REVIEW_SELECTED_FAILURE_INDEX
 
 		local proceed_with_successful='no'
@@ -1644,14 +1676,14 @@ function command_aliases() (
 			while [[ "$update_validated" == "no" ]]; do
 				# on cancel return and exit choose/ask loops below
 
-				if ! edit_name "$REVIEW_SELECTED_DCA_INDEX"; then
+				if ! edit_name "$INDEX"; then
 					proceed_with_successful='yes'
 					return 1
 				fi
 
-				# TODO: below could go into [trigger_event "edit_finished" ]
+				# TODO: below could go into [__trigger_event "edit_finished" ]
 
-				if validate_single_simple "$REVIEW_SELECTED_DCA_INDEX"; then
+				if validate_single_simple "$INDEX"; then
 					update_validated='yes'
 
 					# updating the name, it will only pass the collision system
@@ -1663,7 +1695,7 @@ function command_aliases() (
 					if [[ "$current_was_failure_initially" == 'yes' ]]; then
 						# Only if a failure was rectified,
 						trim_failure_arrays "$REVIEW_SELECTED_FAILURE_INDEX"
-						success_pos_add "$REVIEW_SELECTED_DCA_INDEX"
+						success_pos_add "$INDEX"
 					fi
 				fi
 			done
@@ -1674,25 +1706,25 @@ function command_aliases() (
 			if [[ "$reviewing" == 'failures' ]]; then
 				# echo "apply:failures"
 				current_was_failure_initially='yes'
-				REVIEW_SELECTED_DCA_INDEX="${REVIEW_ARRAY[$_selected_review_index]}"
+				INDEX="${REVIEW_ARRAY[$_selected_review_index]}"
 				REVIEW_SELECTED_FAILURE_INDEX="$_selected_review_index" # "$(get_failure_pos_from_dca_index "$_selected_review_index")"
 
 			elif [[ "$reviewing" == 'both' ]] && is_failure "$_selected_review_index"; then
 				# echo "apply:both"
 				current_was_failure_initially='yes'
-				REVIEW_SELECTED_DCA_INDEX="$_selected_review_index"
+				INDEX="$_selected_review_index"
 				REVIEW_SELECTED_FAILURE_INDEX="$(get_failure_pos_from_dca_index "$_selected_review_index")"
 
 			else
 				# echo "apply:else"
 				current_was_failure_initially='no'
 				if [[ "$reviewing" == 'successful' ]]; then
-					REVIEW_SELECTED_DCA_INDEX="$(get_dca_index_from_success_pos "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
+					INDEX="$(get_dca_index_from_success_pos "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
 				else
-					REVIEW_SELECTED_DCA_INDEX="$_selected_review_index" #"$(get_success_pos_from_dca_index "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
+					INDEX="$_selected_review_index" #"$(get_success_pos_from_dca_index "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
 				fi
 			fi
-			# echo "dcai $REVIEW_SELECTED_DCA_INDEX | sfix $REVIEW_SELECTED_FAILURE_INDEX"
+			# echo "dcai $INDEX | sfix $REVIEW_SELECTED_FAILURE_INDEX"
 		}
 
 		#
@@ -1793,7 +1825,7 @@ function command_aliases() (
 				# echo
 
 				# echo "sel pos = $REVIEW_SELECTED_FAILURE_INDEX"
-				# echo "sel val = $REVIEW_SELECTED_DCA_INDEX"
+				# echo "sel val = $INDEX"
 
 				# TODO: if false then [do_review_post]
 				! __review__handle_edit && break
@@ -1836,8 +1868,11 @@ function command_aliases() (
 				DCA_DESCS+=("$new_alias_desc")
 				DCA_ARGS+=("")
 				local last=$(("${#DCA_NAMES[@]}" - 1))
+
+				# TODO: let update_dependent_data_arrays handle build contents
 				build_contents "$last"
-				update_additional_array_data
+				update_dependent_data_arrays
+
 				if [[ "$option_parsing_verbose" == 'yes' ]]; then
 					log_during_parsing
 				fi
@@ -1847,6 +1882,9 @@ function command_aliases() (
 		function parse_posix__collect_functions {
 			local new_alias_name function_names=()
 			mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
+
+			# PERF: Shouldnt I be able to parse all func bodies in one go??
+
 			for new_alias_name in "${function_names[@]}"; do
 				local body body_trimmed #new_alias_name
 				body="$(bash -c 'source '"$input_file"'; declare -f '"$new_alias_name")"
@@ -1874,8 +1912,11 @@ function command_aliases() (
 				DCA_DESCS+=("")
 				DCA_ARGS+=("'${arguments[@]}'")
 				local last=$(("${#DCA_NAMES[@]}" - 1))
+
+				# TODO: let update_dependent_data_arrays handle build contents
 				build_contents "$last"
-				update_additional_array_data
+				update_dependent_data_arrays
+
 				if [[ "$option_parsing_verbose" == 'yes' ]]; then
 					log_during_parsing
 				fi
