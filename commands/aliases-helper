@@ -12,7 +12,11 @@
 # -----------------------------------------------------------------------------
 # IMPORTANT
 #
+# TODO: set the $INDEX variable everytime something is selected or being
+# worked on.
+#
 # TODO: populate all new data arrays and use the $INDEX var to "get" data.
+# -> [update_additional_array_data]
 #
 # TEST: add my own aliases w/--test
 # TEST: add my own aliases w/--evaluate
@@ -23,6 +27,8 @@
 # TODO: review_post
 #       -> on empty -> run choose menu to update any component.
 #           >>> reuse choose menu from act_create
+#
+# TODO: review choose title -> show type [regular|dummy|evaluate]
 #
 # TODO: ( ) ask: prefix alias with exec?
 #
@@ -688,6 +694,12 @@ function command_aliases() (
     remove_array_index "INVALID_CORRECTION_FUNC" "$index"
   }
 
+  function update_additional_array_data {
+    local DCA_DIRS=()        #
+    local DCA_PATHS=()       #
+    local DCA_PATHS_SHORT=() # Only used for displaying
+  }
+
   # =======================================================
   # =======================================================
   # GETTERS
@@ -697,6 +709,7 @@ function command_aliases() (
     find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
   }
 
+  # TODO: move this into "update_array_data"
   function get_dca_sub_dir_target() {
     local index="${1-0}" pre=$USER_COMMAND_ALIASES_DIR sub_path
     if [[ "$option_evaluate" == 'yes' ]]; then
@@ -939,11 +952,13 @@ function command_aliases() (
         INVALID_CORRECTION_FUNC+=("$failure_part_redo_func")
       else
         # echo "<[ASSIGN TEMP FAILURE]>"
+        DCA_IS_VALID[$vi]='no'
         TEMP_FAILURE_REASON="$reason"
         TEMP_FAILURE_CORRECTION_FUNC="$failure_part_redo_func"
       fi
     else
       SUCCESS_POSITIONS+=("$vi")
+      DCA_IS_VALID[$vi]='yes'
       if [[ "$option_parsing_verbose" == 'yes' ]]; then
         echo-style --success "Successfully validated alias [$(get_dca_short_path "$vi")]"
       fi
@@ -963,7 +978,7 @@ function command_aliases() (
     # if ! name_has_uppercase "$1" && name_has_valid_chars "$1" && name_is_unique_in_path "$1" && __parsed_name_is_unique "$1"; then
     # 	return 0
     # fi
-    echo "validate_single_simple | input: $1"
+    # echo "validate_single_simple | input: $1"
     if ! handle_validate --temp "$1"; then
       return 1
     fi
@@ -1392,6 +1407,7 @@ function command_aliases() (
       fi
     done
     check_name_collisions
+    update_additional_array_data
     local failure_redo_func status
     while :; do
       eval_capture --statusvar=status -- validate_all
@@ -1411,6 +1427,7 @@ function command_aliases() (
           "$failure_redo_func"
           reset_status_arrays
           check_name_collisions
+          update_additional_array_data
         fi
       else
         create_dca_files
@@ -1805,6 +1822,7 @@ function command_aliases() (
         DCA_ARGS+=("")
         local last=$(("${#DCA_NAMES[@]}" - 1))
         build_contents "$last"
+        update_additional_array_data
         if [[ "$option_parsing_verbose" == 'yes' ]]; then
           log_during_parsing
         fi
@@ -1842,6 +1860,7 @@ function command_aliases() (
         DCA_ARGS+=("'${arguments[@]}'")
         local last=$(("${#DCA_NAMES[@]}" - 1))
         build_contents "$last"
+        update_additional_array_data
         if [[ "$option_parsing_verbose" == 'yes' ]]; then
           log_during_parsing
         fi
