@@ -21,9 +21,12 @@
 # | But in the review process, then the index is changing based on selection
 # | or current iteration in fix loop, therefore this value has to be set.
 #
-# TODO: __trigger_event: return false on cancel (empty string answer.)
-# TODO: Ensure data arrays are always reset/populated before `getting`.
-# TODO: Then, migrate to using the INDEX for getting everywhere.
+# TODO: ( ) __trigger_event: return false on cancel (empty string answer.)
+# >> set new name inside __trigger_event
+#
+# TODO: ( ) Ensure data arrays are always reset/populated before `getting`.
+#
+# TODO: ( ) Then, migrate to using the INDEX for getting everywhere.
 #
 # TODO: populate all new data arrays and use the $INDEX var to "get" data.
 # -> [update_dependent_data_arrays]
@@ -706,21 +709,19 @@ function command_aliases() (
 	# TODO: During parsing this will be done in a loop without INDEX. Therefore
 	# this func needs to take an optional arg
 	function update_dependent_data_arrays {
-	  :
-		# if [[ $# -ne 0 ]]; then
-		# 	# supplied index
-		# 	# local index=${1-0} c=''
-		# 	make_dca_dir "$1"
-		# 	make_dca_path "$1"
-		# 	make_dca_path_short "$1"
-		# 	make_contents "$1"
-		# else
-		# 	# use INDEX
-		# 	make_dca_dir
-		# 	make_dca_path
-		# 	make_dca_path_short
-		# 	make_contents
-		# fi
+		if [[ $# -ne 0 ]]; then
+			# supplied index
+			# make_dca_dir "$1"
+			# make_dca_path "$1"
+			# make_dca_path_short "$1"
+			make_contents "$1"
+		else
+			# use INDEX
+			# make_dca_dir
+			# make_dca_path
+			# make_dca_path_short
+			make_contents
+		fi
 	}
 
 	# =======================================================
@@ -1165,7 +1166,7 @@ function command_aliases() (
 	# =======================================================
 	#
 
-	function build_contents() {
+	function make_contents() {
 		local index=${1-0} c=''
 		c+="$SHEBANG_BASH"
 		c+=$'\n'"# Name: ${DCA_NAMES[$index]}"
@@ -1265,19 +1266,19 @@ function command_aliases() (
 			return 1
 		fi
 		# DCA_NAMES[index]="$answer"
-		# build_contents
+		# make_contents
 	}
 
 	function edit_value() {
 		local index=${1-0}
 		DCA_VALUES[index]="$(ask --linger "$AX_UI_PREFIX Edit command value (index: $index):")"
-		build_contents
+		make_contents
 	}
 
 	function edit_desc() {
 		local index=${1-0}
 		DCA_DESCS[index]="$(ask --linger "$AX_UI_PREFIX Edit new alias description (index: $index):")"
-		build_contents
+		make_contents
 	}
 
 	function edit_sub_path() {
@@ -1300,7 +1301,7 @@ function command_aliases() (
 			fi
 		done
 		DCA_GROUPS[index]="$sub_path"
-		build_contents
+		make_contents
 	}
 
 	# =======================================================
@@ -1335,7 +1336,7 @@ function command_aliases() (
 
 			DCA_NAMES[index]="$EDIT_ANSWER"
 
-			build_contents
+			make_contents
 			;;
 		"REVIEW_PRE") ;;
 		*)
@@ -1437,7 +1438,7 @@ function command_aliases() (
 		else
 			DCA_GROUPS+=("")
 		fi
-		build_contents
+		# make_contents
 		update_dependent_data_arrays
 
 		while :; do
@@ -1869,9 +1870,7 @@ function command_aliases() (
 				DCA_ARGS+=("")
 				local last=$(("${#DCA_NAMES[@]}" - 1))
 
-				# TODO: let update_dependent_data_arrays handle build contents
-				build_contents "$last"
-				update_dependent_data_arrays
+				update_dependent_data_arrays $(("${#DCA_NAMES[@]}" - 1))
 
 				if [[ "$option_parsing_verbose" == 'yes' ]]; then
 					log_during_parsing
@@ -1911,11 +1910,7 @@ function command_aliases() (
 				DCA_VALUES+=("$body_trimmed")
 				DCA_DESCS+=("")
 				DCA_ARGS+=("'${arguments[@]}'")
-				local last=$(("${#DCA_NAMES[@]}" - 1))
-
-				# TODO: let update_dependent_data_arrays handle build contents
-				build_contents "$last"
-				update_dependent_data_arrays
+				update_dependent_data_arrays $(("${#DCA_NAMES[@]}" - 1))
 
 				if [[ "$option_parsing_verbose" == 'yes' ]]; then
 					log_during_parsing
