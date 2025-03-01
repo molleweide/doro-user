@@ -750,16 +750,11 @@ function command_aliases() (
   # During parsing, this func requires an index to be supplied so that the
   # last index can be generated on each loop.
   function update_secondary_data {
-    local index
-
-    if [[ -n "${1-}" ]]; then
-      index=$1
-    fi
-
-    make_dca_dir "$1"
-    make_dca_path "$1"
-    make_dca_path_short "$1"
-    make_contents "$1"
+    local index="${1-INDEX}"
+    make_dca_dir "$INDEX"
+    make_dca_path "$INDEX"
+    make_dca_path_short "$INDEX"
+    make_contents "$INDEX"
   }
 
   # =======================================================
@@ -1369,6 +1364,7 @@ function command_aliases() (
 
       DCA_NAMES[index]="$new_name"
 
+      # remove usage of index here later
       update_secondary_data "$index"
       ;;
     # "REVIEW_PRE") ;;
@@ -1480,11 +1476,16 @@ function command_aliases() (
       if ! confirm --ppid=$$ --positive -- "$prompt_confirm_or_edit"; then
         # todo: move title definition into the choose command
         local redo_func redo_options=() title="$AX_UI_PREFIX Select which part to edit:"
-        redo_options+=(edit_name "Name (${DCA_NAMES[0]})")
-        redo_options+=(edit_value "Value (${DCA_VALUES[0]})")
-        redo_options+=(edit_sub_path "Sub group name (${DCA_GROUPS[0]})")
-        redo_options+=(edit_desc "Description (${DCA_DESCS[0]})")
+        redo_options+=(edit_name "Name (${DCA_NAMES[INDEX]})")
+        redo_options+=(edit_value "Value (${DCA_VALUES[INDEX]})")
+        redo_options+=(edit_sub_path "Sub group name (${DCA_GROUPS[INDEX]})")
+        redo_options+=(edit_desc "Description (${DCA_DESCS[INDEX]})")
         redo_func="$(choose "$title" --label -- "${redo_options[@]}")"
+
+        # FIX: This handles failure after edit_* finish, but I dont quite like having
+        # to put it here and also having the validation call below..
+        eval_capture --statusvar=status -- validate_all
+
         "$redo_func"
       else
         break
