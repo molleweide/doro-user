@@ -1,20 +1,9 @@
 
-    # `v` / `vh` / `vdock`
-
-# test delete later
-
-
-# alias vi='vim'
-# alias nv='nvim'
-
 #-----------------------------
 #---       VIM STUFF       ---
 #-----------------------------
 
-# RUN VIM
-
-# Use neovim for vim if present.
-[ -x "$(command -v nvim)" ] && alias vim="nvim" vimdiff="nvim -d"
+# TODO: migrate to DCA
 
 # versions managed by bob
 alias v="nvim" # "CC=gcc-12 nvim"

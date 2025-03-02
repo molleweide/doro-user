@@ -2,6 +2,11 @@
 
 # NOTE: rename this file to zsh-plugins, because it deals with adding
 # plugins to the zsh.
+#
+# TODO: https://github.com/ohmyzsh/ohmyzsh/wiki/Plugins
+# |------
+# | - ( ) check out nice plugins
+# | - ( ) copy git plugin and try migrating.
 
 # FIX: Many of these things should be made compatible with multiple shells
 # so that I can use all of th aliases from any shell.

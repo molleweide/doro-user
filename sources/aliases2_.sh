@@ -11,6 +11,7 @@ function ars() {
 
 alias x="echo"
 
+
 function xxee() {
 	echo "$@"
 }

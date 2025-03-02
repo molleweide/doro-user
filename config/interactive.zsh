@@ -29,6 +29,12 @@ for f in "$DOROTHY/user/sources/"*.zsh; do
   # else
   #     source "$f"
   # fi
+  if [[ "$f" == *"_.zsh" ]]; then
+    #   :
+    # else
+    #     source "$f"
+    continue
+  fi
   source "$f"
 done
 

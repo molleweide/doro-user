@@ -1,26 +1,14 @@
-# reload aliases
-function reload_aliases() {
-  echo "[RELOADING SHELL]"
+# reload shell
+function rl() {
   source "$DOROTHY/sources/environment.sh"
   source "$DOROTHY/sources/interactive.sh"
-  # source "$DOROTHY/user/sources/aliases.sh"
-  # source "$DOROTHY/user/sources/nvim.sh"
-  # source $DOROTHY/user/sources/asdf.bash
-  # source $XDG_CONFIG_HOME/dorothy/sources/aliases.sh
-  # source $XDG_CONFIG_HOME/dorothy/sources/nvim.sh
 }
-alias ralias="reload_aliases"
-alias rl="reload_aliases"
-
-alias il="zsh -il"
-
-# TEST: -----
 
 # =======================================================
 # shell switching
 #
 
-alias b="bash"
+alias b="b"
 alias bi="bash -i"
 alias bil="bash -il"
 alias xb="exec bash"
@@ -29,11 +17,9 @@ alias xbil="exec bash -il"
 
 alias zi="zsh -i"
 alias zil="zsh -il"
-alias xz="exec zsh"
+alias ez="exez zsh"
 alias xzi="exec zsh -i"
 alias xzil="exec zsh -il"
-
-
 
 # function oz() {
 #   source "$DOROTHY/themes/oz"
@@ -124,23 +110,20 @@ alias k="clear"
 alias mm="man man"
 alias tt="ttyper"
 # alias dbm="rake db:migrate && RAILS_ENV=test rake db:migrate"
-alias j=z # I'm used to autojump 'j' vs fasd 'z'
-alias less="less -r"
+# alias j=z # I'm used to autojump 'j' vs fasd 'z'
+# alias less="less -r"
 # alias sketch="magick $1 \( -clone 0 -negate -blur 0x5 \) -compose colordodge -composite -modulate 100,0,100 -auto-level $2"
 # alias srync="rsync -vrazh"
 # alias emacs="TERM=xterm-24bit emacs -nw"
 alias cl="calcurse"
 alias ei="cointop"
-alias duu="diskutil"      # list commands
-alias dul="diskutil list" # list drives
-alias tst="testing-shell"
 alias ctgr="ctags -R"
 # # shortcuts
 # alias vi='vim'
 # alias nv='nvim'
 # alias afind='ack -il'
-alias md="mkdir -p"
-alias rd="rmdir"
+# alias md="mkdir -p"
+# alias rd="rmdir"
 # alias please=sudo
 alias po=popd
 alias pu=pushd
@@ -177,23 +160,23 @@ alias suc="setup-user-configs"
 #---       TILING       ---
 #--------------------------
 
+# reload macos yabai tiling
 function reload_tiling() {
   brew services restart yabai
   brew services restart skhd
   limelight # there is a wierd err msg but it works...
 }
 
-alias rtile="reload_tiling"
-
 #--------------------------
 #---       locate       ---
 #--------------------------
 
-# https://egeek.me/2020/04/18/enabling-locate-on-osx/
-if which glocate >/dev/null; then
-  alias locate="glocate -d $HOME/locatedb"
-fi
-alias loaddb="locatedb-load"
+# TODO: handle this one
+# # https://egeek.me/2020/04/18/enabling-locate-on-osx/
+# if which glocate >/dev/null; then
+#   alias locate="glocate -d $HOME/locatedb"
+# fi
+# alias loaddb="locatedb-load"
 
 #--------------------------------
 #---       SPREADSHEETS       ---
@@ -267,11 +250,9 @@ fgr() {
 # tmux configs
 # https://github.com/search?q=tmux+configuration
 
-# tm [SESSION_NAME | FUZZY PATTERN] - create new tmux session, or switch to existing one.
+# [SESSION_NAME | FUZZY PATTERN] - create new tmux session, or switch to existing one.
 # Running `tm` will let you fuzzy-find a session mame
 # Passing an argument to `ftm` will switch to that session if it exists or create it otherwise
-
-# tmux new session
 tns() {
   [[ -n "$TMUX" ]] && change="switch-client" || change="attach-session"
   if [ $1 ]; then
@@ -320,21 +301,24 @@ alias dkwp="docker-compose run --rm wpcli"
 
 alias fh="fff"
 alias fj="lf"
-alias fk="ranger"
+alias fk="ranger_"
 alias fn="nnn"
 
 # switch cwd on exit
-function ranger {
-  local IFS=$'\t\n'
-  local tempfile="$(mktemp -t tmp.XXXXXX)"
-  local ranger_cmd=(
+
+# ranger with some extras
+# - Q to exit to current dir in CLI.
+function ranger_ {
+  local IFS=$'\t\n' tempfile ranger_cmd
+  tempfile="$(mktemp -t tmp.XXXXXX)"
+  ranger_cmd=(
     command
     ranger
-    --cmd="map Q chain shell echo %d > "$tempfile"; quitall"
+    --cmd='map Q chain shell echo %d > '"$tempfile"'; quitall'
   )
 
-  ${ranger_cmd[@]} "$@"
-  if [[ -f "$tempfile" ]] && [[ "$(cat -- "$tempfile")" != "$(echo -n $(pwd))" ]]; then
+  "${ranger_cmd[@]}" "$@"
+  if [[ -f "$tempfile" ]] && [[ "$(cat -- "$tempfile")" != "$(echo -n "$(pwd)")" ]]; then
     cd -- "$(cat "$tempfile")" || return
   fi
   command rm -f -- "$tempfile" 2>/dev/null
@@ -382,8 +366,6 @@ fgb() {
     git checkout $(echo "$branch" | sed "s/.* //" | sed "s#remotes/[^/]*/##")
 }
 
-alias gs='git status -sb'
-alias gcfls="git conflicts"
 alias m="git checkout molleweide"
 alias M="git checkout molldev"
 alias gcreb="git add --all && git commit -m 'REBASE ME!!!'"
@@ -404,18 +386,18 @@ alias gbld="git for-each-ref --sort=committerdate refs/heads/ --format='%(color:
 #---       GITHUB       ---
 #-----------------------
 
-# add this to `ghm`
-alias ghfk="gh repo fork"
+alias ghfk="gh repo fork" # add this to `ghm`
+
 alias ghprdev="gh pr create --base develop"
 
-# todo: if not main then check for master..
-alias ghprmst="gh pr create --base master"
+alias ghprmst="gh pr create --base master" # ???
 
-# @param repo name
-# @param description
+# create public git repo
 function ghrc() {
   gh repo create $1 --public
 }
+
+# create puflic git repo
 function ghrcc() {
   gh repo create $1 --public -c
 }
@@ -465,20 +447,18 @@ alias krb="open -a /Applications/Karabiner-Elements.app"
 #--------------------------
 #---       KMONAD       ---
 #-------------------------
-
-kmonad=~/.local/bin/kmonad
-layouts=~/code/tools/kmonad/keymap/user/molleweide
-
-alias kmo="kmonad_run"
-alias kmor="kmo -r"
-
-# old
-kmopro() { sudo $kmonad $layouts/macbook_pro_2012.kbd; }
-kmoair() { sudo $kmonad $layouts/macbook_air_2021_m1.kbd; }
-kmoez() { sudo $kmonad $layouts/ergodox_ez.kbd; }
-kmoproT() { sudo $kmonad $layouts/macbook_pro_2012.kbd -l debug; }
-kmoairT() { sudo $kmonad $layouts/macbook_air_2021_m1.kbd -l debug; }
-kmoezT() { sudo $kmonad $layouts/ergodox_ez.kbd -l debug; }
+# DEPRECATED
+# kmonad=~/.local/bin/kmonad
+# layouts=~/code/tools/kmonad/keymap/user/molleweide
+# alias kmo="kmonad_run"
+# alias kmor="kmo -r"
+# # old
+# kmopro() { sudo $kmonad $layouts/macbook_pro_2012.kbd; }
+# kmoair() { sudo $kmonad $layouts/macbook_air_2021_m1.kbd; }
+# kmoez() { sudo $kmonad $layouts/ergodox_ez.kbd; }
+# kmoproT() { sudo $kmonad $layouts/macbook_pro_2012.kbd -l debug; }
+# kmoairT() { sudo $kmonad $layouts/macbook_air_2021_m1.kbd -l debug; }
+# kmoezT() { sudo $kmonad $layouts/ergodox_ez.kbd -l debug; }
 
 #-------------------------
 #---       MEDIA       ---
@@ -576,41 +556,46 @@ function opendir() {
 #---       ZSH ONLY       ---
 #----------------------------
 
-if [[ -n ${ZSH_VERSION-} ]]; then
-  alias -- -='cd -'
-  alias 1='cd -'
-  alias 2='cd -2'
-  alias 3='cd -3'
-  alias 4='cd -4'
-  alias 5='cd -5'
-  alias 6='cd -6'
-  alias 7='cd -7'
-  alias 8='cd -8'
-  alias 9='cd -9'
+# alias ..='cd ../..'
+# alias ...='cd ../../..'
+# alias ....='cd ../../../..'
+# alias .....='cd ../../../../..'
 
-  alias ..='cd ..'
-  alias -g ..2='../..'
-  alias -g ..3='../../..'
-  alias -g ..4='../../../..'
-  alias -g ..5='../../../../..'
-  alias -g ...='../..'
-  alias -g ....='../../..'
-  alias -g .....='../../../..'
-  alias -g ......='../../../../..'
-
-  # alias zshrc='$VISUAL "${ZDOTDIR:-$HOME}"/.zshrc'
-  alias reload='source "${ZDOTDIR:-$HOME}"/.zshrc'
-  alias zbench='export LAZY_PROMPT=false; for i in $(seq 1 10); do; /usr/bin/time zsh -i -c exit; done; unset LAZY_PROMPT'
-  alias zdot='cd $ZDOTDIR'
-
-  # zsh pipes
-  alias -g H='| head'
-  alias -g T='| tail'
-  alias -g G='| grep -E'
-  alias -g S='| sort'
-  alias -g L='| less'
-  alias -g M='| more'
-fi
+# if [[ -n ${ZSH_VERSION-} ]]; then
+#   alias -- -='cd -'
+#   alias 1='cd -'
+#   alias 2='cd -2'
+#   alias 3='cd -3'
+#   alias 4='cd -4'
+#   alias 5='cd -5'
+#   alias 6='cd -6'
+#   alias 7='cd -7'
+#   alias 8='cd -8'
+#   alias 9='cd -9'
+#
+#   alias ..='cd ..'
+#   alias -g ..2='../..'
+#   alias -g ..3='../../..'
+#   alias -g ..4='../../../..'
+#   alias -g ..5='../../../../..'
+#   alias -g ...='../..'
+#   alias -g ....='../../..'
+#   alias -g .....='../../../..'
+#   alias -g ......='../../../../..'
+#
+#   # alias zshrc='$VISUAL "${ZDOTDIR:-$HOME}"/.zshrc'
+#   alias reload='source "${ZDOTDIR:-$HOME}"/.zshrc'
+#   alias zbench='export LAZY_PROMPT=false; for i in $(seq 1 10); do; /usr/bin/time zsh -i -c exit; done; unset LAZY_PROMPT'
+#   alias zdot='cd $ZDOTDIR'
+#
+#   # zsh pipes
+#   alias -g H='| head'
+#   alias -g T='| tail'
+#   alias -g G='| grep -E'
+#   alias -g S='| sort'
+#   alias -g L='| less'
+#   alias -g M='| more'
+# fi
 
 # # mask built-ins with better defaults
 # # alias cp='cp -i'
@@ -621,9 +606,10 @@ fi
 # alias ping='ping -c 5'
 
 # be safe
-alias cpi='cp -i'
-alias mvi='mv -i'
-alias rmi='rm -i'
+# alias cpi='cp -i'
+# alias mvi='mv -i'
+# alias rmi='rm -i'
+
 # Verbosity and settings that you pretty much just always are going to want.
 # alias \
 # 	cp="cp -iv" \
@@ -635,9 +621,7 @@ alias rmi='rm -i'
 # 	yta="yt -x -f bestaudio/best" \
 # 	ffmpeg="ffmpeg -hide_banner"
 
-# # single character shortcuts - be sparing!
-# alias _='sudo'
-# alias c='clear'
+# single character shortcuts - be sparing!
 alias d='dirs -v | head -10'
 # alias v='vim'
 alias h='history'
@@ -840,32 +824,19 @@ alias speedtest="wget -O /dev/null http://speed.transip.nl/10mb.bin"
 #---       heroku       ---
 #-------------------------
 
-alias her="heroku"
-alias herl="heroku local web"
+alias hk="heroku"
+alias hkl="heroku local web"
 
-# https://www.golinuxcloud.com/linux-commands-cheat-sheet/
-
-#--------------------------------------------
-#---       CHECK SYSTEM INFORMATION       ---
-#--------------------------------------------
-
-# linux equivalents on macos
-if is-mac; then
-  # display free memory / linux `free` equiv https://superuser.com/questions/521681/what-is-the-mac-osx-equivalent-of-free-m
-  function freem() {
+# CHECK SYSTEM INFORMATION
+# display free memory / linux `free` equiv https://superuser.com/questions/521681/what-is-the-mac-osx-equivalent-of-free-m
+# make equivalents for linux: dmidecode # lshw # hwinfo # lscpu # lspci # /proc/cpuinfo
+function freem() {
+  if is-mac; then
     echo $(($(sysctl -a | awk '/memsize/{print $2}') / 2 ** 30))
-  }
+  else
+    echo "freem only supported on macos.."
+  fi
+}
+#
 
-  # dmidecode
-
-  # lshw
-
-  # hwinfo
-
-  # lscpu
-
-  # lspci
-
-  # /proc/cpuinfo
-
-fi
+# fi

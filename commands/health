@@ -51,6 +51,9 @@ function health_() (
 
 
 	function act_diagnose_environment {
+	  # TODO: basically modify the `setup-environment-commands` to spit out
+	  # only the diff between [user] and [core]
+	  # TODO: Make a nice prompt
 	  :
 	}
 
