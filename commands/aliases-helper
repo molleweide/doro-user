@@ -20,11 +20,26 @@
 # https://github.com/difosschan/easy-sh-alias
 # https://github.com/cykerway/complete-alias
 #
-#
-#
+# HACK: (=) migrated my own aliases
+# - main file
+# - nvim
 
+# TODO: ( ) support cancelling input in all edit_* funcs
+#
 # TODO: ( ) post_review: go back to review | select which mode.
 # - change how the review mode is set -> use a type of [all/failures/successful] instead of multiple boolean option var
+# - choose menu
+#
+# FIX: ( ) opt-in: replace underscores in func names with hyphen?
+# FIX: ( ) opt-in: capture comment block above.
+#
+# FIX: ( ) review_post: create -> include failures.
+# in some cases you want to include custom overrides...
+# eg. my `ranger` alias which overrides the original `ranger` bin.
+#
+# TODO: ( ) support zsh
+# - modified parser ??
+# - add zsh shebang?
 #
 # NOTE:
 # (*) value -> rename to code
@@ -33,8 +48,6 @@
 # (x) desc -> needs to come before the code.
 #
 # -----------------------------------------------------------------------------
-#
-# TODO: ( ) support cancelling input in all edit_* funcs
 #
 # TODO: ( ) REVISE ALL BELOW TODOS
 #
@@ -51,33 +64,22 @@
 #
 # >>> review_mode=[failures|successful|both]
 #
-# FIX: ( ) review_post: create -> include failures.
-# in some cases you want to include custom overrides...
-# eg. my `ranger` alias which overrides the original `ranger` bin.
-#
 # TODO: review choose title -> show type [regular|dummy|evaluate]
 #
 # TODO: ( ) ask: prefix alias with exec?
 #
-# FIX: ( ) capture unquoted aliases, [alias x=abc # comment ...]
-#
-# FIX: ( ) opt-in: replace underscores in func names with hyphen?
-#
 # NOTE: Why not allow upper case chars??
 #
 # FIX: ( ) opt-in: auto convert aliases to lowercase?
-#
-# FIX: ( ) opt-in: capture comment block above.
 #
 # FIX: ( ) for migrating omz git stuff, i need to load the file with zsh instead of bash.
 # And use zsh funcs to spit out the alias names and funcs.
 #
 # TODO: ( ) on [create_dca_files] it seems to duplicate the print statements which
 # makes it seem like you made duplicate files but it does not.
+# ?????
 #
 # TODO: try using [echo-lines] for column formatting.
-#
-# TEST: on my real aliases
 #
 # PERF: obtain all fn bodies in bulk - works bc we dont care about order.
 #
@@ -199,7 +201,6 @@ function command_aliases() (
 	local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
 	local DCA_TEST_DIR_NAME="__testing"
 	local DCA_EVALUATE_DIR_NAME="__evaluate"
-	local SHEBANG_BASH="#!/usr/bin/env bash"
 	local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
 	local ALLOW_MAX_SUB_DIRS=2
 	local VALID_NAME_CHARS_PATTERN="a-zA-Z0-9_.-"
@@ -304,6 +305,8 @@ function command_aliases() (
 
 	# ---------------------------------
 	# supports
+
+	local SHEBANG_BASH="#!/usr/bin/env bash"
 
 	local supported=(
 		sh
@@ -463,8 +466,8 @@ function command_aliases() (
 						    dont garble your regularly used dcas with unwanted garbage.
 
 						--verbose
-						--review-verbose
-						--parsing-verbose
+						--verbose-parsing
+						--verbose-review
 						    Select which states of the migration process that should print the
 						    parsed contents to tty.
 
@@ -472,6 +475,10 @@ function command_aliases() (
 						--iterate
 						    Ignore reviewing newly created DCas via UI menu and directly enter
 						    a review process loop where you can fix or discard parsed DCAs.
+
+						--replace-underscores
+						    When converting functions to commands, take the function name
+						    and replace it with hyphens in the command name.
 
 						--rename-args (todo...)
 						    If a function is parsed, prompt to rename func args for better
@@ -542,10 +549,10 @@ function command_aliases() (
 		'--help' | '-h') help ;;
 		'--debug') option_debug='yes' ;;
 		# verbosity
-		'--no-review-verbose'* | '--review-verbose'*)
+		'--no-verbose-parsing'* | '--review-verbose'*)
 			option_review_verbose="$(get-flag-value --affirmative --fallback="$option_review_verbose" -- "$item")"
 			;;
-		'--parsing-verbose') option_parsing_verbose='yes' ;;
+		'--verbose-review') option_parsing_verbose='yes' ;;
 		'--verbose')
 			option_parsing_verbose='yes'
 			option_review_verbose='yes'
@@ -976,7 +983,7 @@ function command_aliases() (
 		for ((i = 0; i < "${#DCA_NAMES[@]}"; i++)); do
 			if [[ $index -eq $i ]]; then
 				continue
-			elif [[ "$EDIT_ANSWER" == "${DCA_NAMES[$i]}" ]]; then
+			elif [[ "$name" == "${DCA_NAMES[$i]}" ]]; then
 				return 1
 			fi
 		done

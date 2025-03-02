@@ -80,35 +80,50 @@ source "$ADOTDIR/antigen.zsh"
 # https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/git
 # source code: https://github.com/ohmyzsh/ohmyzsh/blob/master/plugins/git/git.plugin.zsh
 # patch alias to list all aliases.
+
+# TODO: migrate to DCA
 antigen bundle git
 
+# not using ...
 antigen bundle nvm
+
+# not using ...
 antigen bundle pyenv
+
+# not using...
 antigen bundle rvm
+
 # antigen bundle vi-mode
 # echo "zsh cache after bundle OMZ: $ZSH_CACHE_DIR"
 
 # NOTE: replace with https://github.com/Aloxaf/fzf-tab
 # antigen bundle dbalatero/fzf-git
+#
+# what is this???
 antigen bundle Aloxaf/fzf-tab
 
-# THIS IS SPECIFICALLY A ZSH PLUGIN
 # https://github.com/DarrinTisdale/zsh-aliases-exa
+#
+# move this to DCA?
 antigen bundle DarrinTisdale/zsh-aliases-exa
 
 # I HAVE NO IDEA WHAT THIS DOES..
 # antigen bundle chriskempson/base16-shell
 
+# TODO: look into what this is and migrate to DCA
 antigen bundle wookayin/fzf-fasd
 
 # antigen bundle rupa/z z.sh
 
+# ???
 antigen bundle twang817/zsh-ssh-agent
 
+# ??
 antigen bundle zsh-users/zsh-completions
 
 # antigen bundle zdharma/fast-syntax-highlighting
 
+# ??/
 antigen bundle hlissner/zsh-autopair
 
 # echo "zsh cache before antigen apply: $ZSH_CACHE_DIR"
