@@ -21,61 +21,12 @@ alias ez="exez zsh"
 alias xzi="exec zsh -i"
 alias xzil="exec zsh -il"
 
-# function oz() {
-#   source "$DOROTHY/themes/oz"
-#   echo "Load oz prompt"
-#   oztheme zsh "$last_command_exit_status"
-# }
-#
-# # set starship prompt
-# function ss() {
-#   echo "Load starshit prompt"
-#   eval "$(starship init zsh)"
-# }
-
-#------------------------
-#---       TODO       ---
-#------------------------
-
-# make alias XXX="arstqarstast" SNIPPET
-
-# https://github.com/alebcay/awesome-shell#command-line-productivity
-
-# -----------------------------
-# ---       exercises       ---
-# -----------------------------
-
-# https://duckduckgo.com/?q=linux+commandline+exercises+solutions&ia=web
-# https://innolitics.com/10x/lessons/core-tech/the-linux-command-line/
-# https://www.csc.fi/documents/200270/272439/Linux-command-line-exercises_Linux%2BCSC-Quick-Reference.pdf/0d3d1813-238a-4aed-a1e3-1a3d57a243f3
-# https://practity.com/lynux/
-
-#-------------------------------
-#---       inspiration       ---
-#-------------------------------
-
-# https://github.com/alebcay/awesome-shell#command-line-productivity
-# https://github.com/mavcunha/shell
-# https://github.com/asciimoo/ali
-# https://github.com/spencerwooo/dotfiles
-# https://github.com/rainchen/git-cmd-helpers
-# https://github.com/mcwoodle/shell-directory-management
-# https://github.com/japanese-goblinn/.dotfiles/tree/main/shell
-# https://github.com/difosschan/easy-sh-alias
-
-# https://github.com/cykerway/complete-alias
-
 #---------------------------
 #---       general       ---
 #---------------------------
 
 # # Use $XINITRC variable if file exists.
 # [ -f "$XINITRC" ] && alias startx="startx $XINITRC"
-
-# # sudo not required for some system commands
-# for command in mount umount sv pacman updatedb su ; do
-# 	alias $command="sudo $command"
-# done; unset command
 
 # # # Colorize commands when possible.
 # alias \
@@ -104,11 +55,10 @@ alias xzil="exec zsh -il"
 # 	xq="xbps-query" \
 # 	# z="zathura" # linux
 
-# alias xx="zsh -il"
-alias e="fg"
-alias k="clear"
+alias e="fg" # Resume background process
+alias k="clear" # Clear screen
 alias mm="man man"
-alias tt="ttyper"
+alias tt="ttyper" # Typing test
 # alias dbm="rake db:migrate && RAILS_ENV=test rake db:migrate"
 # alias j=z # I'm used to autojump 'j' vs fasd 'z'
 # alias less="less -r"
@@ -276,16 +226,8 @@ tks() {
     tmux kill-session -t "$session" || echo "No session found to delete."
 }
 
-# tm [window name | fuzzy pattern]
-# so that I can focus on building tmuxinator sessions, which I then can
-# search windows. sometimes there are many windows
-
-# ftw() {
-# }
-
 alias tm="tmux"
 alias tk="tmux kill-session"
-alias tn="tmuxinator"
 
 #---------------------------
 #---       dockers       ---
@@ -299,10 +241,10 @@ alias dkwp="docker-compose run --rm wpcli"
 #---       file browsers       ---
 #---------------------------------
 
-alias fh="fff"
-alias fj="lf"
-alias fk="ranger_"
-alias fn="nnn"
+alias fh="fff" # File browser
+alias fj="lf" # File browser
+alias fk="ranger_" # File browser custom func
+alias fn="nnn" # File browser
 
 # switch cwd on exit
 
@@ -416,7 +358,7 @@ alias ghh="ghq help"
 #---       COMMUNICATIONS       ---
 #----------------------------------
 
-alias sg="gurk" # signal
+alias sig="gurk" # signal
 # alias sg="gurk" # siggo has better support than gurk
 alias nt="neomutt" # email
 # tg for telegram is default..
@@ -622,7 +564,7 @@ function opendir() {
 # 	ffmpeg="ffmpeg -hide_banner"
 
 # single character shortcuts - be sparing!
-alias d='dirs -v | head -10'
+alias dr='dirs -v | head -10'
 # alias v='vim'
 alias h='history'
 

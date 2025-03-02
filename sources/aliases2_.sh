@@ -1,16 +1,20 @@
-alias x="echo"
-alias xy="echo"
+alias x="echo" # duarsnaste
+alias xy="echo" # nsetest
 
-alias nvim="echo"
-alias x="echo"
+alias nvim="echo" # after nvim
 
+alias x="echo" # after x
+
+# above a
 alias a="echo"
+
+# above ars
 function ars() {
 	echo "$@"
 }
 
+# above x
 alias x="echo"
-
 
 function xxee() {
 	echo "$@"

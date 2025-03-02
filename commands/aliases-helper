@@ -8,41 +8,33 @@
 # This command is compatible with [Bash version 4.0 or later]
 #
 #
-#
+# SOME LINKS AND RESOURCES
+# https://github.com/alebcay/awesome-shell#command-line-productivity
+# https://github.com/alebcay/awesome-shell#command-line-productivity
+# https://github.com/mavcunha/shell
+# https://github.com/asciimoo/ali
+# https://github.com/spencerwooo/dotfiles
+# https://github.com/rainchen/git-cmd-helpers
+# https://github.com/mcwoodle/shell-directory-management
+# https://github.com/japanese-goblinn/.dotfiles/tree/main/shell
+# https://github.com/difosschan/easy-sh-alias
+# https://github.com/cykerway/complete-alias
 #
 #
 #
 
-# BASH
-# alias [-p] [name[=value] ...]
-#        Alias with no arguments or with the -p option prints the list of aliases in the form alias name=value on standard output.  When
-#        arguments are supplied, an alias is defined for each name whose value is given.  A trailing space in value causes the next word
-#        to be checked for alias substitution when the alias is expanded.  For each name in the argument list for which no value is
-#        supplied, the name and value of the alias is printed.  Alias returns true unless a name is given for which no alias has been
-#        defined.
-
-# TODO: NEXT
-# 1. Ensure that migrating works properly. [testing/evaluate/regular]
-# 2. Migrate my existing aliases.
-#       [aliases migrate --review-all --verbose -- $DOROTHY/user/sources/aliases.sh]
-# 3. Migrate my ZSH plugins
-# 4. Begin working on `setup-fabric`
-
+# TODO: ( ) post_review: go back to review | select which mode.
+# - change how the review mode is set -> use a type of [all/failures/successful] instead of multiple boolean option var
+#
 # NOTE:
-# value -> rename to code
-# desc -> needs to come before the code.
+# (*) value -> rename to code
+#     (x) rename the data array
+#     ( ) update prompt texts
+# (x) desc -> needs to come before the code.
 #
-#
-#
-
 # -----------------------------------------------------------------------------
 #
-# TODO: on [create_dca_files] it seems to duplicate the print statements which
-# makes it seem like you made duplicate files but it does not.
-#
-# TODO: support cancelling input sub group for act_create
-#
-# TODO: [list] lists nothing??
+# TODO: ( ) support cancelling input in all edit_* funcs
 #
 # TODO: ( ) REVISE ALL BELOW TODOS
 #
@@ -59,7 +51,7 @@
 #
 # >>> review_mode=[failures|successful|both]
 #
-# FIX: review_post: create -> include failures.
+# FIX: ( ) review_post: create -> include failures.
 # in some cases you want to include custom overrides...
 # eg. my `ranger` alias which overrides the original `ranger` bin.
 #
@@ -71,9 +63,17 @@
 #
 # FIX: ( ) opt-in: replace underscores in func names with hyphen?
 #
+# NOTE: Why not allow upper case chars??
+#
 # FIX: ( ) opt-in: auto convert aliases to lowercase?
 #
 # FIX: ( ) opt-in: capture comment block above.
+#
+# FIX: ( ) for migrating omz git stuff, i need to load the file with zsh instead of bash.
+# And use zsh funcs to spit out the alias names and funcs.
+#
+# TODO: ( ) on [create_dca_files] it seems to duplicate the print statements which
+# makes it seem like you made duplicate files but it does not.
 #
 # TODO: try using [echo-lines] for column formatting.
 #
@@ -164,6 +164,8 @@
 
 # TODO: ( ) act_clean group
 # TODO: ( ) act_clean single
+#
+# TODO: prefix the shell of the source file when listing entries.
 
 # -------------------------------------------------------
 # PERFORMANCE
@@ -234,7 +236,7 @@ function command_aliases() (
 	local DCA_PATHS=()                 #
 	local DCA_PATHS_SHORT=()           # Only used for displaying
 	local DCA_PATHS_SHORT_FORMATTED=() # Used for choose entries
-	local DCA_VALUES=()                #
+	local DCA_CODE=()                #
 	local DCA_DESCS=()                 #
 	local DCA_ARGS=()                  #
 	local DCA_CONTENTS=()              # The code body of the new dca
@@ -707,7 +709,7 @@ function command_aliases() (
 		DCA_PATHS_SHORT=()
 		DCA_PATHS_SHORT_FORMATTED=()
 		DCA_CONTENTS=()
-		DCA_VALUES=()
+		DCA_CODE=()
 		DCA_DESCS=()
 		DCA_ARGS=()
 		DCA_IS_FUNC=()
@@ -800,9 +802,31 @@ function command_aliases() (
 		find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
 	}
 
-  # --alias | --fn
+	# --alias | --fn
 	function get_comment_block_above() {
-		:
+	  :
+		# # This is a sample script from ChatGPT.
+		#
+		# # Function to greet someone
+		# # Usage: greet <name>
+		# greet() {
+		# 	local name="$1"
+		# 	echo "Hello, $name!"
+		# }
+		#
+		# # Extract comment block above a function definition
+		# extract_comment() {
+		# 	local function_name="$1"
+		# 	awk -v func="$function_name" '
+		#   /^#/ { comments = comments "\n" $0; next }
+		#   $0 ~ "^" func "\\(" { print comments; exit }
+		#   { comments = "" }
+		#   ' "$0"
+		# }
+		#
+		# # Example usage:
+		# comment_block=$(extract_comment "greet")
+		# echo "$comment_block"
 	}
 
 	# =======================================================
@@ -1210,9 +1234,9 @@ function command_aliases() (
 		c+=$'\n'"# Desc: ${DCA_DESCS[$index]}"
 		if [[ "${DCA_IS_FUNC[$index]}" == 'yes' ]]; then
 			c+=$'\n'"# Args: ${DCA_ARGS[$index]}"
-			c+=$'\n'"${DCA_VALUES[$index]}"
+			c+=$'\n'"${DCA_CODE[$index]}"
 		else
-			c+=$'\n'"${DCA_VALUES[$index]}"
+			c+=$'\n'"${DCA_CODE[$index]}"
 			c+=' "$@"'
 		fi
 		DCA_CONTENTS[index]="$c"
@@ -1309,7 +1333,7 @@ function command_aliases() (
 		echo ""EDIT_VALUE": todo..."
 		return
 
-		DCA_VALUES[index]="$(ask --linger "$AX_UI_PREFIX Edit command value (index: $index):")"
+		DCA_CODE[index]="$(ask --linger "$AX_UI_PREFIX Edit command value (index: $index):")"
 		make_contents
 	}
 
@@ -1465,8 +1489,8 @@ function command_aliases() (
 		# could these be replaced by the update funcs, and use some kind of default mode?
 		DCA_IS_FUNC+=('no')
 		DCA_NAMES+=("$(ask --linger "$ask_prefix | 1. What will the NAME be?")")
-		DCA_VALUES+=("$(ask --linger "$ask_prefix | 2. What will the VALUE be?")")
 		DCA_DESCS+=("$(ask --linger "$ask_prefix | 3. What will the DESC be?")")
+		DCA_CODE+=("$(ask --linger "$ask_prefix | 2. What will the VALUE be?")")
 		if confirm --ppid=$$ --negative -- "$ask_prefix | 4. Put it in sub path, eg. [commands.aliases/<my>/<dir>]?"; then
 			sub_path="$(ask --linger "$ask_prefix | What will the SUB PATH be?")"
 			while :; do
@@ -1496,7 +1520,7 @@ function command_aliases() (
 				# todo: move title definition into the choose command
 				local redo_func redo_options=() title="$AX_UI_PREFIX Select which part to edit:"
 				redo_options+=(edit_name "Name (${DCA_NAMES[INDEX]})")
-				redo_options+=(edit_value "Value (${DCA_VALUES[INDEX]})")
+				redo_options+=(edit_value "Value (${DCA_CODE[INDEX]})")
 				redo_options+=(edit_sub_path "Sub group name (${DCA_GROUPS[INDEX]})")
 				redo_options+=(edit_desc "Description (${DCA_DESCS[INDEX]})")
 				redo_func="$(choose "$title" --label -- "${redo_options[@]}")"
@@ -1914,18 +1938,24 @@ function command_aliases() (
 					line_alias="${BASH_REMATCH[1]}"
 					new_alias_desc="${BASH_REMATCH[2]}"
 				fi
+
 				# handle split alias
+				# TODO: handle case where code `value` is not quoted.
 				if [[ "$line_alias" =~ alias\ ([^=]+)=\"(.*)\" ]]; then
 					new_alias_name="${BASH_REMATCH[1]}"
 					value="${BASH_REMATCH[2]}"
 				elif [[ "$line_alias" =~ alias\ ([^=]+)=\'(.*)\' ]]; then
 					new_alias_name="${BASH_REMATCH[1]}"
 					value="${BASH_REMATCH[2]}"
+				elif [[ "$line_alias" =~ alias\ ([^=]+)=(.*) ]]; then
+					new_alias_name="${BASH_REMATCH[1]}"
+					value="${BASH_REMATCH[2]}"
 				fi
+
 				DCA_IS_FUNC+=('no')
 				DCA_NAMES+=("$new_alias_name")
 				DCA_GROUPS+=("$option_migrate_to_subdir")
-				DCA_VALUES+=("$value")
+				DCA_CODE+=("$value")
 				DCA_DESCS+=("$new_alias_desc")
 				DCA_ARGS+=("")
 
@@ -1970,7 +2000,7 @@ function command_aliases() (
 				DCA_IS_FUNC+=('yes')
 				DCA_NAMES+=("$new_alias_name")
 				DCA_GROUPS+=("$option_migrate_to_subdir")
-				DCA_VALUES+=("$body_trimmed")
+				DCA_CODE+=("$body_trimmed")
 				DCA_DESCS+=("")
 				DCA_ARGS+=("'${arguments[@]}'")
 
