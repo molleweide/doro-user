@@ -52,6 +52,9 @@ function echo_comment_blocks() (
 
 			--function=<name>
 
+			--output-multiline
+			    Output each comment block as a multiline string.
+
 		EOF
     if [[ $# -ne 0 ]]; then
       echo-error "$@"
@@ -78,13 +81,34 @@ function echo_comment_blocks() (
     esac
   done
 
-  local capture_comment_lines_pattern='/^#/ { comments = comments "\n" $0; next }' # Collect comment lines
+  # =======================================================
+  # FUNCTION DEFINITIONS BY LANG
+  # =======================================================
 
-  local find_func_defs_pattern='/^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/'
+  local BASH_COMMENT_REGEX='/^#/'
 
-  local func_def_regex='/^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/'
+  # =======================================================
+  # FUNCTION DEFINITIONS BY LANG
+  # =======================================================
 
-  local func_def_action="$func_def_regex"' {
+  local BASH_FUNCTION_DEFINITIONS_REGEX='/^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/'
+  # local zsh
+  # local fish
+  # local nu
+
+  # =======================================================
+  # =======================================================
+  # =======================================================
+  #
+  # TODO: print each comment block as a multiline string
+
+  local CAPTURE_COMMENT_LINES_ACTION='{ comments = comments "\n" $0; next }'
+  local CAPTURE_COMMENT_MULTILINE_ACTION=' { comments = comments "\n" substr($0, 3); next }' # Collect comment lines, remove "# "
+
+  # local capture_comment_lines_pattern="$BASH_COMMENT_REGEX $CAPTURE_COMMENT_LINES_ACTION"
+  local capture_comment_lines_pattern="$BASH_COMMENT_REGEX $CAPTURE_COMMENT_MULTILINE_ACTION"
+
+  local func_def_action="$BASH_FUNCTION_DEFINITIONS_REGEX"' {
         func_name = $0;                                             # Extract function name
         sub(/^function[ \t]+/, "", func_name);                      # Remove "function" keyword if present
         sub(/[ \t]*\(\)?[ \t]*\{.*/, "", func_name);                # Remove () and { part
@@ -118,8 +142,6 @@ function echo_comment_blocks() (
     }
 
     add_line "$capture_comment_lines_pattern"
-
-    add_line "$find_func_defs_pattern"
 
     add_line "$func_def_action"
 
