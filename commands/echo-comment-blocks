@@ -26,6 +26,9 @@
 # 	echo "$comment_block"
 # }
 
+# NOTE: Name suggestions
+# echo-preceeding-comment-blocks
+
 function echo_comment_blocks() (
 
   function help {
@@ -34,9 +37,20 @@ function echo_comment_blocks() (
 
 			Input file or stdin and parse out comment blocks above a function.
 
+			Defaults to spitting out all findings.
+
+			You can specify which type of definition name above which you want
+			to extract the comment.
+
 			USAGE:
 			echo-bash-comment-blocks -- <file>
 			echo-bash-comment-blocks --func-name=<name> -- <file>
+
+			OPTIONS:
+
+			--alias=<name>
+
+			--function=<name>
 
 		EOF
     if [[ $# -ne 0 ]]; then
@@ -45,12 +59,14 @@ function echo_comment_blocks() (
     return 22 # EINVAL 22 Invalid argument
   }
 
-  local option_args=()
+  local option_args=() option_name='' option_alias='' option_func=''
 
   while [[ $# -ne 0 ]]; do
     item="$1"
     shift
     case "$item" in
+    '--function='*) option_alias="${item#*=}" ;;
+    '--alias='*) option_func="${item#*=}" ;;
     '--')
       option_args+=("$@")
       shift $#
@@ -62,48 +78,114 @@ function echo_comment_blocks() (
     esac
   done
 
-  # # Example usage
-  # # extract_comments_for_all_functions "your_script.sh"
-  # # TODO: match the three types of func defs
-  # # - <name>() {
-  # # - function <name>() {
-  # # - function <name> {
-  # function extract_comments_for_all_functions() {
-  #   awk '
-  #    /^#/ { comments = comments "\n" $0; next }  # Collect comment lines
-  #    /^[a-zA-Z_][a-zA-Z0-9_]*\(\) *{/ {          # Match function definitions
-  #        func_name = $1;                         # Capture function name
-  #        sub(/\(\)$/, "", func_name);            # Remove () from name
-  #        print "Function: " func_name;           # Print function name
-  #        print comments "\n";                    # Print associated comment block
-  #        comments = "";                          # Reset comments
-  #    }
-  #    { comments = "" }  # Reset comments if a non-comment, non-function line is encountered
-  #    ' "$1"
-  # }
+  local capture_comment_lines_pattern='/^#/ { comments = comments "\n" $0; next }' # Collect comment lines
 
+  local find_func_defs_pattern='/^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/'
 
-  # TODO: split this up into smaller variables and name them appropriately
-  # so that I learn how awk work.
-  # And can modify this to work with other shells than bash.
+  local func_def_regex='/^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/'
+
+  local func_def_action="$func_def_regex"' {
+        func_name = $0;                                             # Extract function name
+        sub(/^function[ \t]+/, "", func_name);                      # Remove "function" keyword if present
+        sub(/[ \t]*\(\)?[ \t]*\{.*/, "", func_name);                # Remove () and { part
+
+        print "---------------------------------";
+        print "Function: [" func_name "]";
+
+        # print comments "\n";
+        if (comments) {
+            print comments "\n";
+        } else {
+            print "NO COMMENT\n";
+        }
+
+        comments = "";                              # Reset comment block
+
+    }
+    { comments = "" }                       # Reset comments if a non-comment, non-function line is encountered
+    '
 
   extract_comments_for_all_functions() {
-    awk '
-    /^#/ { comments = comments "\n" $0; next }  # Collect comment lines
-    /^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/ {
-        # Extract function name
-        func_name = $0;
-        sub(/^function[ \t]+/, "", func_name);  # Remove "function" keyword if present
-        sub(/[ \t]*\(\)?[ \t]*\{.*/, "", func_name);  # Remove () and { part
-        print "Function: " func_name;
-        print comments "\n";
-        comments = "";  # Reset comment block
+    local awk_string=''
+
+    # notice that we add a whitespace at the end to avoid issues when adding to same line
+    function add_line() {
+      awk_string+=$'\n'"$1"' '
     }
-    { comments = "" }  # Reset comments if a non-comment, non-function line is encountered
-    ' "$1"
+
+    function add_same_line() {
+      awk_string+="$1"
+    }
+
+    add_line "$capture_comment_lines_pattern"
+
+    add_line "$find_func_defs_pattern"
+
+    add_line "$func_def_action"
+
+    # rest='
+    # /^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/ {
+    #     func_name = $0;                                             # Extract function name
+    #
+    #     sub(/^function[ \t]+/, "", func_name);                      # Remove "function" keyword if present
+    #
+    #     sub(/[ \t]*\(\)?[ \t]*\{.*/, "", func_name);                # Remove () and { part
+    #
+    #     print "---------------------------------";
+    #     print "Function: [" func_name "]";
+    #
+    #     # print comments "\n";
+    #     if (comments) {
+    #         print comments "\n";
+    #     } else {
+    #         print "NO COMMENT\n";
+    #     }
+    #
+    #     comments = "";                              # Reset comment block
+    #
+    # }
+    # { comments = "" }                       # Reset comments if a non-comment, non-function line is encountered
+    # '
+
+    # awk_string+="$rest"
+
+    # awk '
+    #
+    # /^#/ { comments = comments "\n" $0; next }                      # Collect comment lines
+    #
+    # /^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/ {
+    #     func_name = $0;                                             # Extract function name
+    #
+    #     sub(/^function[ \t]+/, "", func_name);                      # Remove "function" keyword if present
+    #
+    #     sub(/[ \t]*\(\)?[ \t]*\{.*/, "", func_name);                # Remove () and { part
+    #
+    #     print "Function: [" func_name "]";
+    #
+    #     print comments "\n";
+    #
+    #     comments = "";                              # Reset comment block
+    #
+    # }
+    # { comments = "" }                       # Reset comments if a non-comment, non-function line is encountered
+    # ' "$1"
+
+    awk "$awk_string" "$1"
   }
 
-  extract_comments_for_all_functions "${option_args[0]}"
+  if [[ -z "$option_alias" && -z "$option_func" ]]; then
+    # output all findings
+    extract_comments_for_all_functions "${option_args[0]}"
+
+  else
+
+    if [[ -n "$option_alias" ]]; then
+      extract_comments_for_all_functions "${option_args[0]}"
+    elif [[ -n "$option_func" ]]; then
+      extract_comments_for_all_functions "${option_args[0]}"
+    fi
+
+  fi
 )
 
 # fire if invoked standalone

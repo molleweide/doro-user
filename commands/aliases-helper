@@ -21,6 +21,12 @@
 # https://github.com/cykerway/complete-alias
 #
 
+# FIX: (=) opt-in: capture comment block above.
+# 1. echo-bash-comment-blocks
+# 2. Modify it to take a specific func <name>
+# 3. If funcs -> collect comment block
+# 4. Insert
+#
 # TODO: ( ) test that all edit_* funcs work.
 #
 # TODO: ( ) post_review: go back to review | select which mode.
@@ -28,11 +34,6 @@
 # - choose menu
 #
 # FIX: ( ) opt-in: replace underscores in func names with hyphen?
-#
-# FIX: (=) opt-in: capture comment block above.
-# 1. echo-bash-comment-blocks
-# 2. Modify it to take a specific func <name>
-# 3. concatenate code block with alias comment after line.
 #
 # FIX: ( ) review_post: upon creation -> include failures.
 # WHY??: In some cases you want to include custom overrides...
@@ -1251,13 +1252,17 @@ function command_aliases() (
 	# =======================================================
 	#
 
+  #
 	function make_contents() {
 		local index=$1 c=''
 		c+="$SHEBANG_BASH"
-		c+=$'\n'"# Name: ${DCA_NAMES[$index]}"
-		c+=$'\n'"# Desc: ${DCA_DESCS[$index]}"
+		c+=$'\n'"# NAME: ${DCA_NAMES[$index]}"
+		c+=$'\n'"# -------------------------------------------------------"
+		c+=$'\n'"# DESCRIPTION:"
+		c+=$'\n'"# ${DCA_DESCS[$index]}"
+		c+=$'\n'"# -------------------------------------------------------"
 		if [[ "${DCA_IS_FUNC[$index]}" == 'yes' ]]; then
-			c+=$'\n'"# Args: ${DCA_ARGS[$index]}"
+			c+=$'\n'"# ARGS: ${DCA_ARGS[$index]}"
 			c+=$'\n'"${DCA_CODE[$index]}"
 		else
 			c+=$'\n'"${DCA_CODE[$index]}"
