@@ -30,6 +30,26 @@
 # echo-preceeding-comment-blocks
 
 function echo_comment_blocks() (
+  source "$DOROTHY/sources/bash.bash"
+  __require_array 'mapfile'
+
+  # =======================================================
+  # FUNCTION DEFINITIONS BY LANG
+  # =======================================================
+
+  local LANG_BASH_COMMENT_REGEX='/^#/'
+
+  # =======================================================
+  # FUNCTION DEFINITIONS BY LANG
+  # =======================================================
+
+  local LANG_BASH_FUNCTION_DEFINITIONS_REGEX='/^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/'
+  # local zsh
+  # local fish
+  # local nu
+
+  # =======================================================
+  # Help
 
   function help {
     cat <<-EOF >/dev/stderr
@@ -55,12 +75,18 @@ function echo_comment_blocks() (
 			--output-multiline
 			    Output each comment block as a multiline string.
 
+			--lang=<lang>
+			    Defaults to bash
+
 		EOF
     if [[ $# -ne 0 ]]; then
       echo-error "$@"
     fi
     return 22 # EINVAL 22 Invalid argument
   }
+
+  # =======================================================
+  # Args
 
   local option_args=() option_name='' option_alias='' option_func=''
 
@@ -82,43 +108,44 @@ function echo_comment_blocks() (
   done
 
   # =======================================================
-  # FUNCTION DEFINITIONS BY LANG
-  # =======================================================
-
-  local BASH_COMMENT_REGEX='/^#/'
-
-  # =======================================================
-  # FUNCTION DEFINITIONS BY LANG
-  # =======================================================
-
-  local BASH_FUNCTION_DEFINITIONS_REGEX='/^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/'
-  # local zsh
-  # local fish
-  # local nu
-
-  # =======================================================
   # =======================================================
   # =======================================================
   #
   # TODO: print each comment block as a multiline string
+  # This post explains the most stable way ending strings with null delim in awl
+  # https://stackoverflow.com/questions/9133315/how-can-i-output-null-terminated-strings-in-awk
+  # See awk-null-test
 
-  local CAPTURE_COMMENT_LINES_ACTION='{ comments = comments "\n" $0; next }'
-  local CAPTURE_COMMENT_MULTILINE_ACTION=' { comments = comments "\n" substr($0, 3); next }' # Collect comment lines, remove "# "
+  # local CAPTURE_COMMENT_LINES_ACTION='{ comments = comments "\n" $0; next }'
+  # local CAPTURE_COMMENT_MULTILINE_ACTION=' { comments = comments "\n" substr($0, 3); next }' # Collect comment lines, remove "# "
+  local CAPTURE_COMMENT_MULTILINE_ACTION=' { comments = comments "\n" $0; next }' # Collect comment lines, remove "# "
 
-  # local capture_comment_lines_pattern="$BASH_COMMENT_REGEX $CAPTURE_COMMENT_LINES_ACTION"
-  local capture_comment_lines_pattern="$BASH_COMMENT_REGEX $CAPTURE_COMMENT_MULTILINE_ACTION"
+  # local capture_comment_lines_pattern="$LANG_BASH_COMMENT_REGEX $CAPTURE_COMMENT_LINES_ACTION"
+  local capture_comment_lines_pattern="$LANG_BASH_COMMENT_REGEX $CAPTURE_COMMENT_MULTILINE_ACTION"
 
-  local func_def_action="$BASH_FUNCTION_DEFINITIONS_REGEX"' {
+  local func_def_action="$LANG_BASH_FUNCTION_DEFINITIONS_REGEX"' {
         func_name = $0;                                             # Extract function name
         sub(/^function[ \t]+/, "", func_name);                      # Remove "function" keyword if present
         sub(/[ \t]*\(\)?[ \t]*\{.*/, "", func_name);                # Remove () and { part
 
-        print "---------------------------------";
-        print "Function: [" func_name "]";
-
+        # print "---------------------------------";
+        # print "Function: [" func_name "]";
         # print comments "\n";
+
+        # OFS="\0" # will use null as the field separator when printing
+
         if (comments) {
+            print "============================================"
             print comments "\n";
+            # print $0
+            # printf "\0"
+
+            # print "$'\''\0'\''"
+
+            # print "" comments "\"\0";  # Print as a single multiline string
+
+            # print  comments "\n$'\''\0" ;# "\n"
+
         } else {
             print "NO COMMENT\n";
         }
@@ -130,7 +157,7 @@ function echo_comment_blocks() (
     '
 
   extract_comments_for_all_functions() {
-    local awk_string=''
+    local awk_string='BEGIN { ORS = "\0" } ;'
 
     # notice that we add a whitespace at the end to avoid issues when adding to same line
     function add_line() {
@@ -145,61 +172,39 @@ function echo_comment_blocks() (
 
     add_line "$func_def_action"
 
-    # rest='
-    # /^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/ {
-    #     func_name = $0;                                             # Extract function name
-    #
-    #     sub(/^function[ \t]+/, "", func_name);                      # Remove "function" keyword if present
-    #
-    #     sub(/[ \t]*\(\)?[ \t]*\{.*/, "", func_name);                # Remove () and { part
-    #
-    #     print "---------------------------------";
-    #     print "Function: [" func_name "]";
-    #
-    #     # print comments "\n";
-    #     if (comments) {
-    #         print comments "\n";
-    #     } else {
-    #         print "NO COMMENT\n";
-    #     }
-    #
-    #     comments = "";                              # Reset comment block
-    #
-    # }
-    # { comments = "" }                       # Reset comments if a non-comment, non-function line is encountered
-    # '
-
-    # awk_string+="$rest"
-
-    # awk '
-    #
-    # /^#/ { comments = comments "\n" $0; next }                      # Collect comment lines
-    #
-    # /^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/ {
-    #     func_name = $0;                                             # Extract function name
-    #
-    #     sub(/^function[ \t]+/, "", func_name);                      # Remove "function" keyword if present
-    #
-    #     sub(/[ \t]*\(\)?[ \t]*\{.*/, "", func_name);                # Remove () and { part
-    #
-    #     print "Function: [" func_name "]";
-    #
-    #     print comments "\n";
-    #
-    #     comments = "";                              # Reset comment block
-    #
-    # }
-    # { comments = "" }                       # Reset comments if a non-comment, non-function line is encountered
-    # ' "$1"
+    # add_line "END"
 
     awk "$awk_string" "$1"
   }
 
   if [[ -z "$option_alias" && -z "$option_func" ]]; then
+    echo "before"
     # output all findings
-    extract_comments_for_all_functions "${option_args[0]}"
+    local comments=()
+
+    # comments+=("$(extract_comments_for_all_functions "${option_args[0]}")")
+    # mapfile -t comments < <(extract_comments_for_all_functions "${option_args[0]}")
+
+    # IFS= read -ra comments < <(extract_comments_for_all_functions "${option_args[0]}")
+
+    mapfile -t -d '' comments < <(extract_comments_for_all_functions "${option_args[0]}")
+
+    # while IFS= read -d '' -r input; do
+    #   echo "[$input]"
+    #   comments+=("$input")
+    # done < <(extract_comments_for_all_functions "${option_args[0]}")
+
+    echo "after"
+
+    for com in "${comments[@]}"; do
+      __print_lines ">>>>"
+      __print_lines "$com"
+      __print_lines "<<<<"
+    done
 
   else
+
+    echo "else"
 
     if [[ -n "$option_alias" ]]; then
       extract_comments_for_all_functions "${option_args[0]}"

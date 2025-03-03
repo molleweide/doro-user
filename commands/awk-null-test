@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+
+
+test1(){   # '{printf( "%s%c",$0,0)}'|
+    a='awk'
+    IFS=',' read -ra line <<<"$a"
+    for i in "${line[@]}"; do
+        printf "%14.12s %40s" "$i" "$1"
+        echo -ne "a\nb\nc\n" |
+        $i "$1"|
+        od -cAn;
+    done
+}
+
+#test1 '{print}'
+test1 'BEGIN { ORS = "\0" } ; { print $0 }'
+test1 '{ printf "%s\0", $0}'
+test1 '{ printf( "%s%c", $0, 0 )}'
