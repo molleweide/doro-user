@@ -16,7 +16,7 @@ export TERM
 path='' alias_dirs=()
 mapfile -t alias_dirs < <(find "$DOROTHY/user/commands.aliases" -type d)
 for p in "${alias_dirs[@]}"; do
-  echo "Add [$p] to path">/dev/tty
+  # echo "Add [$p] to path">/dev/tty
 	path+="$p:"
 done
 PATH="$path$PATH"

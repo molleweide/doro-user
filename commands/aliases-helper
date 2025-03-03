@@ -20,21 +20,22 @@
 # https://github.com/difosschan/easy-sh-alias
 # https://github.com/cykerway/complete-alias
 #
-# HACK: (=) migrated my own aliases
-# - main file
-# - nvim
 
-# TODO: (=) remove reference to $index in __trigger_event
+# TODO: ( ) test that all edit_* funcs work.
 #
 # TODO: ( ) post_review: go back to review | select which mode.
 # - change how the review mode is set -> use a type of [all/failures/successful] instead of multiple boolean option var
 # - choose menu
 #
 # FIX: ( ) opt-in: replace underscores in func names with hyphen?
-# FIX: ( ) opt-in: capture comment block above.
 #
-# FIX: ( ) review_post: create -> include failures.
-# in some cases you want to include custom overrides...
+# FIX: (=) opt-in: capture comment block above.
+# 1. echo-bash-comment-blocks
+# 2. Modify it to take a specific func <name>
+# 3. concatenate code block with alias comment after line.
+#
+# FIX: ( ) review_post: upon creation -> include failures.
+# WHY??: In some cases you want to include custom overrides...
 # eg. my `ranger` alias which overrides the original `ranger` bin.
 #
 # TODO: ( ) support zsh
@@ -995,9 +996,9 @@ function command_aliases() (
 	# This is only used/checked upon event "EDIT_NAME_FINISHED"
 	# TODO: Move into event handler??
 	function __new_name_is_unique {
-		local index="$1" name="$2" i
+		local name="$2" i
 		for ((i = 0; i < "${#DCA_NAMES[@]}"; i++)); do
-			if [[ $index -eq $i ]]; then
+			if [[ $INDEX -eq $i ]]; then
 				continue
 			elif [[ "$name" == "${DCA_NAMES[$i]}" ]]; then
 				return 1
@@ -1343,36 +1344,29 @@ function command_aliases() (
 
 		[[ -z "$answer" ]] && return 1
 
-		__trigger_event "EDIT_NAME_FINISHED" "$index" "$answer"
+		__trigger_event "EDIT_NAME_FINISHED" "$answer"
 
 		# DCA_NAMES[index]="$answer"
 		# make_contents
 	}
 
-	# # FIX: update to current impl
 	function edit_value() {
-		local index=${1-0}
-
+		local answer
+		answer="$(ask --linger "$AX_UI_PREFIX Edit command value (index: $INDEX):")"
 		[[ -z "$answer" ]] && return 1
-
-		DCA_CODE[index]="$(ask --linger "$AX_UI_PREFIX Edit command value (index: $index):")"
+		DCA_CODE[INDEX]="$answer"
 		make_contents
 	}
 
-	# # FIX: update to current impl
 	function edit_desc() {
-		local index=${1-0}
-
+		local answer
+		answer="$(ask --linger "$AX_UI_PREFIX Edit new alias description (index: $INDEX):")"
 		[[ -z "$answer" ]] && return 1
-
-		DCA_DESCS[index]="$(ask --linger "$AX_UI_PREFIX Edit new alias description (index: $index):")"
+		DCA_DESCS[INDEX]="$answer"
 		make_contents
 	}
 
-	# # FIX: update to current impl
 	function edit_sub_path() {
-		local index=${1-0}
-
 		local sub_path
 		while :; do
 			sub_path="$(ask --linger "$AX_UI_PREFIX Redo sub path:")"
@@ -1390,8 +1384,8 @@ function command_aliases() (
 				break
 			fi
 		done
-		[[ -z "$answer" ]] && return 1
-		DCA_GROUPS[index]="$sub_path"
+		[[ -z "$subpath" ]] && return 1
+		DCA_GROUPS[INDEX]="$sub_path"
 		make_contents
 	}
 
@@ -1403,7 +1397,7 @@ function command_aliases() (
 	# maybe I should rename this.
 
 	function __trigger_event {
-		local event=${1-} index
+		local event=${1-}
 
 		if [[ $# -eq 0 ]]; then
 			logger "ERROR: Requires at least one event name passed."
@@ -1413,14 +1407,13 @@ function command_aliases() (
 		case "$event" in
 		# "EDIT_PRE") ;;
 		"EDIT_NAME_FINISHED")
-			index="${1-}"
-			local new_name="${2-}" # this should be $1 when transitio to $INDEX is done.
+			local new_name="${1-}" # this should be $1 when transitio to $INDEX is done.
 
 			# this is redundant since cancel is handled before throwing event.
 			# [[ -z "$EDIT_ANSWER" ]] && return
 
 			# Check if collision still persists.
-			if ! __parsed_name_was_unique && __new_name_is_unique "$index" "$new_name"; then
+			if ! __parsed_name_was_unique && __new_name_is_unique "$new_name"; then
 				remove_collision "$index"
 			fi
 
@@ -1777,7 +1770,7 @@ function command_aliases() (
 			while [[ "$update_validated" == "no" ]]; do
 				# on cancel return and exit choose/ask loops below
 
-				if ! edit_name "$INDEX"; then
+				if ! edit_name; then
 					proceed_with_successful='yes'
 					return # discard edit and go back/continue review.
 				fi

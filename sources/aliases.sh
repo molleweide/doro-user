@@ -250,7 +250,7 @@ alias fn="nnn" # File browser
 
 # ranger with some extras
 # - Q to exit to current dir in CLI.
-function ranger_ {
+function ranger_() {
   local IFS=$'\t\n' tempfile ranger_cmd
   tempfile="$(mktemp -t tmp.XXXXXX)"
   ranger_cmd=(
