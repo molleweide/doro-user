@@ -243,14 +243,14 @@ alias dkwp="docker-compose run --rm wpcli"
 
 alias fh="fff" # File browser
 alias fj="lf" # File browser
-alias fk="ranger_" # File browser custom func
+alias fk="ranger2" # File browser custom func
 alias fn="nnn" # File browser
 
 # switch cwd on exit
 
 # ranger with some extras
 # - Q to exit to current dir in CLI.
-function ranger_() {
+function ranger2() {
   local IFS=$'\t\n' tempfile ranger_cmd
   tempfile="$(mktemp -t tmp.XXXXXX)"
   ranger_cmd=(

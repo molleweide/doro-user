@@ -3,6 +3,10 @@ alias xy="echo" # nsetest
 
 alias nvim="echo" # after nvim
 
+function fn_name_with_underscores() {
+	echo "$@"
+}
+
 alias x="echo" # after x
 
 # above a
