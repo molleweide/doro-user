@@ -22,10 +22,10 @@
 #
 
 # FIX: (=) opt-in: capture comment block above.
-# 1. echo-bash-comment-blocks
-# 2. Modify it to take a specific func <name>
-# 3. If funcs -> collect comment block
-# 4. Insert
+# 1. (x) echo-bash-comment-blocks
+# 2. (x) Modify it to take a specific func <name>
+# 3. ( ) If funcs -> collect comment block
+# 4. ( ) Insert
 #
 # TODO: ( ) test that all edit_* funcs work.
 #

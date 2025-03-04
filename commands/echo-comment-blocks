@@ -15,66 +15,6 @@ function echo_comment_blocks() (
   __require_array 'mapfile'
 
   # =======================================================
-  # FS: COMMENT PATTERN
-  # =======================================================
-
-  local BASH__FS_COMMENT='/^#/'
-
-  # =======================================================
-  # FS: FUNCTION NAME PATTERN
-  # =======================================================
-
-  local BASH__FS_FUNC_DEF='/^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/'
-
-  # =======================================================
-  # SNIPPET: EXTRACT FUNCTION NAME
-  # =======================================================
-
-  local BASH__SNIPPET_EXTRACT_FUNC_NAME='
-        func_name = $0;                                             # Extract function name
-        sub(/^function[ \t]+/, "", func_name);                      # Remove "function" keyword if present
-        sub(/[ \t]*\(\)?[ \t]*\{.*/, "", func_name);                # Remove () and { part
-        '
-
-  # =======================================================
-  # FUNCTIONS: MAKE PATTERN-ACTION STATEMENTS
-  # =======================================================
-
-
-  function get_pa__collect_comment() {
-    local fs=${1}__FS_COMMENT
-    __print_lines "${!fs}"' { comments = comments "\n" $0; next };'
-  }
-
-  function get_pattern_action__func_defs_all() {
-    local fs=${1}__FS_FUNC_DEF
-    local extract=${1}__SNIPPET_EXTRACT_FUNC_NAME
-    __print_lines "${!fs}"' {
-        '"${!extract}"'
-        if (comments) {
-          printf( "%s%c", comments, 0)      # print string with custom delimiter
-        } else {
-        printf( "%s%c", "NO COMMENT", 0)
-      }
-      comments = "";                        # Reset comment block
-    };'
-  }
-
-  function get_pattern_action__func_def_by_name() {
-    local fs=${1}__FS_FUNC_DEF
-    local extract=${1}__SNIPPET_EXTRACT_FUNC_NAME
-    __print_lines "${!fs}"' {
-        '"${!extract}"'
-        if (comments && func_name == capture_func) {
-            printf( "%s%c", comments, 0)
-        };
-        comments = "";                        # Reset comment block
-    };'
-  }
-
-  local PATTERN_ACTION__COMMENT_RESET='{ comments = ""};'
-
-  # =======================================================
   # Help
 
   function help {
@@ -84,6 +24,11 @@ function echo_comment_blocks() (
 			Input file or stdin and parse out comment blocks above a function.
 
 			Defaults to spitting out all findings.
+
+			Each output is ended with the null delimitor so that you can capture
+			each comment into an array with:
+
+			mapfile -t -d '' comments < <(echo-comment-blocks -- <file>)
 
 			You can specify which type of definition name above which you want
 			to extract the comment.
@@ -150,6 +95,66 @@ function echo_comment_blocks() (
   done
 
   # =======================================================
+  # FS: COMMENT PATTERN
+  # =======================================================
+
+  local BASH__FS_COMMENT='/^#/'
+
+  # =======================================================
+  # FS: FUNCTION NAME PATTERN
+  # =======================================================
+
+  local BASH__FS_FUNC_DEF='/^(function[ \t]+)?[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\(\)?[ \t]*{/'
+
+  # =======================================================
+  # SNIPPET: EXTRACT FUNCTION NAME
+  # =======================================================
+
+  local BASH__SNIPPET_EXTRACT_FUNC_NAME='
+        func_name = $0;                                             # Extract function name
+        sub(/^function[ \t]+/, "", func_name);                      # Remove "function" keyword if present
+        sub(/[ \t]*\(\)?[ \t]*\{.*/, "", func_name);                # Remove () and { part
+        '
+
+  # =======================================================
+  # FUNCTIONS: MAKE PATTERN-ACTION STATEMENTS
+  # =======================================================
+
+
+  function get_pa__collect_comment() {
+    local fs=${1}__FS_COMMENT
+    __print_lines "${!fs}"' { comments = comments "\n" $0; next };'
+  }
+
+  function get_pattern_action__func_defs_all() {
+    local fs=${1}__FS_FUNC_DEF
+    local extract=${1}__SNIPPET_EXTRACT_FUNC_NAME
+    __print_lines "${!fs}"' {
+        '"${!extract}"'
+        if (comments) {
+          printf( "%s%c", comments, 0)      # print string with custom delimiter
+        } else {
+        printf( "%s%c", "NO COMMENT", 0)
+      }
+      comments = "";                        # Reset comment block
+    };'
+  }
+
+  function get_pattern_action__func_def_by_name() {
+    local fs=${1}__FS_FUNC_DEF
+    local extract=${1}__SNIPPET_EXTRACT_FUNC_NAME
+    __print_lines "${!fs}"' {
+        '"${!extract}"'
+        if (comments && func_name == capture_func) {
+            printf( "%s%c", comments, 0)
+        };
+        comments = "";                        # Reset comment block
+    };'
+  }
+
+  local PATTERN_ACTION__COMMENT_RESET='{ comments = ""};'
+
+  # =======================================================
   # Act
 
   local awk_args=()
@@ -181,13 +186,14 @@ function echo_comment_blocks() (
   if [[ "$option_debug" == 'yes' ]]; then
     __print_lines "$awk_string"
   else
-    local comments=()
-    # split output on null delim
-    mapfile -t -d '' comments < <(awk "${awk_args[@]}" "$awk_string" "${option_args[0]}")
-    for com in "${comments[@]}"; do
-      __print_lines "======================================================="
-      __print_lines "$com"
-    done
+    # local comments=()
+    # # split output on null delim
+    # mapfile -t -d '' comments < <(awk "${awk_args[@]}" "$awk_string" "${option_args[0]}")
+    # for com in "${comments[@]}"; do
+    #   __print_lines "======================================================="
+    #   __print_lines "$com"
+    # done
+    awk "${awk_args[@]}" "$awk_string" "${option_args[@]}"
   fi
 )
 
