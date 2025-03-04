@@ -21,12 +21,6 @@
 # https://github.com/cykerway/complete-alias
 #
 
-# FIX: (=) opt-in: capture comment block above.
-# 1. (x) echo-bash-comment-blocks
-# 2. (x) Modify it to take a specific func <name>
-# 3. ( ) If funcs -> collect comment block
-# 4. ( ) Insert
-#
 # TODO: ( ) test that all edit_* funcs work.
 #
 # TODO: ( ) post_review: go back to review | select which mode.
@@ -132,6 +126,8 @@
 #
 # TODO: use other methods to parse
 # - treesitter
+#
+# TODO: opt-in func description
 #
 # TODO: migrate: multi select which (valid) dcas to create
 #
@@ -2018,7 +2014,10 @@ function command_aliases() (
 				DCA_NAMES+=("$new_alias_name")
 				DCA_GROUPS+=("$option_migrate_to_subdir")
 				DCA_CODE+=("$body_trimmed")
-				DCA_DESCS+=("")
+
+				# DCA_DESCS+=("")
+				DCA_DESCS+=("$(echo-comment-blocks --function="$new_alias_name" -- "$input_file")")
+
 				DCA_ARGS+=("'${arguments[@]}'")
 
 				local last=$(("${#DCA_NAMES[@]}" - 1))

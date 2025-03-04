@@ -9,6 +9,9 @@
 # echo-preceeding-comment-blocks
 
 # TODO: Improve variable names so that
+#
+# TODO: Support `stdinargs`
+# >>> Look at other echo-* commands,
 
 function echo_comment_blocks() (
   source "$DOROTHY/sources/bash.bash"
@@ -91,6 +94,16 @@ function echo_comment_blocks() (
     *)
       help "Unknown argument was provided"
       ;;
+
+
+		# # forward to stdinargs, however support mixing and matching of our options, with stdinargs options
+		# '--')
+		# 	option_args+=("$item" "$@")
+		# 	shift $#
+		# 	break
+		# 	;;
+		# *) option_args+=("$item") ;;
+
     esac
   done
 
@@ -123,7 +136,7 @@ function echo_comment_blocks() (
 
   function get_pa__collect_comment() {
     local fs=${1}__FS_COMMENT
-    __print_lines "${!fs}"' { comments = comments "\n" $0; next };'
+    __print_lines "${!fs}"' { comments = comments $0 "\n"; next };'
   }
 
   function get_pattern_action__func_defs_all() {
@@ -132,7 +145,7 @@ function echo_comment_blocks() (
     __print_lines "${!fs}"' {
         '"${!extract}"'
         if (comments) {
-          printf( "%s%c", comments, 0)      # print string with custom delimiter
+          printf( "%s%c", substr(comments, 0, length(comments)-2), 0)   # trim the last new linew char
         } else {
         printf( "%s%c", "NO COMMENT", 0)
       }
@@ -146,7 +159,7 @@ function echo_comment_blocks() (
     __print_lines "${!fs}"' {
         '"${!extract}"'
         if (comments && func_name == capture_func) {
-            printf( "%s%c", comments, 0)
+            printf( "%s%c", substr(comments, 0, length(comments)-2), 0) # trim the last new linew char
         };
         comments = "";                        # Reset comment block
     };'
@@ -186,15 +199,29 @@ function echo_comment_blocks() (
   if [[ "$option_debug" == 'yes' ]]; then
     __print_lines "$awk_string"
   else
-    # local comments=()
-    # # split output on null delim
-    # mapfile -t -d '' comments < <(awk "${awk_args[@]}" "$awk_string" "${option_args[0]}")
-    # for com in "${comments[@]}"; do
-    #   __print_lines "======================================================="
-    #   __print_lines "$com"
-    # done
-    awk "${awk_args[@]}" "$awk_string" "${option_args[@]}"
+    local comments=()
+    # split output on null delim
+    mapfile -t -d '' comments < <(awk "${awk_args[@]}" "$awk_string" "${option_args[0]}")
+    for com in "${comments[@]}"; do
+      # __print_lines "======================================================="
+      __print_lines "$com"
+    done
+    # awk "${awk_args[@]}" "$awk_string" "${option_args[@]}"
   fi
+
+
+
+
+	# local files=()
+	# function on_line {
+	# 	files+=("$1")
+	# }
+	# function on_finish {
+	# 	echo_files "${files[@]}"
+	# }
+	#
+	# stdinargs "${option_args[@]}"
+
 )
 
 # fire if invoked standalone
