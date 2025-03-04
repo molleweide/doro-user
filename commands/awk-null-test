@@ -1,19 +1,39 @@
 #!/usr/bin/env bash
 
+# TODO:
+# - make print multiline string.
 
+test1() { # '{printf( "%s%c",$0,0)}'|
+  a='awk'
 
-test1(){   # '{printf( "%s%c",$0,0)}'|
-    a='awk'
-    IFS=',' read -ra line <<<"$a"
-    for i in "${line[@]}"; do
-        printf "%14.12s %40s" "$i" "$1"
-        echo -ne "a\nb\nc\n" |
-        $i "$1"|
-        od -cAn;
-    done
+  IFS=',' read -ra line <<<"$a"
+
+  for i in "${line[@]}"; do
+
+    # %s	String format (prints a string).
+    # 14	Minimum width: The field will be at least 14 characters wide (right-aligned by default).
+    # .12	Maximum width: At most 12 characters of the string will be printed. If the string is longer, it will be truncated.
+    # ----
+    # 40	Minimum width: The field will be at least 40 characters wide (right-aligned by default).
+    # (no .N part)	The full string will be printed if it's shorter than 40 characters; otherwise, it will remain untrimmed.
+    printf "%14.12s %40s" "$i" "$1"
+
+    # -n → Prevents a newline (\n) from being added at the end.
+    # -e → Enables interpretation of escape sequences like \n, \t, \xHH, etc.
+    echo -ne "aaa\nb\nc\n" |
+      $i "$1" |
+      # od	Octal Dump: A command that displays the contents of a file (or standard input) in various formats (octal, ASCII, hex, etc.).
+      # -c	Character Format: Prints ASCII characters (or escape sequences for non-printable ones).
+      # -A n	No Addressing: Suppresses the byte offset (memory address) column in the output.
+      od -cAn # octal dump
+  done
 }
 
 #test1 '{print}'
 test1 'BEGIN { ORS = "\0" } ; { print $0 }'
 test1 '{ printf "%s\0", $0}'
-test1 '{ printf( "%s%c", $0, 0 )}'
+test1 '{ printf( "%s", $0, 0 )}'
+
+# this one i have never told before and the body i starint from the older gentleman and
+# the pack that is there and yes they are there feeling demented.
+# everyone just.

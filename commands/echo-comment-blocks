@@ -62,6 +62,8 @@ function echo_comment_blocks() (
 			You can specify which type of definition name above which you want
 			to extract the comment.
 
+			This helper helps in capturing preceeding comment blocks to varios
+
 			USAGE:
 			echo-bash-comment-blocks -- <file>
 			echo-bash-comment-blocks --func-name=<name> -- <file>
@@ -78,6 +80,12 @@ function echo_comment_blocks() (
 			--lang=<lang>
 			    Defaults to bash
 
+			--delim=<char>
+			    When outputting multiple comments, end each block with delim.
+
+			--map
+			    Output the symbol name befor each comment, ie. [<symbol> <comment>]...
+
 		EOF
     if [[ $# -ne 0 ]]; then
       echo-error "$@"
@@ -88,7 +96,12 @@ function echo_comment_blocks() (
   # =======================================================
   # Args
 
-  local option_args=() option_name='' option_alias='' option_func=''
+  local option_args=() \
+  option_name='' \
+  option_alias='' \
+  option_func='' \
+  option_map='no' \
+  option_debug='no'
 
   while [[ $# -ne 0 ]]; do
     item="$1"
@@ -96,6 +109,8 @@ function echo_comment_blocks() (
     case "$item" in
     '--function='*) option_alias="${item#*=}" ;;
     '--alias='*) option_func="${item#*=}" ;;
+    '--map') option_map="yes" ;;
+    '--debug') option_debug='yes';;
     '--')
       option_args+=("$@")
       shift $#
@@ -120,34 +135,27 @@ function echo_comment_blocks() (
   # local CAPTURE_COMMENT_MULTILINE_ACTION=' { comments = comments "\n" substr($0, 3); next }' # Collect comment lines, remove "# "
   local CAPTURE_COMMENT_MULTILINE_ACTION=' { comments = comments "\n" $0; next }' # Collect comment lines, remove "# "
 
-  # local capture_comment_lines_pattern="$LANG_BASH_COMMENT_REGEX $CAPTURE_COMMENT_LINES_ACTION"
-  local capture_comment_lines_pattern="$LANG_BASH_COMMENT_REGEX $CAPTURE_COMMENT_MULTILINE_ACTION"
+  # local CAPTURE_COMMENT_LINES_PATTERN="$LANG_BASH_COMMENT_REGEX $CAPTURE_COMMENT_LINES_ACTION"
+  local CAPTURE_COMMENT_LINES_PATTERN="$LANG_BASH_COMMENT_REGEX $CAPTURE_COMMENT_MULTILINE_ACTION"
 
-  local func_def_action="$LANG_BASH_FUNCTION_DEFINITIONS_REGEX"' {
+  local EXTRACT_FUNCTION_NAME='
         func_name = $0;                                             # Extract function name
         sub(/^function[ \t]+/, "", func_name);                      # Remove "function" keyword if present
         sub(/[ \t]*\(\)?[ \t]*\{.*/, "", func_name);                # Remove () and { part
+        '
+
+  local func_def_action="$LANG_BASH_FUNCTION_DEFINITIONS_REGEX"' {
+        '"$EXTRACT_FUNCTION_NAME"'
 
         # print "---------------------------------";
         # print "Function: [" func_name "]";
         # print comments "\n";
 
-        # OFS="\0" # will use null as the field separator when printing
 
         if (comments) {
-            print "============================================"
-            print comments "\n";
-            # print $0
-            # printf "\0"
-
-            # print "$'\''\0'\''"
-
-            # print "" comments "\"\0";  # Print as a single multiline string
-
-            # print  comments "\n$'\''\0" ;# "\n"
-
+            printf( "%s%c", comments, 0) # print string with custom delimiter
         } else {
-            print "NO COMMENT\n";
+            printf( "%s%c", "NO COMMENT", 0)
         }
 
         comments = "";                              # Reset comment block
@@ -156,8 +164,8 @@ function echo_comment_blocks() (
     { comments = "" }                       # Reset comments if a non-comment, non-function line is encountered
     '
 
-  extract_comments_for_all_functions() {
-    local awk_string='BEGIN { ORS = "\0" } ;'
+  get_awk_string() {
+    local awk_string='' # BEGIN { ORS = "\0" } ;'
 
     # notice that we add a whitespace at the end to avoid issues when adding to same line
     function add_line() {
@@ -168,16 +176,21 @@ function echo_comment_blocks() (
       awk_string+="$1"
     }
 
-    add_line "$capture_comment_lines_pattern"
+    add_line "$CAPTURE_COMMENT_LINES_PATTERN"
 
     add_line "$func_def_action"
 
     # add_line "END"
 
-    awk "$awk_string" "$1"
+    # awk "$awk_string" "$1"
+    __print_lines "$awk_string"
   }
 
-  if [[ -z "$option_alias" && -z "$option_func" ]]; then
+  if [[ "$option_debug" == 'yes' ]] ; then
+
+    __print_lines "$(get_awk_string)"
+
+  elif [[ -z "$option_alias" && -z "$option_func" ]]; then
     echo "before"
     # output all findings
     local comments=()
@@ -186,20 +199,19 @@ function echo_comment_blocks() (
     # mapfile -t comments < <(extract_comments_for_all_functions "${option_args[0]}")
 
     # IFS= read -ra comments < <(extract_comments_for_all_functions "${option_args[0]}")
+    local str="$(get_awk_string)"
 
-    mapfile -t -d '' comments < <(extract_comments_for_all_functions "${option_args[0]}")
+    mapfile -t -d '' comments < <(awk "$str" "${option_args[0]}")
 
     # while IFS= read -d '' -r input; do
     #   echo "[$input]"
     #   comments+=("$input")
     # done < <(extract_comments_for_all_functions "${option_args[0]}")
-
     echo "after"
 
     for com in "${comments[@]}"; do
-      __print_lines ">>>>"
+      __print_lines "======================================================="
       __print_lines "$com"
-      __print_lines "<<<<"
     done
 
   else
