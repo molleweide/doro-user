@@ -24,12 +24,19 @@
 # TODO: ( ) post_review: go back to review | select which mode.
 # - change how the review mode is set -> use a type of [all/failures/successful] instead of multiple boolean option var
 # - choose menu
+#     (x) REVIEW_UI_MODE
+#     ( ) REVIEW_TYPE
+#         ^ This requires a bit more modification, but it should be quite simple
+#     (=) impl choose menu
+#         - ( ) In the switch case, set REVIEW_UI_MODE and REVIEW_TYPE
 #
 # TODO: ( ) test that all edit_* funcs work.
 #
-# FIX: ( ) review_post: upon creation -> include failures.
-# WHY??: In some cases you want to include custom overrides...
-# eg. my `ranger` alias which overrides the original `ranger` bin.
+# TODO: doom -> add bindings to search DCAs
+#
+# FIX: ( ) review_post -> ASK: Include failures??
+#
+#
 #
 # TODO: ( ) support zsh
 # - modified parser ??
@@ -204,6 +211,9 @@ function command_aliases() (
   # Use indices to get these back
   local AX_UI_PREFIX="ALIASES"
   local DO_RELOAD='no'
+
+  local REVIEW_UI_MODE='choose'
+  local REVIEW_TYPE='failures'
 
   local DCA_SELECTED='' # use this for selection
 
@@ -1291,7 +1301,7 @@ function command_aliases() (
     label="======================================================="
     label+=$'\n'"$AX_UI_PREFIX | ${#FAILING_POSITIONS[@]} / ${#DCA_NAMES[@]} FAILURES"
 
-    if [[ "$option_fix_iterate" == 'yes' ]]; then
+    if [[ "$REVIEW_UI_MODE" == 'iterate' ]]; then
       label+=$'\n'"Supply empty string to discard subsequent and proceed to post review"
     fi
 
@@ -1679,7 +1689,36 @@ function command_aliases() (
             # |     - overview: only invalid
             # |     - overview: only (already) valid
             # |------------------------------------------------
-            echo-style --bold "TODO: Go back to reviewing failures.."
+            local go_back_sel go_back_to_review_choices=(
+              iterate_all "iterate all"
+              iterate_failures "iterate only failures"
+              iterate_successful "iterate (already) successful"
+              menu_all "overview: all"
+              menu_failures "overview: only failures"
+              menu_successful "overview: only (already) successful"
+            )
+            go_back_sel="$(choose "Go back | Select review mode" --label -- "${go_back_to_review_choices[@]}")"
+            case "$go_back_sel" in
+            iterate_*)
+              REVIEW_UI_MODE='iterate'
+              case "$go_back_sel" in
+                *_all) REVIEW_TYPE='all' ;;
+                *_failures) REVIEW_TYPE='failures' ;;
+                *_successful) REVIEW_TYPE='successful' ;;
+              esac
+              ;;
+            menu_*)
+              REVIEW_UI_MODE='iterate'
+              case "$go_back_sel" in
+                *_all) REVIEW_TYPE='all' ;;
+                *_failures) REVIEW_TYPE='failures' ;;
+                *_successful) REVIEW_TYPE='successful' ;;
+              esac
+              ;;
+            *)
+              __print_lines "User cancelled [go back to review] menu"
+              ;;
+            esac
             do_review_main
             return
           fi
@@ -1748,16 +1787,19 @@ function command_aliases() (
 
     # setup variables for review
     local -n REVIEW_ARRAY
-    local reviewing='' \
-      current_was_failure_initially='no' \
-      _selected_review_index
+
+    # TODO: This [reviewing] should be the [REVIEW_TYPE]
+    local reviewing=''
+
+    local current_was_failure_initially='no'
+    local _selected_review_index
 
     local REVIEW_SELECTED_FAILURE_INDEX
 
     local proceed_with_successful='no'
 
     if [[ "$option_review_both" == 'yes' ]]; then
-      reviewing='both'
+      reviewing='both' # FIX: rename this to both
       REVIEW_ARRAY="DCA_NAMES"
     elif [[ "$option_review_successful" == 'yes' ]]; then
       reviewing='successful'
@@ -1829,7 +1871,7 @@ function command_aliases() (
     #
 
     # handle parsed aliases
-    if [[ "$option_fix_iterate" == 'yes' ]]; then
+    if [[ "$REVIEW_UI_MODE" == 'iterate' ]]; then
       # w/ASK --------------------------------------------
       #
       # TEST: Does it handle updated statuses correctly?
@@ -1853,7 +1895,7 @@ function command_aliases() (
         # TODO: if false then [do_review_post]
         ! __review__handle_edit && break
       done
-    else
+    elif [[ "$REVIEW_UI_MODE" == "choose" ]]; then
 
       #
       # REVIEW: UI CHOOSE (MENU)
@@ -2087,6 +2129,18 @@ function command_aliases() (
       echo-style --error "Maximum sub dir depth allowed is [$ALLOW_MAX_SUB_DIRS]"
       exit
     fi
+  fi
+
+  if [[ "$option_fix_iterate" == 'yes' ]]; then
+    REVIEW_UI_MODE="iterate"
+  fi
+
+  if [[ "$option_review_both" == 'yes' ]]; then
+    REVIEW_TYPE='all'
+  elif [[ "$option_review_successful" == 'yes' ]]; then
+    REVIEW_TYPE='successful'
+  else
+    REVIEW_TYPE='failures'
   fi
 
   # =======================================================
