@@ -118,7 +118,7 @@ function echo_comment_blocks() (
   # =======================================================
   # build function pattern-statement
 
-  local EXTRACT_FUNCTION_NAME='
+  local LANG_BASH__CHUNK_EXTRACT_FUNC_NAME='
         func_name = $0;                                             # Extract function name
         sub(/^function[ \t]+/, "", func_name);                      # Remove "function" keyword if present
         sub(/[ \t]*\(\)?[ \t]*\{.*/, "", func_name);                # Remove () and { part
@@ -136,79 +136,66 @@ function echo_comment_blocks() (
   # print all func defs
 
   local ACTION_FUNC_DEFS_ALL="$LANG_BASH__FS_FUNC_DEF"' {
-      '"$EXTRACT_FUNCTION_NAME"'
+      '"$LANG_BASH__CHUNK_EXTRACT_FUNC_NAME"'
       if (comments) {
           printf( "%s%c", comments, 0)      # print string with custom delimiter
       } else {
           printf( "%s%c", "NO COMMENT", 0)
       }
       comments = "";                        # Reset comment block
-  };'"$ACTION_COMMENTS_RESET"
+  };'
 
   # ---------------------------------
   # print only comment block of func def in variable [capture_func]
 
   local ACTION_FUNC_DEF_BY_NAME="$LANG_BASH__FS_FUNC_DEF"' {
-      '"$EXTRACT_FUNCTION_NAME"'
+      '"$LANG_BASH__CHUNK_EXTRACT_FUNC_NAME"'
       if (comments && func_name == capture_func) {
-          print "(comments &&)"
           printf( "%s%c", comments, 0)
       };
       comments = "";                        # Reset comment block
-  };'"$ACTION_COMMENTS_RESET"
+  };'
 
+  local awk_args=()
+  local awk_string='' # BEGIN { ORS = "\0" } ;'
 
-
-
-  build_awk_string() {
-    local awk_string='' # BEGIN { ORS = "\0" } ;'
-
-    # notice that we add a whitespace at the end to avoid issues when adding to same line
-    function add_line() {
-      awk_string+=$'\n'"$1"' '
-    }
-
-    function add_same_line() {
-      awk_string+="$1"
-    }
-
-    function add_wrap() {
-      awk_string+="$1"
-    }
-
-    # initial capture comments
-    add_line "$CAPTURE_COMMENT_LINES_PATTERN_ACTION"
-
-    add_line "$ACTION_FUNC_DEFS_ALL"
-
-    __print_lines "$awk_string"
+  function add_line() {
+    awk_string+=$'\n'"$1"' '
   }
+
+  if [[ -z "$option_alias" && -z "$option_func" ]]; then
+    # all func comments
+    add_line "$CAPTURE_COMMENT_LINES_PATTERN_ACTION"
+    add_line "$ACTION_FUNC_DEFS_ALL"
+  else
+    if [[ -n "$option_func" ]]; then
+      # only one func by name
+      add_line "$CAPTURE_COMMENT_LINES_PATTERN_ACTION"
+      add_line "$ACTION_FUNC_DEF_BY_NAME"
+      awk_args+=(-v capture_func="$option_func")
+
+    elif [[ -n "$option_alias" ]]; then
+      add_line "$CAPTURE_COMMENT_LINES_PATTERN_ACTION"
+      add_line "$ACTION_ALIAS_DEF_BY_NAME"
+      awk_args+=(-v capture_func="$option_alias")
+    fi
+  fi
+  add_line "$ACTION_COMMENTS_RESET"
+
 
   if [[ "$option_debug" == 'yes' ]]; then
 
     __print_lines "$(build_awk_string)"
 
-  elif [[ -z "$option_alias" && -z "$option_func" ]]; then
+  else
     local comments=()
 
     # split output on null delim
-    mapfile -t -d '' comments < <(awk -v capture_func=freem "$(build_awk_string)" "${option_args[0]}")
+    mapfile -t -d '' comments < <(awk "${awk_args[@]}" "$awk_string" "${option_args[0]}")
 
     for com in "${comments[@]}"; do
-      __print_lines "======================================================="
       __print_lines "$com"
     done
-
-  else
-
-    echo "else"
-
-    if [[ -n "$option_alias" ]]; then
-      extract_comments_for_all_functions "${option_args[0]}"
-    elif [[ -n "$option_func" ]]; then
-      extract_comments_for_all_functions "${option_args[0]}"
-    fi
-
   fi
 )
 
