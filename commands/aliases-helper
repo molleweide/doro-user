@@ -21,72 +21,30 @@
 # https://github.com/cykerway/complete-alias
 #
 
-# TODO: ( ) post_review: go back to review | select which mode.
-# - change how the review mode is set -> use a type of [all/failures/successful] instead of multiple boolean option var
-# - choose menu
-#     (x) REVIEW_UI_MODE
-#     ( ) REVIEW_TYPE
-#         ^ This requires a bit more modification, but it should be quite simple
-#     (=) impl choose menu
-#         - ( ) In the switch case, set REVIEW_UI_MODE and REVIEW_TYPE
+# TODO: fix: proceed_with_successful is local to [do_review_main]
 #
-# TODO: ( ) test that all edit_* funcs work.
+# TODO: ( ) review_post -> if failures -> ASK: Include failures??
 #
-# TODO: doom -> add bindings to search DCAs
-#
-# FIX: ( ) review_post -> ASK: Include failures??
-#
-#
+# TODO: prevent edit_code if function?
+# >>> Im not sure this is necessary since you can only enter edit_code from [act_create]
 #
 # TODO: ( ) support zsh
 # - modified parser ??
 # - add zsh shebang?
 #
-# NOTE:
-# (*) value -> rename to code
-#     (x) rename the data array
-#     ( ) update prompt texts
-# (x) desc -> needs to come before the code.
+# TODO: help() -> print supported interpreters
 #
-# -----------------------------------------------------------------------------
-#
-# TODO: ( ) REVISE ALL BELOW TODOS
-#
-# TODO: ( ) REVIEW
-#             FIRST----
-#                 ( ) revies the UIs and take notes.
-#             MAIN-----
-#                 ( ) show type [iterate]
-#             POST------
-#                 ( ) show better status info before creating aliases.
-#                 ( ) do_review_post -> confirm: default put new DCAs in testing dir.
-#                     >> or elevate
-#                 ( ) go back -> choose how to review
-#
-# >>> review_mode=[failures|successful|both]
-#
-# TODO: review choose title -> show type [regular|dummy|evaluate]
+# FIX: 1. you correct a failure, 2. then edit_name and make it a failure again.
+# 3. Then, cancel, -> Now it will show green in UI menu but have the invalid name.
+# >>> Should we use a temp var, or is this just a simple check at the name?
 #
 # TODO: ( ) ask: prefix alias with exec?
 #
-# NOTE: Why not allow upper case chars??
-#
-# FIX: ( ) opt-in: auto convert aliases to lowercase?
-#
-# FIX: ( ) for migrating omz git stuff, i need to load the file with zsh instead of bash.
-# And use zsh funcs to spit out the alias names and funcs.
-#
-# TODO: ( ) on [create_dca_files] it seems to duplicate the print statements which
-# makes it seem like you made duplicate files but it does not.
-# ?????
+# TODO: Why not allow upper case chars??
 #
 # TODO: try using [echo-lines] for column formatting.
 #
 # PERF: obtain all fn bodies in bulk - works bc we dont care about order.
-#
-# PERF: research bash script performance optimization.
-#
-# WARN: befor procedding to migrate, annotate all aliases for clarity
 
 # -----------------------------------------------------------------------------
 # FABRIC
@@ -111,8 +69,6 @@
 # TODO: ( ) -> use DCA_IS_VALID=()
 #       | This will make it easier to handle building UI in eg. edit_*
 #
-# TODO: ( ) move dca $index selection to global var.
-#
 # TODO: edit_ show num
 #       ( ) get number of collisions
 #             -> show in the EDIT_ title
@@ -132,17 +88,9 @@
 # TODO: use other methods to parse
 # - treesitter
 #
-# TODO: opt-in func description
-#
-# TODO: migrate: multi select which (valid) dcas to create
+# TODO: migrate: multi select which to force create?
 #
 # TODO: ask: purge migration source files?
-#
-# TODO: do_review_post: choose menu (!=default)
-# | entry: go back to reviewing -> (overrides all other selections)
-# |!entry: put new under /test dir
-# | entry: purge input source files
-# | entry:
 #
 # TODO: ( ) fzf would really be beneficial for this.
 #
@@ -150,15 +98,10 @@
 #
 # ----
 #
-# TODO: do_review_post: go back to reviewing
-#       -> select: [both | failures | valid]
-#
 # TODO: --review-all
 #         jump to first failure
 #
-# TODO: ( ) environment.sh: only add aliases to path if terminal is interactive
-#
-# TODO: ( ) add previous N lines from terminal HISTORY to DCA or FZF select
+# TODO: ( ) [aliases history] -> add previous N lines from terminal HISTORY to DCA or FZF select
 #         >> use fzf -> search history -> select put into dca
 #
 # TODO: BROWSER:
@@ -166,11 +109,11 @@
 #         ( ) move selection to subgroup.
 #         ( ) rm selection
 #
-
 # TODO: ( ) act_clean group
 # TODO: ( ) act_clean single
 #
 # TODO: prefix the shell of the source file when listing entries.
+# >> This would pertain to migrating multiple files at once.
 
 # -------------------------------------------------------
 # PERFORMANCE
@@ -190,163 +133,163 @@
 # https://stackoverflow.com/questions/53896277/how-to-remove-a-list-item-from-fzf
 
 function command_aliases_test() (
-  # Test that aliases are migrated and parsed correctly. Handle:
-  # - surrounding comments properly.
-  # - collect arguments order and naming?
-  # - ensure uniqueness
-  :
+	# Test that aliases are migrated and parsed correctly. Handle:
+	# - surrounding comments properly.
+	# - collect arguments order and naming?
+	# - ensure uniqueness
+	:
 )
 
 function command_aliases() (
-  source "$DOROTHY/sources/bash.bash"
-  __require_array 'mapfile'
+	source "$DOROTHY/sources/bash.bash"
+	__require_array 'mapfile'
 
-  local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
-  local DCA_TEST_DIR_NAME="__testing"
-  local DCA_EVALUATE_DIR_NAME="__evaluate"
-  local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
-  local ALLOW_MAX_SUB_DIRS=2
-  local VALID_NAME_CHARS_PATTERN="a-zA-Z0-9_.-"
-  local regex_rm_paths_with_files_extension='\.[^/]+$'
-  # Use indices to get these back
-  local AX_UI_PREFIX="ALIASES"
-  local DO_RELOAD='no'
+	local USER_COMMAND_ALIASES_DIR="$DOROTHY/user/commands.aliases"
+	local DCA_TEST_DIR_NAME="__testing"
+	local DCA_EVALUATE_DIR_NAME="__evaluate"
+	local BAT_CMD=(bat --style numbers --color always --language bash --paging=never)
+	local ALLOW_MAX_SUB_DIRS=2
+	local VALID_NAME_CHARS_PATTERN="a-zA-Z0-9_.-"
+	local regex_rm_paths_with_files_extension='\.[^/]+$'
+	# Use indices to get these back
+	local AX_UI_PREFIX="ALIASES"
+	local DO_RELOAD='no'
 
-  local REVIEW_UI_MODE='choose'
-  local REVIEW_TYPE='failures'
+	local REVIEW_UI_MODE='choose'
+	local REVIEW_TYPE='failures'
 
-  local DCA_SELECTED='' # use this for selection
+	local DCA_SELECTED='' # use this for selection
 
-  local EDIT_ANSWER=''
+	local EDIT_ANSWER=''
 
-  local CMD_STATUS='INIT'
+	local CMD_STATUS='INIT'
 
-  # ---------------------------------
-  # data containers
+	# ---------------------------------
+	# data containers
 
-  # NOTE: Current selection index used to obtain data
-  local INDEX=0 # Get any DCA data by eg. name="${DCA_NAMES[INDEX]}"
+	# NOTE: Current selection index used to obtain data
+	local INDEX=0 # Get any DCA data by eg. name="${DCA_NAMES[INDEX]}"
 
-  # --------------------------------------------
-  #
-  # TODO: update the code to load all these arrays so that I can avoid using
-  # subshell when accessing the data.
-  # Setters are OK, but getting data via subshell should be avoided.
-  #
-  # NOTE: In each array, the same index represents data for a single DCA. If
-  # the value is empty string, then the data value should be interpreted as
-  # nil or false
+	# --------------------------------------------
+	#
+	# TODO: update the code to load all these arrays so that I can avoid using
+	# subshell when accessing the data.
+	# Setters are OK, but getting data via subshell should be avoided.
+	#
+	# NOTE: In each array, the same index represents data for a single DCA. If
+	# the value is empty string, then the data value should be interpreted as
+	# nil or false
 
-  local DCA_NAMES=()                 # The command names
-  local DCA_GROUPS=()                # The path segment used for the group
-  local DCA_DIRS=()                  #
-  local DCA_PATHS=()                 #
-  local DCA_PATHS_SHORT=()           # Only used for displaying
-  local DCA_PATHS_SHORT_FORMATTED=() # Used for choose entries
-  local DCA_CODE=()                  #
-  local DCA_DESCS=()                 #
-  local DCA_ARGS=()                  #
-  local DCA_CONTENTS=()              # The code body of the new dca
-  local DCA_IS_FUNC=()               #
-  local DCA_IS_VALID=()              #   -> DCA_IS_VALID
-  local FAILING_POSITIONS=()         #         -> DCA_INDICES_BAD
-  local SUCCESS_POSITIONS=()         #        ->  DCA_INDICES_GOOD
-  local INVALID_REASON=()            #         -> BAD_INDICES__REASON
-  local INVALID_CORRECTION_FUNC=()   # -> BAD_INDICES__FN_RECTIFY
+	local DCA_NAMES=()                 # The command names
+	local DCA_GROUPS=()                # The path segment used for the group
+	local DCA_DIRS=()                  #
+	local DCA_PATHS=()                 #
+	local DCA_PATHS_SHORT=()           # Only used for displaying
+	local DCA_PATHS_SHORT_FORMATTED=() # Used for choose entries
+	local DCA_CODE=()                  #
+	local DCA_DESCS=()                 #
+	local DCA_ARGS=()                  #
+	local DCA_CONTENTS=()              # The code body of the new dca
+	local DCA_IS_FUNC=()               #
+	local DCA_IS_VALID=()              #   -> DCA_IS_VALID
+	local FAILING_POSITIONS=()         #         -> DCA_INDICES_BAD
+	local SUCCESS_POSITIONS=()         #        ->  DCA_INDICES_GOOD
+	local INVALID_REASON=()            #         -> BAD_INDICES__REASON
+	local INVALID_CORRECTION_FUNC=()   # -> BAD_INDICES__FN_RECTIFY
 
-  # NOTE: TEMP_*: only used if user triggers a failure during review edit prompt.
-  # | Maybe need to rethink this.. bc it was a bit hacky...
+	# NOTE: TEMP_*: only used if user triggers a failure during review edit prompt.
+	# | Maybe need to rethink this.. bc it was a bit hacky...
 
-  local TEMP_FAILURE_REASON=''          #          -> TEMP_BAD__REASON
-  local TEMP_FAILURE_CORRECTION_FUNC='' # -> TEMP_BAD__FN_RECTIFY
+	local TEMP_FAILURE_REASON=''          #          -> TEMP_BAD__REASON
+	local TEMP_FAILURE_CORRECTION_FUNC='' # -> TEMP_BAD__FN_RECTIFY
 
-  # upon validate_all -> handle_validate: count matches and put the count number
-  # at the index position of the corresponding DCA indices
-  #
-  # NOTE: I need to think about this so I dont have to put mult values for each
-  # match in the tracker array.
-  #
-  # TODO: try: concatenate strings that represent
+	# upon validate_all -> handle_validate: count matches and put the count number
+	# at the index position of the corresponding DCA indices
+	#
+	# NOTE: I need to think about this so I dont have to put mult values for each
+	# match in the tracker array.
+	#
+	# TODO: try: concatenate strings that represent
 
-  # HACK: HOW TO ACCESS ARRAY INDICES:
-  # | **Expression**            | **Braces Needed?** | **Why?** |
-  # |---------------------------|-------------------|---------|
-  # | `$var`                    | ❌ No              | Works in simple cases |
-  # | `${var}`                  | ✅ Yes             | Needed to separate from surrounding text |
-  # | `$array[1]`               | ❌ No              | Only if using a **literal index** |
-  # | `${array[1]}`             | ✅ Yes             | Recommended for clarity |
-  # | `$array[$index]`          | ❌ No              | Works, but **fails in arithmetic** |
-  # | `${array[$index]}`        | ✅ Yes             | Ensures correct expansion |
-  # | `$(( x + 1 ))`            | ❌ No              | Arithmetic expansion allows `$x` directly |
-  # | `$(( $x + 1 ))`           | ❌ No              | Braces **not required** in `$(( ))` |
+	# HACK: HOW TO ACCESS ARRAY INDICES:
+	# | **Expression**            | **Braces Needed?** | **Why?** |
+	# |---------------------------|-------------------|---------|
+	# | `$var`                    | ❌ No              | Works in simple cases |
+	# | `${var}`                  | ✅ Yes             | Needed to separate from surrounding text |
+	# | `$array[1]`               | ❌ No              | Only if using a **literal index** |
+	# | `${array[1]}`             | ✅ Yes             | Recommended for clarity |
+	# | `$array[$index]`          | ❌ No              | Works, but **fails in arithmetic** |
+	# | `${array[$index]}`        | ✅ Yes             | Ensures correct expansion |
+	# | `$(( x + 1 ))`            | ❌ No              | Arithmetic expansion allows `$x` directly |
+	# | `$(( $x + 1 ))`           | ❌ No              | Braces **not required** in `$(( ))` |
 
-  # ---------------------------------
-  # collision trackers
+	# ---------------------------------
+	# collision trackers
 
-  # (*) Each index represent the DCA index and maps to the index in the count tracker
-  # array (**), which in turn as well as encodes the count, also maps back to
-  # the colliding indices in the DCA names array, or back to (*) if you will.
-  # example=(
-  #   0
-  #   "nul"
-  #   0
-  #   "2"
-  #   ...
-  #   "2"
-  #   0
-  #   "nul"
-  #   ...
-  # )
-  local NAMES_COLLISION_MAP=() # type: int || null
-  local GROUP_COLLISION_MAP=() # type: int || null
+	# (*) Each index represent the DCA index and maps to the index in the count tracker
+	# array (**), which in turn as well as encodes the count, also maps back to
+	# the colliding indices in the DCA names array, or back to (*) if you will.
+	# example=(
+	#   0
+	#   "nul"
+	#   0
+	#   "2"
+	#   ...
+	#   "2"
+	#   0
+	#   "nul"
+	#   ...
+	# )
+	local NAMES_COLLISION_MAP=() # type: int || null
+	local GROUP_COLLISION_MAP=() # type: int || null
 
-  # (**) Each index encodes the number of a specific collition, AND maps back to
-  # their names
-  # example=(
-  #   "0:2:27"    # means that DCAs 0, 5, and 27 collide on the same name
-  #   "3:8"
-  # )
-  local NAMES_COLLISION_COUNT_MAP=() #
-  local GROUP_COLLISION_COUNT_MAP=() #
+	# (**) Each index encodes the number of a specific collition, AND maps back to
+	# their names
+	# example=(
+	#   "0:2:27"    # means that DCAs 0, 5, and 27 collide on the same name
+	#   "3:8"
+	# )
+	local NAMES_COLLISION_COUNT_MAP=() #
+	local GROUP_COLLISION_COUNT_MAP=() #
 
-  # ---------------------------------
-  # supports
+	# ---------------------------------
+	# supports
 
-  local SHEBANG_BASH="#!/usr/bin/env bash"
+	local SHEBANG_BASH="#!/usr/bin/env bash"
 
-  local supported=(
-    sh
-    bash
-    zsh
-    fish
-  )
-  local SUPPORTED_POSIX=(
-    sh
-    bash
-    zsh
-    fish
-  )
-  local SUPPORTED_NON_POSIX=(
-    nu
-    elvish
-    xonsh
-  )
+	local supported=(
+		sh
+		bash
+		zsh
+		fish
+	)
+	local SUPPORTED_POSIX=(
+		sh
+		bash
+		zsh
+		fish
+	)
+	local SUPPORTED_NON_POSIX=(
+		nu
+		elvish
+		xonsh
+	)
 
-  # Predefined/recommended mnemonic aliases for making working with this command more ergonomic.
-  # These will be used when creating "internal" aliases for this command itself.
-  local DCA_SELF=(
-    ali 'aliases'
-    alic 'aliases create'
-    alim 'aliases migrate --'
-    alimc 'aliases migrate --verbose --review-all --'
-    alimi 'aliases migrate --review-verbose --review-all --fix-iterate --'
-  )
+	# Predefined/recommended mnemonic aliases for making working with this command more ergonomic.
+	# These will be used when creating "internal" aliases for this command itself.
+	local DCA_SELF=(
+		ali 'aliases'
+		alic 'aliases create'
+		alim 'aliases migrate --'
+		alimc 'aliases migrate --verbose --review-all --'
+		alimi 'aliases migrate --review-verbose --review-all --fix-iterate --'
+	)
 
-  # =====================================
-  # Arguments
+	# =====================================
+	# Arguments
 
-  function help {
-    cat <<-EOF >/dev/stderr
+	function help {
+		cat <<-EOF >/dev/stderr
 			      NOTE:
 
 			      This command is a "creator" command called [aliase-helper]. It should be
@@ -482,7 +425,7 @@ function command_aliases() (
 						    Ignore reviewing newly created DCas via UI menu and directly enter
 						    a review process loop where you can fix or discard parsed DCAs.
 
-						--replace-underscores
+						--[no]-replace-underscores
 						    When converting functions to commands, take the function name
 						    and replace it with hyphens in the command name.
 
@@ -525,1650 +468,1630 @@ function command_aliases() (
 						--check-collsion-across-shells
 
 		EOF
-    if [[ $# -ne 0 ]]; then
-      echo-error "$@"
-    fi
-    return 22 # EINVAL 22 Invalid argument
-  }
-
-  # =======================================================
-  # ARGS
-
-  local \
-    option_action='' \
-    option_test_mode='yes' \
-    option_evaluate='no' \
-    option_review_verbose='no' \
-    option_quiet='no' \
-    option_migrate_to_subdir='' \
-    option_args=() \
-    option_fix_iterate='no' \
-    option_review_both='no' \
-    option_review_successful='no' \
-    option_parsing_verbose='no' \
-    option_debug='no' \
-    option_replace_underscores='yes'
-
-  while [[ $# -ne 0 ]]; do
-    item="$1"
-    shift
-    case "$item" in
-    '--help' | '-h') help ;;
-    '--debug') option_debug='yes' ;;
-    # verbosity
-    '--no-verbose-parsing'* | '--review-verbose'*)
-      option_review_verbose="$(get-flag-value --affirmative --fallback="$option_review_verbose" -- "$item")"
-      ;;
-    '--verbose-review') option_parsing_verbose='yes' ;;
-    '--verbose')
-      option_parsing_verbose='yes'
-      option_review_verbose='yes'
-      ;;
-    # ---
-    '--no-quiet'* | '--quiet'*)
-      option_quiet="$(get-flag-value --affirmative --fallback="$option_quiet" -- "$item")"
-      ;;
-    '--to='*) option_migrate_to_subdir="${item#*=}" ;;
-    '--no-replace-underscores'* | '--replace-underscores'*)
-      option_quiet="$(get-flag-value --affirmative --fallback="$option_replace_underscores" -- "$item")"
-      ;;
-    '--fix-iterate') option_fix_iterate='yes' ;;
-
-    '--review-all' | '--all') option_review_both='yes' ;;
-    '--review-successful' | '--success') option_review_successful='yes' ;;
-
-    '--no-test'* | '--test'*)
-      # default to using the test dir
-      option_test_mode="$(get-flag-value --affirmative --fallback="$option_test_mode" -- "$item")"
-      ;;
-    '--evaluate') option_evaluate='yes' ;;
-
-    'browse')
-      option_action="browse"
-      AX_UI_PREFIX+=":BROWSE"
-      ;;
-    'clean' | 'remove' | 'rm')
-      option_action="clean"
-      AX_UI_PREFIX+=":CLEAN"
-      ;;
-    'new' | 'create')
-      option_action="create"
-      AX_UI_PREFIX+=":CREATE"
-      ;;
-    'migrate')
-      option_action="migrate"
-      AX_UI_PREFIX+=":MIGRATE"
-      ;;
-    'list')
-      option_action="list"
-      AX_UI_PREFIX+=":LIST"
-      ;;
-      # '--')
-      #   # 	option_args+=("$item" "$@")
-      #   break
-      #   ;;
-      #   # *) option_args+=("$item") ;;
-    '--')
-      option_args+=("$@")
-      shift $#
-      break
-      ;;
-    *)
-      help "Unknown argument was provided"
-      ;;
-    esac
-  done
-
-  # =======================================================
-  # =======================================================
-  # LOG AND DEBUG HELPERS
-
-  function debug_against_failures() {
-    echo "-------"
-    for ((i = 0; i < "${#DCA_NAMES[@]}"; i++)); do
-      echo "DCA_NAMES: $i -> ${DCA_NAMES[i]}"
-    done
-    echo "-------"
-    for i in "${FAILING_POSITIONS[@]}"; do
-      echo "FPOS: $i -> ALL: ${DCA_NAMES[i]}"
-    done
-    echo "-------"
-  }
-
-  function debug_status_arrays() {
-    echo "-------"
-
-    echo "${SUCCESS_POSITIONS[@]}"
-    echo "${FAILING_POSITIONS[@]}"
-    echo "==="
-
-    if [[ "${#FAILING_POSITIONS[@]}" -eq 0 ]]; then
-      echo "FAILING_POSITIONS = empty"
-    else
-      for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
-        fv="${FAILING_POSITIONS[i]}"
-        echo "FAILURE: fp $i : $fv -> ALL: ${DCA_NAMES[fv]}"
-      done
-    fi
-    echo "-------"
-    if [[ "${#SUCCESS_POSITIONS[@]}" -eq 0 ]]; then
-      echo "SUCCESS_POSITIONS = empty"
-    else
-      echo "${#SUCCESS_POSITIONS[@]}"
-      for ((i = 0; i < "${#SUCCESS_POSITIONS[@]}"; i++)); do
-        sv="${SUCCESS_POSITIONS[i]}"
-        echo "sp:$i"
-        echo "sv:$sv"
-        echo "SUCCESS: sp $i : $sv -> ${DCA_NAMES[sv]}"
-      done
-    fi
-    echo "-------"
-  }
-
-  function log_failure_and_success_positions() {
-    echo "--- failure positions ---"
-    echo "${FAILING_POSITIONS[@]}"
-    echo "--- success positions ---"
-    echo "${SUCCESS_POSITIONS[@]}"
-    echo "-------"
-  }
-
-  function log_single_content() {
-    local index="${1-0}"
-    bat --style numbers --color always --language bash --paging=never <<<"${DCA_CONTENTS[$index]}"
-  }
-
-  function log_all_contents() {
-    for c in "${DCA_CONTENTS[@]}"; do
-      bat --style numbers --color always --language bash --paging=never <<<"$c"
-    done
-  }
-
-  function log_during_parsing() {
-    local last=$(("${#DCA_NAMES[@]}" - 1))
-    __print_lines "-------------------------------------------------------"
-    __print_lines "log_during_parsing: $last"
-    log_single_content "$last" # "${DCA_CONTENTS[$last]}"
-  }
-
-  function logger {
-    # echo "<[${FUNCNAME[0]}]>"
-    echo "<[${FUNCNAME[1]}]>: $*"
-  }
-
-  function debug_post_check_name_collisions {
-    logger "NAMES_COLLISION_MAP"
-    for ((a = 0; a < "${#DCA_NAMES[@]}"; a++)); do
-      if [[ -n "${NAMES_COLLISION_MAP[$a]}" ]]; then
-        __print_lines "#$a: ${DCA_NAMES[$a]} -> ${NAMES_COLLISION_MAP[$a]}"
-      fi
-    done
-    logger "NAMES_COLLISION_COUNT_MAP"
-    for ((b = 0; b < "${#NAMES_COLLISION_COUNT_MAP[@]}"; b++)); do
-      echo "$b: ${NAMES_COLLISION_COUNT_MAP[$b]}"
-    done
-  }
-
-  # TODO: print all state vars.
-  function debug_state {
-    :
-  }
-
-  # =======================================================
-  # =======================================================
-  # ARRAY HELPERS
-
-  function reset_new_alias_arrays() {
-    DCA_NAMES=()
-    DCA_GROUPS=()
-    DCA_DIRS=()
-    DCA_PATHS=()
-    DCA_PATHS_SHORT=()
-    DCA_PATHS_SHORT_FORMATTED=()
-    DCA_CONTENTS=()
-    DCA_CODE=()
-    DCA_DESCS=()
-    DCA_ARGS=()
-    DCA_IS_FUNC=()
-  }
-
-  function reset_status_arrays() {
-    DCA_IS_VALID=""
-    FAILING_POSITIONS=()
-    INVALID_REASON=()
-    SUCCESS_POSITIONS=()
-    NAMES_COLLISION_MAP=()
-    NAMES_COLLISION_COUNT_MAP=()
-  }
-
-  function reset_all() {
-    reset_new_alias_arrays
-    reset_status_arrays
-  }
-
-  function success_pos_add() {
-    SUCCESS_POSITIONS+=("$1")
-    SUCCESS_POSITIONS=($(printf "%s\n" "${SUCCESS_POSITIONS[@]}" | sort -n))
-  }
-
-  # Function to remove an index N from an array
-  function remove_array_index() {
-    local array_name="$1" index="$2"
-    eval "local arr=(\"\${$array_name[@]}\")"
-    eval "$array_name=(\"\${arr[@]:0:$index}\" \"\${arr[@]:$((index + 1))}\")"
-  }
-
-  function trim_failure_arrays() {
-    local index="${1-0}"
-    remove_array_index "FAILING_POSITIONS" "$index"
-    remove_array_index "INVALID_REASON" "$index"
-    remove_array_index "INVALID_CORRECTION_FUNC" "$index"
-  }
-
-  # =======================================================
-  # =======================================================
-  # HANDLE SECONDARY DATA
-  #
-
-  function make_dca_path() {
-    local index="${1-$INDEX}"
-    DCA_PATHS[index]="${DCA_DIRS[$index]}/${DCA_NAMES[$index]}"
-  }
-
-  function make_dca_dir() {
-    local index="${1-$INDEX}" pre=$USER_COMMAND_ALIASES_DIR sub_path
-
-    if [[ "$option_evaluate" == 'yes' ]]; then
-      pre="$pre/$DCA_EVALUATE_DIR_NAME"
-    elif [[ "$option_test_mode" == 'yes' ]]; then
-      pre="$pre/$DCA_TEST_DIR_NAME"
-    fi
-    subpath=${DCA_GROUPS[$index]}
-    # logger "subpath = $subpath" >/dev/tty
-    if [[ -z "$subpath" ]]; then
-      # __print_string "$pre"
-      DCA_DIRS[$index]="$pre"
-    else
-      # __print_string "$pre/__group/$subpath"
-      DCA_DIRS[$index]="$pre/__group/$subpath"
-    fi
-  }
-
-  function make_dca_path_short() {
-    local index="${1-INDEX}" path
-    path="${DCA_PATHS[index]}"
-    DCA_PATHS_SHORT[index]="${path#*"commands.aliases/"}"
-  }
-
-  # During parsing, this func requires an index to be supplied so that the
-  # last index can be generated on each loop.
-  function update_secondary_data {
-    local index="${1-INDEX}"
-    make_dca_dir "$index"
-    make_dca_path "$index"
-    make_dca_path_short "$index"
-    # make_dca_path_short_formatted # maybe put in [update_tertiary_data]
-    make_contents "$index"
-  }
-
-  # =======================================================
-  # =======================================================
-
-  # get paths of existing aliases
-  function get_all_existing_dcas() {
-    find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
-  }
-
-  # # --alias | --fn
-  # function get_comment_block_above() {
-  # 	# This is a sample script from ChatGPT.
-  #
-  # 	# # Function to greet someone
-  # 	# # Usage: greet <name>
-  # 	# greet() {
-  # 	# 	local name="$1"
-  # 	# 	echo "Hello, $name!"
-  # 	# }
-  #
-  # 	# Extract comment block above a function definition
-  # 	extract_comment() {
-  # 		local function_name="$1"
-  # 		awk -v func="$function_name" '
-  # 	  /^#/ { comments = comments "\n" $0; next }
-  # 	  $0 ~ "^" func "\\(" { print comments; exit }
-  # 	  { comments = "" }
-  # 	  ' "$0"
-  # 	}
-  #
-  # 	# Example usage:
-  # 	comment_block=$(extract_comment "greet")
-  # 	echo "$comment_block"
-  # }
-  #
-  #   # TODO: Move comment block extractor into its own file.
-  # # Example usage
-  # # extract_comments_for_all_functions "your_script.sh"
-  # function extract_comments_for_all_functions() {
-  #     awk '
-  #     /^#/ { comments = comments "\n" $0; next }  # Collect comment lines
-  #     /^[a-zA-Z_][a-zA-Z0-9_]*\(\) *{/ {         # Match function definitions
-  #         func_name = $1;                         # Capture function name
-  #         sub(/\(\)$/, "", func_name);            # Remove '()' from name
-  #         print "Function: " func_name;           # Print function name
-  #         print comments "\n";                    # Print associated comment block
-  #         comments = "";                          # Reset comments
-  #     }
-  #     { comments = "" }  # Reset comments if a non-comment, non-function line is encountered
-  #     ' "$1"
-  # }
-
-  # =======================================================
-  # =======================================================
-  # STRING HELPERS
-  #
-
-  function str_ensure_length {
-    printf "%-${1-20}.${1-20}s" "$2"
-  }
-
-  # =======================================================
-  # =======================================================
-  # DCA HELPERS
-  #
-
-  # DCA index -> failure position
-  function get_failure_pos_from_dca_index() {
-    local index="${1-}" failure_index
-    if [[ -z "$index" ]]; then
-      return 1 # requires index
-    fi
-    for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
-      failure_index="${FAILING_POSITIONS[$i]}"
-      # check if input index exists amongst failure indices
-      if [[ "$index" == "$failure_index" ]]; then
-        echo "$i"
-        return
-      fi
-    done
-  }
-
-  # failure pos -> DCA index
-  function get_dca_index_from_failure_pos() {
-    printf "%s" "${FAILING_POSITIONS["${1-0}"]}"
-  }
-
-  # DCA index -> success position
-  function get_success_pos_from_dca_index() {
-    local index="${1-}" success_index
-    if [[ -z "$index" ]]; then
-      return 1 # requires index
-    fi
-    for ((i = 0; i < "${#SUCCESS_POSITIONS[@]}"; i++)); do
-      success_index="${SUCCESS_POSITIONS[$i]}"
-      # check if input index exists amongst failure indices
-      if [[ "$index" == "$success_index" ]]; then
-        echo "$i"
-        return
-      fi
-    done
-  }
-
-  # success pos -> dca index
-  function get_dca_index_from_success_pos() {
-    printf "%s" "${SUCCESS_POSITIONS["${1-0}"]}"
-  }
-
-  # DCA index -> true if index is found in failure array
-  function is_failure() {
-    local index="${1-}" ret
-    ret="$(get_failure_pos_from_dca_index "$index")"
-    if [[ -n "$ret" ]]; then
-      return 0
-    else
-      return 1
-    fi
-  }
-
-  # input: DCA index -> status array position
-  function get_status_pos_from_dca_index() {
-    if is_failure "$1"; then
-      get_failure_pos_from_dca_index "$1"
-    else
-      get_success_pos_from_dca_index "$1"
-    fi
-  }
-
-  # =======================================================
-  # =======================================================
-  # VALIDATORS
-
-  # local char_classes="A-Za-z0-9"
-  # local regex='^(/)?([^/\0]+(/)?)+$'
-  # local regex='^/?([A-Za-z0-9._-]+/?)*$'
-  function is_valid_group_dir() {
-    local input=$1
-    local char_classes="[:alpha:][:digit:]"
-    local valid_chars="([$char_classes/]+)"
-    local start='^'
-    local end='$'
-    local regex="$start$valid_chars$end"
-    if [[ ! "$input" =~ $regex ]]; then
-      return 1
-    fi
-  }
-
-  function is_valid_subdir_depth() {
-    local check_str="$1" parts=()
-    IFS='/' read -ra parts <<<"$check_str"
-    if [[ "${#parts[@]}" -gt $ALLOW_MAX_SUB_DIRS ]]; then
-      return 1
-    fi
-  }
-
-  # FIX: FLIP THIS TO {NAME_DOES_NOT_HAVE_UPPERCASE}
-  function name_has_uppercase() {
-    local index="${1-0}"
-    if [[ "${DCA_NAMES[$index]}" =~ [A-Z] ]]; then
-      return 0
-    fi
-    return 1
-  }
-
-  function name_has_valid_chars() {
-    local index="${1-0}"
-    if [[ "${DCA_NAMES[$index]}" =~ ^[$VALID_NAME_CHARS_PATTERN]+$ ]]; then
-      return 0
-    fi
-    return 1
-  }
-
-  function name_is_unique_across_installed_shells {
-    # Ensure that name does not exist in other shells than bash..
-    # Eval for <shell> -il and check existens.
-    :
-  }
-
-  function name_is_unique_in_path() {
-    local index="${1-0}"
-    if which -s "${DCA_NAMES[$index],,}"; then
-      return 1
-    fi
-  }
-
-  # This function is named in past tense since the evaluation of internal
-  # collitions always is made before validation. See "EDIT_NAME_FINISHED".
-  # input: dca index -> bool
-  function __parsed_name_was_unique() {
-    if [[ -n "${NAMES_COLLISION_MAP[${1-0}]}" ]]; then return 1; fi
-  }
-
-  # This is only used/checked upon event "EDIT_NAME_FINISHED"
-  # TODO: Move into event handler??
-  function __new_name_is_unique {
-    local name="$2" i
-    for ((i = 0; i < "${#DCA_NAMES[@]}"; i++)); do
-      if [[ $INDEX -eq $i ]]; then
-        continue
-      elif [[ "$name" == "${DCA_NAMES[$i]}" ]]; then
-        return 1
-      fi
-    done
-  }
-
-  # function
-
-  # =======================================================
-  # =======================================================
-  # VALIDATE DCAS
-
-  function update_status_arrays() {
-    :
-  }
-
-  # how could this be made to work with single index.
-  #
-  # >>> take an arg --temp
-
-  # input: dca index
-  function handle_validate() {
-    local vi name failure='no' set_temp='no' reason='' failure_part_redo_func=''
-
-    if [[ "$1" == "--temp" ]]; then
-      set_temp='yes' # insert status info into TEMP_FAILURE_* instead
-      shift
-      echo "handle_validate --temp $1"
-    fi
-
-    # check failures
-    vi="${1-}"
-    name="${DCA_NAMES[$vi]}"
-    if name_has_uppercase "$vi"; then
-      failure='yes'
-      failure_part_redo_func='edit_name'
-      reason="Alias can only be lower case. Your input was [$name]."
-    elif ! name_has_valid_chars "$vi"; then
-      failure='yes'
-      failure_part_redo_func='edit_name'
-      reason="New alias name contains invalid characters. Only valid chars: [$VALID_NAME_CHARS_PATTERN]"
-    elif ! name_is_unique_in_path "$vi"; then
-      failure='yes'
-      failure_part_redo_func='edit_name'
-      reason="Name [$name] already exists in path. ('which $name' -> $(which "$name"))"
-    elif ! __parsed_name_was_unique "$vi"; then
-      failure='yes'
-      failure_part_redo_func='edit_name'
-      reason="Parsed naming collision for name [$name]"
-    fi
-
-    # set arrays
-    if [[ "$failure" == 'yes' ]]; then
-      if [[ "$option_parsing_verbose" == 'yes' ]]; then
-        echo-style --error "$reason"
-      fi
-      if [[ "$set_temp" == 'no' ]]; then
-        FAILING_POSITIONS+=("$vi")
-        INVALID_REASON+=("$reason")
-        INVALID_CORRECTION_FUNC+=("$failure_part_redo_func")
-      else
-        # echo "<[ASSIGN TEMP FAILURE]>"
-        DCA_IS_VALID[$vi]='no'
-        TEMP_FAILURE_REASON="$reason"
-        TEMP_FAILURE_CORRECTION_FUNC="$failure_part_redo_func"
-      fi
-    else
-      SUCCESS_POSITIONS+=("$vi")
-      DCA_IS_VALID[$vi]='yes'
-      if [[ "$option_parsing_verbose" == 'yes' ]]; then
-        echo-style --success "Successfully validated alias [${DCA_PATHS_SHORT[$vi]}]"
-      fi
-      if [[ "$set_temp" == 'yes' ]]; then
-        # echo "<[RESET TEMP FAILURE]>"
-        TEMP_FAILURE_REASON=""
-        TEMP_FAILURE_CORRECTION_FUNC=""
-      fi
-    fi
-
-    if [[ "$failure" == 'yes' ]]; then
-      return 1
-    fi
-  }
-
-  function validate_single_simple() {
-    # if ! name_has_uppercase "$1" && name_has_valid_chars "$1" && name_is_unique_in_path "$1" && __parsed_name_was_unique "$1"; then
-    # 	return 0
-    # fi
-    # echo "validate_single_simple | input: $1"
-    compute_naming_collisions
-    if ! handle_validate --temp "$1"; then
-      return 1
-    fi
-    # TODO: collect TEMP_FAILURE_* info.
-    # return 1
-  }
-
-  function validate_all() {
-    local vi had_failure='no'
-    compute_naming_collisions
-    for ((vi = 0; vi < "${#DCA_NAMES[@]}"; vi++)); do
-      if ! handle_validate "$vi"; then
-        had_failure='yes'
-      fi
-    done
-    local complete_failure='yes'
-    if [[ "${#SUCCESS_POSITIONS[@]}" == "${#DCA_NAMES[@]}" ]]; then
-      complete_failure='no'
-    fi
-    if [[ "$had_failure" == 'no' ]]; then
-      return 0
-    else
-      if [[ "$complete_failure" == 'yes' ]]; then
-        return 1 # 1 complete failure
-      else
-        return 2 # 2 partial failure. some aliases were validated succeeded
-      fi
-    fi
-  }
-
-  # =======================================================
-  # =======================================================
-  # =======================================================
-  # COLLISION HELPERS
-
-  function get_number_of_collisions {
-    local index="${1-0}" count=0
-    local count_map_idx="${NAMES_COLLISION_MAP[index]}"
-
-    [[ -z "$count_map_idx" ]] && __print_string $count && return
-
-    local count_map_str="${NAMES_COLLISION_COUNT_MAP[$count_map_idx]}"
-
-    IFS=':' read -r -a arr_split <<<"$count_map_str"
-    last=$((${#arr_split[@]} - 1))
-    for ((i = 0; i <= "$last"; i++)); do
-      if [[ "${arr_split[i]}" == "$index" ]]; then
-        continue
-      fi
-      count=$((count + 1))
-    done
-    __print_string "$count"
-  }
-
-  function remove_collision {
-    local index="$1" arr_split=() concat='' i last map_index sep=':'
-    local count_map_idx="${NAMES_COLLISION_MAP[index]}"
-    local count_map_str="${NAMES_COLLISION_COUNT_MAP[count_map_idx]}"
-    # logger "index:$index -> count_map_idx:$count_map_idx -> count_map_str:$count_map_str"
-    IFS=':' read -r -a arr_split <<<"$count_map_str"
-    last=$((${#arr_split[@]} - 1))
-    for ((i = 0; i <= "$last"; i++)); do
-      map_index="${arr_split[i]}"
-      if [[ "$map_index" == "$index" ]]; then
-        continue
-      fi
-      if [[ $i -eq $last ]]; then
-        sep=''
-      fi
-      concat+="$map_index$sep"
-    done
-    NAMES_COLLISION_COUNT_MAP[count_map_idx]="$concat"
-    NAMES_COLLISION_MAP[index]=""
-  }
-
-  function compute_naming_collisions {
-    local i_check name_check y collision encode_count_string collision_counter=0 already_processed=()
-    NAMES_COLLISION_MAP=()
-    NAMES_COLLISION_COUNT_MAP=()
-
-    if [[ "${#DCA_NAMES[@]}" -lt 2 ]]; then
-      NAMES_COLLISION_MAP+=("")
-    fi
-
-    for ((i_check = 0; i_check < "${#DCA_NAMES[@]}"; i_check++)); do
-      name_check="${DCA_NAMES[$i_check]}" collision='no' encode_count_string="$i_check"
-      if is-needle --needle="$name_check" -- "${already_processed[@]}"; then
-        continue # guard against multiple checks for same name.
-      fi
-      for ((y = 0; y < "${#DCA_NAMES[@]}"; y++)); do
-        if [[ "$name_check" == "${DCA_NAMES[$y]}" ]]; then
-          NAMES_COLLISION_MAP[y]=$collision_counter
-          if [[ "$i_check" == "$y" ]]; then
-            already_processed+=("$name_check")
-            continue # first match
-          else
-            collision='yes' # subsequent matches
-            encode_count_string+=":$y"
-          fi
-        fi
-      done
-      if [[ "$collision" == 'yes' ]]; then
-        NAMES_COLLISION_COUNT_MAP+=("$encode_count_string")
-        collision_counter=$((collision_counter + 1))
-      else
-        NAMES_COLLISION_MAP[i_check]=""
-      fi
-    done
-    # debug_post_check_name_collisions
-  }
-
-  # =======================================================
-  # =======================================================
-  # =======================================================
-  # FILE SYSTEM
-
-  function correct_permissions() {
-    # fs-own --permissions="+Xrw" --recursive --quiet -- "$USER_COMMAND_ALIASES_DIR"
-    if [[ $# -eq 0 ]]; then
-      local alias_paths=()
-      mapfile -t alias_paths < <(get_all_existing_dcas)
-      fs-own --x -- "${alias_paths[@]}"
-    else
-      fs-own --x --no-quiet -- "$@" # correct permissions for inpus only
-    fi
-  }
-
-  function create_dca_files() {
-    local i target_path target_dir='' target_name prev_dir='' target_new_paths=()
-
-    function apply() {
-      if [[ -z "$prev_dir" || "$target_dir" != "$prev_dir" ]]; then
-        target_dir="${DCA_DIRS[i]}"
-        __mkdirp "$target_dir" >/dev/null
-        prev_dir="$target_dir"
-      fi
-      target_name="${DCA_NAMES[$i]}"
-      target_path="$target_dir/$target_name"
-      __print_lines "${DCA_CONTENTS[$i]}" >"$target_path"
-      DO_RELOAD='yes'
-      target_new_paths+=("$target_path")
-    }
-
-    if [[ "${1-}" == "--successful" ]]; then
-      for i in "${SUCCESS_POSITIONS[@]}"; do
-        apply
-      done
-    else
-      for ((i = 0; i < "${#DCA_NAMES[@]}"; i++)); do
-        apply
-      done
-    fi
-
-    correct_permissions "${target_new_paths[@]}" # bulk correct permissions
-  }
-
-  # =======================================================
-  # =======================================================
-  # =======================================================
-  #
-
-  #
-  function make_contents() {
-    local index=$1 c=''
-    c+="$SHEBANG_BASH"
-    c+=$'\n'"# NAME: ${DCA_NAMES[$index]}"
-    c+=$'\n'"# -------------------------------------------------------"
-    c+=$'\n'"# DESCRIPTION:"
-    c+=$'\n'"# ${DCA_DESCS[$index]}"
-    c+=$'\n'"# -------------------------------------------------------"
-    if [[ "${DCA_IS_FUNC[$index]}" == 'yes' ]]; then
-      c+=$'\n'"# ARGS: ${DCA_ARGS[$index]}"
-      c+=$'\n'"${DCA_CODE[$index]}"
-    else
-      c+=$'\n'"${DCA_CODE[$index]}"
-      c+=' "$@"'
-    fi
-    DCA_CONTENTS[index]="$c"
-  }
-
-  # =======================================================
-  # =======================================================
-  # =======================================================
-  # EDIT FUNCS
-  #
-  # - ( ) Add ability to create more informative labels by passing, eg. failure reason.
-  #
-  # TODO: these functions should return status on abort, so that i can use that
-  # to break out of editing pipeline in act_migrate
-
-  local EDIT_label=''
-
-  function pre_edit__ {
-    :
-  }
-
-  function edit_name() {
-    local index=${1-0} answer failure_pos success_pos label current_value temp_fail='no'
-
-    label="======================================================="
-    label+=$'\n'"$AX_UI_PREFIX | ${#FAILING_POSITIONS[@]} / ${#DCA_NAMES[@]} FAILURES"
-
-    if [[ "$REVIEW_UI_MODE" == 'iterate' ]]; then
-      label+=$'\n'"Supply empty string to discard subsequent and proceed to post review"
-    fi
-
-    echo "name in edit: ${DCA_NAMES[$index]}"
-
-    local num_failures="$(get_number_of_collisions "$index")"
-
-    if [[ -n "$TEMP_FAILURE_REASON" ]]; then
-      temp_fail='yes'
-    else
-      failure_pos="$(get_failure_pos_from_dca_index "$index")"
-      success_pos="$(get_success_pos_from_dca_index "$index")"
-      echo "index $index | fpos $failure_pos | spos $success_pos"
-    fi
-
-    current_value="${DCA_NAMES[$index]}"
-
-    # edit_name | build label
-
-    if [[ "$temp_fail" == 'yes' ]]; then
-      # temp / review
-      label+=$'\n'"$(echo-style --error "Rectify name (currently: ${DCA_NAMES[index]} | DCA index: $index):")"
-      label+=$'\n'"REASON: $TEMP_FAILURE_REASON"
-      if [[ "$option_review_verbose" == 'yes' ]]; then
-        label+=$'\n'"$(log_single_content "$index")"
-      fi
-
-    elif [[ -n "$failure_pos" ]]; then
-      # is failure
-      label+=$'\n'"$(echo-style --error "Rectify name (currently: ${DCA_NAMES[index]} | DCA index: $index):")"
-      label+=$'\n'"REASON: ${INVALID_REASON[$failure_pos]}"
-      if [[ "$option_review_verbose" == 'yes' ]]; then
-        label+=$'\n'"$(log_single_content "$index")"
-      fi
-
-    elif [[ -n "$success_pos" ]]; then
-      # is valid
-      label+=$'\n'"$(echo-style --success "Edit name (currently: ${DCA_NAMES[index]} | DCA index: $index):")"
-      if [[ "$option_review_verbose" == 'yes' ]]; then
-        label+=$'\n'"$(log_single_content "$index")"
-      fi
-      # answer="$(ask --linger --default="$current_value" "$label")"
-    else
-      label+="$AX_UI_PREFIX Edit name (old: ${DCA_NAMES[index]}) for index ($index):"
-    fi
-    answer="$(ask --linger --default="$current_value" "$label")"
-
-    # Shouldnt -z cancel come before triggering finished since, cancelling
-    # implies not finishing??
-    # >> And then i can remove __* from the trigger_event func.
-    #
-    # Which then would discard any updates on cancel
-
-    [[ -z "$answer" ]] && return 1
-
-    __trigger_event "EDIT_NAME_FINISHED" "$answer"
-
-    # DCA_NAMES[index]="$answer"
-    # make_contents
-  }
-
-  function edit_value() {
-    local answer
-    answer="$(ask --linger "$AX_UI_PREFIX Edit command value (index: $INDEX):")"
-    [[ -z "$answer" ]] && return 1
-    DCA_CODE[INDEX]="$answer"
-    make_contents
-  }
-
-  function edit_desc() {
-    local answer
-    answer="$(ask --linger "$AX_UI_PREFIX Edit new alias description (index: $INDEX):")"
-    [[ -z "$answer" ]] && return 1
-    DCA_DESCS[INDEX]="$answer"
-    make_contents
-  }
-
-  function edit_sub_path() {
-    local sub_path
-    while :; do
-      sub_path="$(ask --linger "$AX_UI_PREFIX Redo sub path:")"
-      # path valid | validation is already done in the final validator func.
-      # maybe it can be removed from here...
-      if ! is_valid_group_dir "$sub_path"; then
-        sub_path="$(ask --linger "$AX_UI_PREFIX [$sub_path] is not valid | Input sub path again:")"
-        # This could also go into the validator?
-      elif ! is_valid_subdir_depth "$sub_path"; then
-        sub_path="$(ask --linger "$AX_UI_PREFIX [$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
-        # elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
-        # # this is handled by the redo choose menu
-        # 	sub_path="$(ask --linger "$AX_UI_PREFIX Input subpath again:")"
-      else
-        break
-      fi
-    done
-    [[ -z "$subpath" ]] && return 1
-    DCA_GROUPS[INDEX]="$sub_path"
-    make_contents
-  }
-
-  # =======================================================
-  # =======================================================
-  # =======================================================
-  # EVENTS
-  # This is more just a post_editing function rather than an event system. So,
-  # maybe I should rename this.
-
-  function __trigger_event {
-    local event=${1-}
-
-    if [[ $# -eq 0 ]]; then
-      logger "ERROR: Requires at least one event name passed."
-    fi
-    shift
-
-    case "$event" in
-    # "EDIT_PRE") ;;
-    "EDIT_NAME_FINISHED")
-      local new_name="${1-}" # this should be $1 when transitio to $INDEX is done.
-
-      # this is redundant since cancel is handled before throwing event.
-      # [[ -z "$EDIT_ANSWER" ]] && return
-
-      # Check if collision still persists.
-      if ! __parsed_name_was_unique && __new_name_is_unique "$new_name"; then
-        remove_collision "$index"
-      fi
-
-      DCA_NAMES[index]="$new_name"
-
-      # remove usage of index here later
-      update_secondary_data "$index"
-      ;;
-    # "REVIEW_PRE") ;;
-    *)
-      logger "ERROR: Un recognized event name."
-      ;;
-    esac
-  }
-
-  # =======================================================
-  # =======================================================
-  # =======================================================
-  # ACTIONS
-
-  # =======================================================
-  # LIST
-
-  # TODO: only show <group>/<name>
-  # TODO: type/group/all/etc...
-  function act_list() {
-    local path alias_paths=() aliases_short=()
-
-    mapfile -t alias_paths < <(get_all_existing_dcas)
-
-    # for path in "${alias_paths[@]}"; do
-    #   aliases_short+=("$(get_dca_short_path --path "$path")")
-    #   # aliases_short+=("$(basename "$path")")
-    # done
-
-    if [[ "${#alias_paths[@]}" -eq 0 ]]; then
-      echo "No aliases exists."
-      return
-    fi
-    __print_lines "${alias_paths[@]}"
-  }
-  # =======================================================
-  # BROWSE
-
-  # ( ) choose
-  # ( ) fuzzy-helper
-  # ( ) keybind create new DCA from selection.
-  # TODO: Choose which type to display:
-  # | 1. [ regular | testing | evaluate ]
-  # | 2. Which group to show?
-  # | 3. Mix groups and single DCAs in the same view?
-  # | On choose <esc> cancel go to menu where you can either close or select
-  # | another type/group to display.
-  function act_browse() {
-    local path alias_paths=() alias_names=() alias_labels=()
-    mapfile -t alias_paths < <(get_all_existing_dcas)
-    for path in "${alias_paths[@]}"; do
-      local header contents
-      # ${path#*"commands.aliases"} does not work for trimming everything before
-      # the match pattern. That is why the string looks a bit weird below.
-      header="commands${path#*"commands"}"
-      contents="$("${BAT_CMD[@]}" "$path")"
-      alias_names+=("$header")
-      alias_labels+=("$header"$'\n'"$contents")
-    done
-    if [[ "${#alias_paths[@]}" -eq 0 ]]; then
-      echo "No aliases exists."
-      return
-    fi
-    local index=0 choose_title="$AX_UI_PREFIX "
-    while :; do
-      index="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${alias_labels[@]}")"
-      if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
-        break
-      fi
-    done
-  }
-
-  # =======================================================
-  # CREATE
-
-  function act_create() {
-    local sub_path='' ask_prefix="ALIASES CREATE" prompt_confirm_or_edit
-    reset_all
-    # could these be replaced by the update funcs, and use some kind of default mode?
-    DCA_IS_FUNC+=('no')
-    DCA_NAMES+=("$(ask --linger "$ask_prefix | 1. What will the NAME be?")")
-    DCA_DESCS+=("$(ask --linger "$ask_prefix | 3. What will the DESC be?")")
-    DCA_CODE+=("$(ask --linger "$ask_prefix | 2. What will the VALUE be?")")
-    if confirm --ppid=$$ --negative -- "$ask_prefix | 4. Put it in sub path, eg. [commands.aliases/<my>/<dir>]?"; then
-      sub_path="$(ask --linger "$ask_prefix | What will the SUB PATH be?")"
-      while :; do
-        # path valid
-        if ! is_valid_group_dir "$sub_path"; then
-          sub_path="$(ask --linger "[$sub_path] is not valid | Input sub path again:")"
-          # path maxth depth
-        elif ! is_valid_subdir_depth "$sub_path"; then
-          sub_path="$(ask --linger "[$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
-          # elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
-          # # this is handled by the redo choose menu
-          # 	sub_path="$(ask --linger "Input subpath again:")"
-        else
-          DCA_GROUPS+=("$sub_path")
-          break
-        fi
-      done
-    else
-      DCA_GROUPS+=("")
-    fi
-    # make_contents
-    update_secondary_data
-
-    while :; do
-      prompt_confirm_or_edit="Go ahead create alias at [${DCA_PATHS_SHORT[$INDEX]}] OR edit alias?"$'\n'"$(log_single_content)"
-      if ! confirm --ppid=$$ --positive -- "$prompt_confirm_or_edit"; then
-        # todo: move title definition into the choose command
-        local redo_func redo_options=() title="$AX_UI_PREFIX Select which part to edit:"
-        redo_options+=(edit_name "Name (${DCA_NAMES[INDEX]})")
-        redo_options+=(edit_value "Value (${DCA_CODE[INDEX]})")
-        redo_options+=(edit_sub_path "Sub group name (${DCA_GROUPS[INDEX]})")
-        redo_options+=(edit_desc "Description (${DCA_DESCS[INDEX]})")
-        redo_func="$(choose "$title" --label -- "${redo_options[@]}")"
-
-        # FIX: This handles failure after edit_* finish, but I dont quite like having
-        # to put it here and also having the validation call below..
-        eval_capture --statusvar=status -- validate_all
-
-        "$redo_func"
-      else
-        break
-      fi
-    done
-
-    local failure_redo_func status
-    while :; do
-      eval_capture --statusvar=status -- validate_all
-      if [[ "$status" -ne 0 ]]; then
-        local label
-        label="[$status] Creating alias [${DCA_PATHS_SHORT[$INDEX]}] failed with reason:"
-        label+=$'\n'"REASON: ${INVALID_REASON[0]}"
-        label+=$'\n'"Do you want to re-edit failing part?"
-        if confirm --ppid=$$ --positive -- "$label"; then
-          # failure_redo_func="${INVALID_CORRECTION_FUNC[0]}"
-          # if [[ -n "$failure_redo_func" && "$failure_redo_func" == "none" ]]; then
-          # 	echo-style --error "CREATE | Could not create alias [$(get_dca_short_path)]. No re-edit func exists for failure. (todo: ignore/discard?)"
-          # fi
-          # "$failure_redo_func"
-          "${INVALID_CORRECTION_FUNC[0]}"
-          reset_status_arrays
-
-          # TODO: move this into EDIT_NAME_FINISHED
-          update_secondary_data
-
-        fi
-      else
-        create_dca_files
-        break
-      fi
-    done
-
-    if confirm --ppid=$$ --positive -- "Add nother alias?"; then
-      act_create
-    fi
-  }
-
-  # =======================================================
-  # CLEAN
-
-  # TODO: same as with browse. select which type/group/single to remove.
-  function act_clean() {
-    local alias_paths=() alias_names=() alias_labels=()
-
-    clean_labels=(
-      test "test dir"
-      evaluate "evaluate dir"
-      all "all"
-      groups "group"
-      single "select single"
-    )
-
-    # __print_lines "${alias_labels[@]}"
-    local index=0 clean_title="$AX_UI_PREFIX Select which category you want to purge:"
-    clean_selection="$(choose "$clean_title" --labels -- "${clean_labels[@]}")"
-    # if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
-    # 	break
-    # fi
-
-    local opts=("-Rf")
-    case "$clean_selection" in
-    test)
-      if confirm --ppid=$$ --negative -- "Are you sure you want to purge all [TESTING] aliases?"; then
-        echo "Purging all TESTING aliases..."
-        rm "${opts[@]}" "$USER_COMMAND_ALIASES_DIR/$DCA_TEST_DIR_NAME"/*
-      fi
-      ;;
-    evaluate)
-      if confirm --ppid=$$ --negative -- "Are you sure you want to purge all [EVALUATE] aliases?"; then
-        echo "Purging all TESTING aliases..."
-        rm "${opts[@]}" "$USER_COMMAND_ALIASES_DIR/$DCA_EVALUATE_DIR_NAME"/*
-      fi
-      ;;
-    all)
-      if confirm --ppid=$$ --negative -- "Are you sure you want to purge [ALL] aliases?"; then
-        if confirm --ppid=$$ --negative -- "Again, are you really, really sure to remove [ALL] aliases?"; then
-          echo "Purging all ALL aliases..."
-          rm "${opts[@]}" "$USER_COMMAND_ALIASES_DIR"/*
-        fi
-      fi
-      ;;
-    groups) echo "purge group todo.." ;;
-    single) echo "purge single todo.." ;;
-    esac
-  }
-
-  # =======================================================
-  # MIGRATE
-
-  function do_review_pre {
-    # nothing was picked up. review doesnt make sense
-    if [[ "${#DCA_NAMES[@]}" -eq 0 ]]; then
-      do_review_post
-      return
-    fi
-
-    # compute_naming_collisions
-
-    # validate parsed aliases and funcs
-    eval_capture --statusvar=validate_status -- validate_all
-  }
-
-  # call this after the parser loop has run it's course.
-  function do_review_post() {
-    logger
-    echo-style --header "$migrate_prefix POST REVIEW"
-
-    local num_failures="${#FAILING_POSITIONS[@]}"
-    local num_successful="${#SUCCESS_POSITIONS[@]}"
-
-    if [[ "${#DCA_NAMES[@]}" -eq 0 ]]; then
-      # nothing. exit
-      echo-style --bold "Parser did not pick anything. Exiting..."
-    else
-
-      if [[ "$num_successful" -gt 0 ]]; then
-
-        if [[ "$num_failures" -gt 0 ]]; then
-          if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
-
-            # NOTE: Currently, when you go back to review, the same mode, eg. iterate
-            # is used for review, but you might want to select another mode.
-            #
-            # TODO: GO BACK TO REVIEWING
-            # |________________________________________________
-            # | [ALIASES:MIGRATE] - Select how/what to review |
-            # |------------------------------------------------
-            # |     - iterate all
-            # |     - iterate only invalid
-            # |     - iterate (already) valid
-            # |     - overview: all
-            # |     - overview: only invalid
-            # |     - overview: only (already) valid
-            # |------------------------------------------------
-            local go_back_sel go_back_to_review_choices=(
-              iterate_all "iterate all"
-              iterate_failures "iterate only failures"
-              iterate_successful "iterate (already) successful"
-              menu_all "overview: all"
-              menu_failures "overview: only failures"
-              menu_successful "overview: only (already) successful"
-            )
-            go_back_sel="$(choose "Go back | Select review mode" --label -- "${go_back_to_review_choices[@]}")"
-            case "$go_back_sel" in
-            iterate_*)
-              REVIEW_UI_MODE='iterate'
-              case "$go_back_sel" in
-                *_all) REVIEW_TYPE='all' ;;
-                *_failures) REVIEW_TYPE='failures' ;;
-                *_successful) REVIEW_TYPE='successful' ;;
-              esac
-              ;;
-            menu_*)
-              REVIEW_UI_MODE='iterate'
-              case "$go_back_sel" in
-                *_all) REVIEW_TYPE='all' ;;
-                *_failures) REVIEW_TYPE='failures' ;;
-                *_successful) REVIEW_TYPE='successful' ;;
-              esac
-              ;;
-            *)
-              __print_lines "User cancelled [go back to review] menu"
-              ;;
-            esac
-            do_review_main
-            return
-          fi
-        fi
-
-        # confirm create or exit
-        if ! confirm --ppid=$$ --positive -- "There are successful DCAs parsed. Do you want to go ahead and create them?"; then
-          echo-style --bold "[User cancelled]: Exiting..."
-          exit
-        fi
-
-        # TODO: Default to creating aliases under [aliases/testing]
-        # if ! confirm --ppid=$$ --positive -- "Put NEW DCAs in /testing dir?"; then
-        # 	# echo-style --bold "[User cancelled]: Exiting..."
-        # 	# exit
-        # fi
-
-        # this is just because user can cancel review, with existing failures,
-        # then we only want to create successful ones and exit
-        local create_opts=()
-        if [[ "$proceed_with_successful" == 'yes' ]]; then
-          echo-style --bold "Proceeding to create only valid DCAs.."
-          create_opts+=(--successful)
-        fi
-
-        # TODO: Choose "Add to TEST dir or REAL positions"
-
-        create_dca_files "${create_opts[@]}"
-
-      else
-        # only failures
-
-        echo-style --bold "$num_failures invalid left."
-
-        if [[ "$option_review_both" == 'yes' ]]; then
-          echo-style --bold "Option review BOTH but no successful parses. Exiting..."
-        elif [[ "$option_review_successful" == 'yes' ]]; then
-          echo-style --bold "Option review ONLY SUCCESSFUL but no successful parses. Exiting..."
-        else
-          echo-style --bold "Option review ONLY FAILURES (default)"
-          if [[ "$num_failures" -gt 0 ]]; then
-            if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
-              echo-style --bold "TODO: Go back to reviewing failures.."
-            fi
-          fi
-          echo-style --bold "Exiting..."
-        fi
-      fi
-    fi
-  }
-
-  function do_review_main {
-    do_review_pre
-
-    # # nothing was picked up. review doesnt make sense
-    # if [[ "${#DCA_NAMES[@]}" -eq 0 ]]; then
-    # 	do_review_post
-    # 	return
-    # fi
-    #
-    # compute_naming_collisions
-    #
-    # # validate parsed aliases and funcs
-    # local validate_status
-    # eval_capture --statusvar=validate_status -- validate_all
-
-    # setup variables for review
-    local -n REVIEW_ARRAY
-
-    # TODO: This [reviewing] should be the [REVIEW_TYPE]
-    local reviewing=''
-
-    local current_was_failure_initially='no'
-    local _selected_review_index
-
-    local REVIEW_SELECTED_FAILURE_INDEX
-
-    local proceed_with_successful='no'
-
-    if [[ "$option_review_both" == 'yes' ]]; then
-      reviewing='both' # FIX: rename this to both
-      REVIEW_ARRAY="DCA_NAMES"
-    elif [[ "$option_review_successful" == 'yes' ]]; then
-      reviewing='successful'
-      REVIEW_ARRAY="SUCCESS_POSITIONS"
-    else
-      reviewing='failures'
-      REVIEW_ARRAY="FAILING_POSITIONS"
-    fi
-
-    function __review__handle_edit() {
-      local update_validated='no'
-
-      while [[ "$update_validated" == "no" ]]; do
-        # on cancel return and exit choose/ask loops below
-
-        if ! edit_name; then
-          proceed_with_successful='yes'
-          return # discard edit and go back/continue review.
-        fi
-
-        # TODO: below could go into [__trigger_event "edit_finished" ]
-
-        if validate_single_simple "$INDEX"; then
-          update_validated='yes'
-
-          # updating the name, it will only pass the collision system
-          #
-          # edit -> check if us unique within -> validate
-          #
-          # edit -> trigger
-
-          if [[ "$current_was_failure_initially" == 'yes' ]]; then
-            # Only if a failure was rectified,
-            trim_failure_arrays "$REVIEW_SELECTED_FAILURE_INDEX"
-            success_pos_add "$INDEX"
-          fi
-        fi
-      done
-    }
-
-    # Ensure correct mapping of indices after selection or iteration if fix iterate
-    function review__apply_correct_indices() {
-      if [[ "$reviewing" == 'failures' ]]; then
-        # echo "apply:failures"
-        current_was_failure_initially='yes'
-        INDEX="${REVIEW_ARRAY[$_selected_review_index]}"
-        REVIEW_SELECTED_FAILURE_INDEX="$_selected_review_index" # "$(get_failure_pos_from_dca_index "$_selected_review_index")"
-
-      elif [[ "$reviewing" == 'both' ]] && is_failure "$_selected_review_index"; then
-        # echo "apply:both"
-        current_was_failure_initially='yes'
-        INDEX="$_selected_review_index"
-        REVIEW_SELECTED_FAILURE_INDEX="$(get_failure_pos_from_dca_index "$_selected_review_index")"
-
-      else
-        # echo "apply:else"
-        current_was_failure_initially='no'
-        if [[ "$reviewing" == 'successful' ]]; then
-          INDEX="$(get_dca_index_from_success_pos "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
-        else
-          INDEX="$_selected_review_index" #"$(get_success_pos_from_dca_index "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
-        fi
-      fi
-      # echo "dcai $INDEX | sfix $REVIEW_SELECTED_FAILURE_INDEX"
-    }
-
-    #
-    # REVIEW: UI ASK (ITERATE)
-    #
-
-    # handle parsed aliases
-    if [[ "$REVIEW_UI_MODE" == 'iterate' ]]; then
-      # w/ASK --------------------------------------------
-      #
-      # TEST: Does it handle updated statuses correctly?
-      # TEST: Does it handle causing new errors??
-      #
-      # FAILURES ONLY:
-      # with fails only each will be stomped out one by one.
-
-      # TODO: func [run_review_iterate]
-
-      # debug_status_arrays
-      local ordinal iterations="${#REVIEW_ARRAY[@]}"
-      for ((ordinal = 0; ordinal < "$iterations"; ordinal++)); do
-        _selected_review_index='' REVIEW_SELECTED_FAILURE_INDEX=''
-        _selected_review_index="$ordinal" # "${REVIEW_ARRAY[i]}"
-        if [[ "$reviewing" == 'failures' ]]; then
-          _selected_review_index=0
-        fi
-        review__apply_correct_indices
-
-        # TODO: if false then [do_review_post]
-        ! __review__handle_edit && break
-      done
-    elif [[ "$REVIEW_UI_MODE" == "choose" ]]; then
-
-      #
-      # REVIEW: UI CHOOSE (MENU)
-      #
-
-      # TODO: func [run_review_choose]
-
-      while [[ "${#REVIEW_ARRAY[@]}" -gt 0 ]]; do
-        _selected_review_index='' REVIEW_SELECTED_FAILURE_INDEX=''
-
-        # echo "-------------------------------------------------------"
-        # echo "::::::::: DEBUG BEFORE :::::::::"
-        # debug_status_arrays
-
-        local ordinal choose_start_index=0 choose_title="$AX_UI_PREFIX " choose_review_labels=() short_path_formatted
-
-        choose_title+="| REVIEWING: [$reviewing] | "
-        choose_title+="${#FAILING_POSITIONS[@]} BAD | ${#SUCCESS_POSITIONS[@]} GOOD / ${#DCA_NAMES[@]} total | Select below to fix failing issue."
-        choose_title+=$'\n'"ENTER: edit/fix selection | ESC/CANCEL: create validate only | Ctrl-C: Abort"
-
-        for ((ordinal = 0; ordinal < "${#REVIEW_ARRAY[@]}"; ordinal++)); do
-          local review_label='' dca_review_index status_pos
-          if [[ "$reviewing" == 'both' ]]; then
-            dca_review_index=$ordinal
-          else
-            dca_review_index="${REVIEW_ARRAY[$ordinal]}"
-          fi
-
-          local short_path_formatted="$(str_ensure_length 40 "[${DCA_PATHS_SHORT[$dca_review_index]}]")"
-
-          function make_failure_label() {
-            review_label+="$(echo-style --error+bold "#$ordinal: $short_path_formatted REASON: ${INVALID_REASON[$status_pos]}")"
-          }
-          function make_successful_label() {
-            review_label+="$(echo-style --success+bold "#$ordinal: $short_path_formatted")"
-          }
-          status_pos="$(get_status_pos_from_dca_index "$dca_review_index")"
-          if [[ "$reviewing" == 'both' ]]; then
-            if is_failure "$dca_review_index"; then
-              make_failure_label
-            else
-              make_successful_label
-            fi
-          elif [[ "$reviewing" == 'failures' ]]; then
-            make_failure_label
-          elif [[ "$reviewing" == 'successful' ]]; then
-            make_successful_label
-          fi
-          if [[ "$option_review_verbose" == 'yes' ]]; then
-            review_label+=$'\n'"$(log_single_content "$dca_review_index")"
-          fi
-          choose_review_labels+=("$review_label")
-        done
-
-        # --default="$choose_start_index" --match='$INDEX'
-        _selected_review_index="$(choose "$choose_title" --index -- "${choose_review_labels[@]}")"
-
-        review__apply_correct_indices
-
-        if [[ -z "$_selected_review_index" ]]; then # choose sets output to empty string on cancel
-          logger "chooce cancel"
-          proceed_with_successful='yes'
-          break
-        fi
-        # ^ this only pertains to review_choose
-
-        # echo "::::::::: DEBUG AFTER :::::::::"
-        # debug_status_arrays
-        # echo
-
-        # echo "sel pos = $REVIEW_SELECTED_FAILURE_INDEX"
-        # echo "sel val = $INDEX"
-
-        # TODO: if false then [do_review_post]
-        ! __review__handle_edit && break
-      done
-    fi
-
-    do_review_post
-  }
-
-  function act_migrate() {
-    local interpreter='' input_file migrate_prefix="ALIASES MIGRATE |"
-    if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_group_dir "$option_migrate_to_subdir"; then
-      echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
-      exit 1
-    fi
-
-    function parse_posix__collect_aliases {
-      local aliases=()
-      local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
-      mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
-      for line_alias in "${aliases[@]}"; do
-        local new_alias_name='' new_alias_desc='' value=''
-        # handle trim trailing comment
-        if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
-          line_alias="${BASH_REMATCH[1]}"
-          new_alias_desc="${BASH_REMATCH[2]}"
-        fi
-
-        # handle split alias
-        # TODO: handle case where code `value` is not quoted.
-        if [[ "$line_alias" =~ alias\ ([^=]+)=\"(.*)\" ]]; then
-          new_alias_name="${BASH_REMATCH[1]}"
-          value="${BASH_REMATCH[2]}"
-        elif [[ "$line_alias" =~ alias\ ([^=]+)=\'(.*)\' ]]; then
-          new_alias_name="${BASH_REMATCH[1]}"
-          value="${BASH_REMATCH[2]}"
-        elif [[ "$line_alias" =~ alias\ ([^=]+)=(.*) ]]; then
-          new_alias_name="${BASH_REMATCH[1]}"
-          value="${BASH_REMATCH[2]}"
-        fi
-
-        DCA_IS_FUNC+=('no')
-        DCA_NAMES+=("$new_alias_name")
-        DCA_GROUPS+=("$option_migrate_to_subdir")
-        DCA_CODE+=("$value")
-        DCA_DESCS+=("$new_alias_desc")
-        DCA_ARGS+=("")
-
-        local last=$(("${#DCA_NAMES[@]}" - 1))
-        update_secondary_data "$last"
-
-        if [[ "$option_parsing_verbose" == 'yes' ]]; then
-          log_during_parsing
-        fi
-      done
-    }
-
-    function parse_posix__collect_functions {
-      local new_alias_name function_names=()
-      mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
-
-      # PERF: Shouldnt I be able to parse all func bodies in one go??
-      #
-      # >> In _doc_helper we wanted the correct order that functions are
-      # defined in but here that does not matter so we could just bulk parse.
-
-      for new_alias_name in "${function_names[@]}"; do
-        local body body_trimmed #new_alias_name
-        body="$(bash -c 'source '"$input_file"'; declare -f '"$new_alias_name")"
-        body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
-        # Capture how many arguments each func snippets takes. This is not perfect but at least it gives some indication.
-        local arguments=() count=0
-        while read -r line; do
-          local line="$line"
-          while [[ "$line" =~ (\$[0-9]+) ]]; do
-            local match="${BASH_REMATCH[0]}"
-            if ! is-needle "$match" -- "${arguments[@]}"; then
-              arguments+=("$match")
-            fi
-            line="${line/"$match"/}" # Remove the matched part from the line
-            # echo "trim: [$line]"
-            if [[ "$count" == 10 ]]; then
-              break
-            fi
-          done
-        done <<<"$body_trimmed"
-        DCA_IS_FUNC+=('yes')
-
-        if [[ "$option_replace_underscores" == 'yes' ]]; then
-          new_alias_name=${new_alias_name//_/-}
-        fi
-
-        DCA_NAMES+=("$new_alias_name")
-        DCA_GROUPS+=("$option_migrate_to_subdir")
-        DCA_CODE+=("$body_trimmed")
-
-        # DCA_DESCS+=("")
-        DCA_DESCS+=("$(echo-comment-blocks --function="$new_alias_name" -- "$input_file")")
-
-        DCA_ARGS+=("'${arguments[@]}'")
-
-        local last=$(("${#DCA_NAMES[@]}" - 1))
-        update_secondary_data "$last"
-
-        if [[ "$option_parsing_verbose" == 'yes' ]]; then
-          log_during_parsing
-        fi
-      done
-    }
-
-    function migrate_single_file() {
-      input_file=$1
-      interpreter="$(get-interpreter --name -- "$input_file")"
-      if is-needle --needle="$interpreter" -- "${supported[@]}"; then
-        # TODO:: check if contents are posix. test source file and see if it returns success
-        if is-needle "$interpreter" -- "${SUPPORTED_POSIX[@]}"; then
-          parse_posix__collect_aliases
-          parse_posix__collect_functions
-          #	log_all_contents
-        elif is-needle "$interpreter" -- "${SUPPORTED_NON_POSIX[@]}"; then
-          if [[ "$interpreter" == "nu" ]]; then
-            :
-          elif [[ "$interpreter" == "elvish" ]]; then
-            :
-          elif [[ "$interpreter" == "xonsh" ]]; then
-            :
-          fi
-        else
-          help "Interpreter [$interpreter] not supported"
-        fi
-      fi
-    }
-
-    # try parse
-    for migrate_file in "${option_args[@]}"; do
-      migrate_single_file "$migrate_file"
-    done
-
-    do_review_main
-  }
-
-  # =======================================================
-  # =======================================================
-  # PREPARE
-
-  if [[ ! -d "$USER_COMMAND_ALIASES_DIR" ]]; then
-    __mkdirp "$USER_COMMAND_ALIASES_DIR"
-    # fs-own --permissions="+Xrw" --recursive --quiet -- "$USER_COMMAND_ALIASES_DIR"
-  fi
-
-  if [[ -z "$option_action" ]]; then
-    # help "No action provided"
-    option_action="browse"
-  fi
-
-  # Check before running migration..
-  if [[ -n "$option_migrate_to_subdir" ]]; then
-    if ! is_valid_subdir_depth "$option_migrate_to_subdir"; then
-      echo-style --error "Maximum sub dir depth allowed is [$ALLOW_MAX_SUB_DIRS]"
-      exit
-    fi
-  fi
-
-  if [[ "$option_fix_iterate" == 'yes' ]]; then
-    REVIEW_UI_MODE="iterate"
-  fi
-
-  if [[ "$option_review_both" == 'yes' ]]; then
-    REVIEW_TYPE='all'
-  elif [[ "$option_review_successful" == 'yes' ]]; then
-    REVIEW_TYPE='successful'
-  else
-    REVIEW_TYPE='failures'
-  fi
-
-  # =======================================================
-  # Act
-
-  # This is a better one liner but my linter complains too much about
-  # funcs being unreachable so for now i go with the switch case.
-  # "act_$option_action"
-
-  case "$option_action" in
-  browse) act_browse ;;
-  create) act_create ;;
-  migrate) act_migrate ;;
-  clean) act_clean ;;
-  list) act_list ;;
-  esac
-
-  if [[ "$DO_RELOAD" == 'yes' ]]; then
-    echo "Env needs reload!"
-    return 1
-  fi
+		if [[ $# -ne 0 ]]; then
+			echo-error "$@"
+		fi
+		return 22 # EINVAL 22 Invalid argument
+	}
+
+	# =======================================================
+	# ARGS
+
+	local \
+		option_action='' \
+		option_test_mode='yes' \
+		option_evaluate='no' \
+		option_review_verbose='no' \
+		option_quiet='no' \
+		option_migrate_to_subdir='' \
+		option_args=() \
+		option_fix_iterate='no' \
+		option_review_both='no' \
+		option_review_successful='no' \
+		option_parsing_verbose='no' \
+		option_debug='no' \
+		option_replace_underscores='yes'
+
+	while [[ $# -ne 0 ]]; do
+		item="$1"
+		shift
+		case "$item" in
+		'--help' | '-h') help ;;
+		'--debug') option_debug='yes' ;;
+		# verbosity
+		'--no-verbose-parsing'* | '--review-verbose'*)
+			option_review_verbose="$(get-flag-value --affirmative --fallback="$option_review_verbose" -- "$item")"
+			;;
+		'--verbose-review') option_parsing_verbose='yes' ;;
+		'--verbose')
+			option_parsing_verbose='yes'
+			option_review_verbose='yes'
+			;;
+		# ---
+		'--no-quiet'* | '--quiet'*)
+			option_quiet="$(get-flag-value --affirmative --fallback="$option_quiet" -- "$item")"
+			;;
+		'--to='*) option_migrate_to_subdir="${item#*=}" ;;
+		'--no-replace-underscores'* | '--replace-underscores'*)
+			option_quiet="$(get-flag-value --affirmative --fallback="$option_replace_underscores" -- "$item")"
+			;;
+		'--fix-iterate') option_fix_iterate='yes' ;;
+
+		'--review-all' | '--all') option_review_both='yes' ;;
+		'--review-successful' | '--success') option_review_successful='yes' ;;
+
+		'--no-test'* | '--test'*)
+			# default to using the test dir
+			option_test_mode="$(get-flag-value --affirmative --fallback="$option_test_mode" -- "$item")"
+			;;
+		'--evaluate') option_evaluate='yes' ;;
+
+		'browse')
+			option_action="browse"
+			AX_UI_PREFIX+=":BROWSE"
+			;;
+		'clean' | 'remove' | 'rm')
+			option_action="clean"
+			AX_UI_PREFIX+=":CLEAN"
+			;;
+		'new' | 'create')
+			option_action="create"
+			AX_UI_PREFIX+=":CREATE"
+			;;
+		'migrate')
+			option_action="migrate"
+			AX_UI_PREFIX+=":MIGRATE"
+			;;
+		'list')
+			option_action="list"
+			AX_UI_PREFIX+=":LIST"
+			;;
+			# '--')
+			#   # 	option_args+=("$item" "$@")
+			#   break
+			#   ;;
+			#   # *) option_args+=("$item") ;;
+		'--')
+			option_args+=("$@")
+			shift $#
+			break
+			;;
+		*)
+			help "Unknown argument was provided"
+			;;
+		esac
+	done
+
+	# =======================================================
+	# =======================================================
+	# LOG AND DEBUG HELPERS
+
+	function debug_against_failures() {
+		echo "-------"
+		for ((i = 0; i < "${#DCA_NAMES[@]}"; i++)); do
+			echo "DCA_NAMES: $i -> ${DCA_NAMES[i]}"
+		done
+		echo "-------"
+		for i in "${FAILING_POSITIONS[@]}"; do
+			echo "FPOS: $i -> ALL: ${DCA_NAMES[i]}"
+		done
+		echo "-------"
+	}
+
+	function debug_status_arrays() {
+		echo "-------"
+
+		echo "${SUCCESS_POSITIONS[@]}"
+		echo "${FAILING_POSITIONS[@]}"
+		echo "==="
+
+		if [[ "${#FAILING_POSITIONS[@]}" -eq 0 ]]; then
+			echo "FAILING_POSITIONS = empty"
+		else
+			for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
+				fv="${FAILING_POSITIONS[i]}"
+				echo "FAILURE: fp $i : $fv -> ALL: ${DCA_NAMES[fv]}"
+			done
+		fi
+		echo "-------"
+		if [[ "${#SUCCESS_POSITIONS[@]}" -eq 0 ]]; then
+			echo "SUCCESS_POSITIONS = empty"
+		else
+			echo "${#SUCCESS_POSITIONS[@]}"
+			for ((i = 0; i < "${#SUCCESS_POSITIONS[@]}"; i++)); do
+				sv="${SUCCESS_POSITIONS[i]}"
+				# echo "sp:$i"
+				# echo "sv:$sv"
+				echo "SUCCESS: spos $i : sval $sv -> ${DCA_NAMES[sv]}"
+			done
+		fi
+		echo "-------"
+	}
+
+	function log_failure_and_success_positions() {
+		echo "--- failure positions ---"
+		echo "${FAILING_POSITIONS[@]}"
+		echo "--- success positions ---"
+		echo "${SUCCESS_POSITIONS[@]}"
+		echo "-------"
+	}
+
+	function log_single_content() {
+		local index="${1-0}"
+		bat --style numbers --color always --language bash --paging=never <<<"${DCA_CONTENTS[$index]}"
+	}
+
+	function log_all_contents() {
+		for c in "${DCA_CONTENTS[@]}"; do
+			bat --style numbers --color always --language bash --paging=never <<<"$c"
+		done
+	}
+
+	function log_during_parsing() {
+		local last=$(("${#DCA_NAMES[@]}" - 1))
+		__print_lines "-------------------------------------------------------"
+		__print_lines "log_during_parsing: $last"
+		log_single_content "$last" # "${DCA_CONTENTS[$last]}"
+	}
+
+	function logger {
+		# echo "<[${FUNCNAME[0]}]>"
+		echo "<[${FUNCNAME[1]}]>: $*"
+	}
+
+	function debug_post_check_name_collisions {
+		logger "NAMES_COLLISION_MAP"
+		for ((a = 0; a < "${#DCA_NAMES[@]}"; a++)); do
+			if [[ -n "${NAMES_COLLISION_MAP[$a]}" ]]; then
+				__print_lines "#$a: ${DCA_NAMES[$a]} -> ${NAMES_COLLISION_MAP[$a]}"
+			fi
+		done
+		logger "NAMES_COLLISION_COUNT_MAP"
+		for ((b = 0; b < "${#NAMES_COLLISION_COUNT_MAP[@]}"; b++)); do
+			echo "$b: ${NAMES_COLLISION_COUNT_MAP[$b]}"
+		done
+	}
+
+	# TODO: print all state vars.
+	function debug_state {
+		:
+	}
+
+	# =======================================================
+	# =======================================================
+	# ARRAY HELPERS
+
+	function reset_new_alias_arrays() {
+		DCA_NAMES=()
+		DCA_GROUPS=()
+		DCA_DIRS=()
+		DCA_PATHS=()
+		DCA_PATHS_SHORT=()
+		DCA_PATHS_SHORT_FORMATTED=()
+		DCA_CONTENTS=()
+		DCA_CODE=()
+		DCA_DESCS=()
+		DCA_ARGS=()
+		DCA_IS_FUNC=()
+	}
+
+	function reset_status_arrays() {
+		DCA_IS_VALID=""
+		FAILING_POSITIONS=()
+		INVALID_REASON=()
+		SUCCESS_POSITIONS=()
+		NAMES_COLLISION_MAP=()
+		NAMES_COLLISION_COUNT_MAP=()
+	}
+
+	function reset_all() {
+		reset_new_alias_arrays
+		reset_status_arrays
+	}
+
+	function success_pos_add() {
+		SUCCESS_POSITIONS+=("$1")
+		SUCCESS_POSITIONS=($(printf "%s\n" "${SUCCESS_POSITIONS[@]}" | sort -n))
+	}
+
+	# Function to remove an index N from an array
+	function remove_array_index() {
+		local array_name="$1" index="$2"
+		eval "local arr=(\"\${$array_name[@]}\")"
+		eval "$array_name=(\"\${arr[@]:0:$index}\" \"\${arr[@]:$((index + 1))}\")"
+	}
+
+	function trim_failure_arrays() {
+		local index="${1-0}"
+		remove_array_index "FAILING_POSITIONS" "$index"
+		remove_array_index "INVALID_REASON" "$index"
+		remove_array_index "INVALID_CORRECTION_FUNC" "$index"
+	}
+
+	# =======================================================
+	# =======================================================
+	# HANDLE SECONDARY DATA
+	#
+
+	function make_dca_path() {
+		local index="${1-$INDEX}"
+		DCA_PATHS[index]="${DCA_DIRS[$index]}/${DCA_NAMES[$index]}"
+	}
+
+	function make_dca_dir() {
+		local index="${1-$INDEX}" pre=$USER_COMMAND_ALIASES_DIR sub_path
+
+		if [[ "$option_evaluate" == 'yes' ]]; then
+			pre="$pre/$DCA_EVALUATE_DIR_NAME"
+		elif [[ "$option_test_mode" == 'yes' ]]; then
+			pre="$pre/$DCA_TEST_DIR_NAME"
+		fi
+		subpath=${DCA_GROUPS[$index]}
+		# logger "subpath = $subpath" >/dev/tty
+		if [[ -z "$subpath" ]]; then
+			# __print_string "$pre"
+			DCA_DIRS[$index]="$pre"
+		else
+			# __print_string "$pre/__group/$subpath"
+			DCA_DIRS[$index]="$pre/__group/$subpath"
+		fi
+	}
+
+	function make_dca_path_short() {
+		local index="${1-INDEX}" path
+		path="${DCA_PATHS[index]}"
+		DCA_PATHS_SHORT[index]="${path#*"commands.aliases/"}"
+	}
+
+	# During parsing, this func requires an index to be supplied so that the
+	# last index can be generated on each loop.
+	function update_secondary_data {
+		local index="${1-INDEX}"
+		make_dca_dir "$index"
+		make_dca_path "$index"
+		make_dca_path_short "$index"
+		# make_dca_path_short_formatted # maybe put in [update_tertiary_data]
+		make_contents "$index"
+	}
+
+	# =======================================================
+	# =======================================================
+
+	# get paths of existing aliases
+	function get_all_existing_dcas() {
+		find "$USER_COMMAND_ALIASES_DIR" -type f | grep -Ev "$regex_rm_paths_with_files_extension"
+	}
+
+	# # --alias | --fn
+	# function get_comment_block_above() {
+	# 	# This is a sample script from ChatGPT.
+	#
+	# 	# # Function to greet someone
+	# 	# # Usage: greet <name>
+	# 	# greet() {
+	# 	# 	local name="$1"
+	# 	# 	echo "Hello, $name!"
+	# 	# }
+	#
+	# 	# Extract comment block above a function definition
+	# 	extract_comment() {
+	# 		local function_name="$1"
+	# 		awk -v func="$function_name" '
+	# 	  /^#/ { comments = comments "\n" $0; next }
+	# 	  $0 ~ "^" func "\\(" { print comments; exit }
+	# 	  { comments = "" }
+	# 	  ' "$0"
+	# 	}
+	#
+	# 	# Example usage:
+	# 	comment_block=$(extract_comment "greet")
+	# 	echo "$comment_block"
+	# }
+	#
+	#   # TODO: Move comment block extractor into its own file.
+	# # Example usage
+	# # extract_comments_for_all_functions "your_script.sh"
+	# function extract_comments_for_all_functions() {
+	#     awk '
+	#     /^#/ { comments = comments "\n" $0; next }  # Collect comment lines
+	#     /^[a-zA-Z_][a-zA-Z0-9_]*\(\) *{/ {         # Match function definitions
+	#         func_name = $1;                         # Capture function name
+	#         sub(/\(\)$/, "", func_name);            # Remove '()' from name
+	#         print "Function: " func_name;           # Print function name
+	#         print comments "\n";                    # Print associated comment block
+	#         comments = "";                          # Reset comments
+	#     }
+	#     { comments = "" }  # Reset comments if a non-comment, non-function line is encountered
+	#     ' "$1"
+	# }
+
+	# =======================================================
+	# =======================================================
+	# STRING HELPERS
+	#
+
+	function str_ensure_length {
+		printf "%-${1-20}.${1-20}s" "$2"
+	}
+
+	# =======================================================
+	# =======================================================
+	# DCA HELPERS
+	#
+
+	# DCA index -> failure position
+	function get_failure_pos_from_dca_index() {
+		local index="${1-}" failure_index
+		if [[ -z "$index" ]]; then
+			return 1 # requires index
+		fi
+		for ((i = 0; i < "${#FAILING_POSITIONS[@]}"; i++)); do
+			failure_index="${FAILING_POSITIONS[$i]}"
+			# check if input index exists amongst failure indices
+			if [[ "$index" == "$failure_index" ]]; then
+				echo "$i"
+				return
+			fi
+		done
+	}
+
+	# failure pos -> DCA index
+	function get_dca_index_from_failure_pos() {
+		printf "%s" "${FAILING_POSITIONS["${1-0}"]}"
+	}
+
+	# DCA index -> success position
+	function get_success_pos_from_dca_index() {
+		local index="${1-}" success_index
+		if [[ -z "$index" ]]; then
+			return 1 # requires index
+		fi
+		for ((i = 0; i < "${#SUCCESS_POSITIONS[@]}"; i++)); do
+			success_index="${SUCCESS_POSITIONS[$i]}"
+			# check if input index exists amongst failure indices
+			if [[ "$index" == "$success_index" ]]; then
+				echo "$i"
+				return
+			fi
+		done
+	}
+
+	# success pos -> dca index
+	function get_dca_index_from_success_pos() {
+		printf "%s" "${SUCCESS_POSITIONS["${1-0}"]}"
+	}
+
+	# DCA index -> true if index is found in failure array
+	function is_failure() {
+		local index="${1-}" ret
+		ret="$(get_failure_pos_from_dca_index "$index")"
+		if [[ -n "$ret" ]]; then
+			return 0
+		else
+			return 1
+		fi
+	}
+
+	# input: DCA index -> status array position
+	function get_status_pos_from_dca_index() {
+		if is_failure "$1"; then
+			get_failure_pos_from_dca_index "$1"
+		else
+			get_success_pos_from_dca_index "$1"
+		fi
+	}
+
+	# =======================================================
+	# =======================================================
+	# VALIDATORS
+
+	# local char_classes="A-Za-z0-9"
+	# local regex='^(/)?([^/\0]+(/)?)+$'
+	# local regex='^/?([A-Za-z0-9._-]+/?)*$'
+	function is_valid_group_dir() {
+		local input=$1
+		local char_classes="[:alpha:][:digit:]"
+		local valid_chars="([$char_classes/]+)"
+		local start='^'
+		local end='$'
+		local regex="$start$valid_chars$end"
+		if [[ ! "$input" =~ $regex ]]; then
+			return 1
+		fi
+	}
+
+	function is_valid_subdir_depth() {
+		local check_str="$1" parts=()
+		IFS='/' read -ra parts <<<"$check_str"
+		if [[ "${#parts[@]}" -gt $ALLOW_MAX_SUB_DIRS ]]; then
+			return 1
+		fi
+	}
+
+	# FIX: FLIP THIS TO {NAME_DOES_NOT_HAVE_UPPERCASE}
+	function name_has_uppercase() {
+		local index="${1-0}"
+		if [[ "${DCA_NAMES[$index]}" =~ [A-Z] ]]; then
+			return 0
+		fi
+		return 1
+	}
+
+	function name_has_valid_chars() {
+		local index="${1-0}"
+		if [[ "${DCA_NAMES[$index]}" =~ ^[$VALID_NAME_CHARS_PATTERN]+$ ]]; then
+			return 0
+		fi
+		return 1
+	}
+
+	function name_is_unique_across_installed_shells {
+		# Ensure that name does not exist in other shells than bash..
+		# Eval for <shell> -il and check existens.
+		:
+	}
+
+	function name_is_unique_in_path() {
+		local index="${1-0}"
+		if which -s "${DCA_NAMES[$index],,}"; then
+			return 1
+		fi
+	}
+
+	# This function is named in past tense since the evaluation of internal
+	# collitions always is made before validation. See "EDIT_NAME_FINISHED".
+	# input: dca index -> bool
+	function __parsed_name_was_unique() {
+		if [[ -n "${NAMES_COLLISION_MAP[${1-0}]}" ]]; then return 1; fi
+	}
+
+	# This is only used/checked upon event "EDIT_NAME_FINISHED"
+	# TODO: Move into event handler??
+	function __new_name_is_unique {
+		local name="$1" i
+		for ((i = 0; i < "${#DCA_NAMES[@]}"; i++)); do
+			if [[ $INDEX -eq $i ]]; then
+				continue
+			elif [[ "$name" == "${DCA_NAMES[$i]}" ]]; then
+				return 1
+			fi
+		done
+	}
+
+	# function
+
+	# =======================================================
+	# =======================================================
+	# VALIDATE DCAS
+
+	function update_status_arrays() {
+		:
+	}
+
+	# how could this be made to work with single index.
+	#
+	# >>> take an arg --temp
+
+	# input: dca index
+	function handle_validate() {
+		local vi name failure='no' set_temp='no' reason='' failure_part_redo_func=''
+
+		if [[ "$1" == "--temp" ]]; then
+			set_temp='yes' # insert status info into TEMP_FAILURE_* instead
+			shift
+			echo "handle_validate --temp $1"
+		fi
+
+		# check failures
+		vi="${1-}"
+		name="${DCA_NAMES[$vi]}"
+		if name_has_uppercase "$vi"; then
+			failure='yes'
+			failure_part_redo_func='edit_name'
+			reason="Alias can only be lower case. Your input was [$name]."
+		elif ! name_has_valid_chars "$vi"; then
+			failure='yes'
+			failure_part_redo_func='edit_name'
+			reason="New alias name contains invalid characters. Only valid chars: [$VALID_NAME_CHARS_PATTERN]"
+		elif ! name_is_unique_in_path "$vi"; then
+			failure='yes'
+			failure_part_redo_func='edit_name'
+			reason="Name [$name] already exists in path. ('which $name' -> $(which "$name"))"
+		elif ! __parsed_name_was_unique "$vi"; then
+			failure='yes'
+			failure_part_redo_func='edit_name'
+			reason="Parsed naming collision for name [$name]"
+		fi
+
+		# set arrays
+		if [[ "$failure" == 'yes' ]]; then
+			if [[ "$option_parsing_verbose" == 'yes' ]]; then
+				echo-style --error "$reason"
+			fi
+			if [[ "$set_temp" == 'no' ]]; then
+				FAILING_POSITIONS+=("$vi")
+				INVALID_REASON+=("$reason")
+				INVALID_CORRECTION_FUNC+=("$failure_part_redo_func")
+			else
+				# echo "<[ASSIGN TEMP FAILURE]>"
+				DCA_IS_VALID[$vi]='no'
+				TEMP_FAILURE_REASON="$reason"
+				TEMP_FAILURE_CORRECTION_FUNC="$failure_part_redo_func"
+			fi
+		else
+			SUCCESS_POSITIONS+=("$vi")
+			DCA_IS_VALID[$vi]='yes'
+			if [[ "$option_parsing_verbose" == 'yes' ]]; then
+				echo-style --success "Successfully validated alias [${DCA_PATHS_SHORT[$vi]}]"
+			fi
+			if [[ "$set_temp" == 'yes' ]]; then
+				# echo "<[RESET TEMP FAILURE]>"
+				TEMP_FAILURE_REASON=""
+				TEMP_FAILURE_CORRECTION_FUNC=""
+			fi
+		fi
+
+		if [[ "$failure" == 'yes' ]]; then
+			return 1
+		fi
+	}
+
+	function validate_single_simple() {
+		# if ! name_has_uppercase "$1" && name_has_valid_chars "$1" && name_is_unique_in_path "$1" && __parsed_name_was_unique "$1"; then
+		# 	return 0
+		# fi
+		# echo "validate_single_simple | input: $1"
+		compute_naming_collisions
+		if ! handle_validate --temp "$1"; then
+			return 1
+		fi
+		# TODO: collect TEMP_FAILURE_* info.
+		# return 1
+	}
+
+	function validate_all() {
+		local vi had_failure='no'
+		compute_naming_collisions
+		for ((vi = 0; vi < "${#DCA_NAMES[@]}"; vi++)); do
+			if ! handle_validate "$vi"; then
+				had_failure='yes'
+			fi
+		done
+		local complete_failure='yes'
+		if [[ "${#SUCCESS_POSITIONS[@]}" == "${#DCA_NAMES[@]}" ]]; then
+			complete_failure='no'
+		fi
+		if [[ "$had_failure" == 'no' ]]; then
+			return 0
+		else
+			if [[ "$complete_failure" == 'yes' ]]; then
+				return 1 # 1 complete failure
+			else
+				return 2 # 2 partial failure. some aliases were validated succeeded
+			fi
+		fi
+	}
+
+	# =======================================================
+	# =======================================================
+	# =======================================================
+	# COLLISION HELPERS
+
+	function get_number_of_collisions {
+		local index="${1-0}" count=0
+		local count_map_idx="${NAMES_COLLISION_MAP[index]}"
+
+		[[ -z "$count_map_idx" ]] && __print_string $count && return
+
+		local count_map_str="${NAMES_COLLISION_COUNT_MAP[$count_map_idx]}"
+
+		IFS=':' read -r -a arr_split <<<"$count_map_str"
+		last=$((${#arr_split[@]} - 1))
+		for ((i = 0; i <= "$last"; i++)); do
+			if [[ "${arr_split[i]}" == "$index" ]]; then
+				continue
+			fi
+			count=$((count + 1))
+		done
+		__print_string "$count"
+	}
+
+	function remove_collision {
+		local index="$1" arr_split=() concat='' i last map_index sep=':'
+		local count_map_idx="${NAMES_COLLISION_MAP[index]}"
+		local count_map_str="${NAMES_COLLISION_COUNT_MAP[count_map_idx]}"
+		# logger "index:$index -> count_map_idx:$count_map_idx -> count_map_str:$count_map_str"
+		IFS=':' read -r -a arr_split <<<"$count_map_str"
+		last=$((${#arr_split[@]} - 1))
+		for ((i = 0; i <= "$last"; i++)); do
+			map_index="${arr_split[i]}"
+			if [[ "$map_index" == "$index" ]]; then
+				continue
+			fi
+			if [[ $i -eq $last ]]; then
+				sep=''
+			fi
+			concat+="$map_index$sep"
+		done
+		NAMES_COLLISION_COUNT_MAP[count_map_idx]="$concat"
+		NAMES_COLLISION_MAP[index]=""
+	}
+
+	function compute_naming_collisions {
+		local i_check name_check y collision encode_count_string collision_counter=0 already_processed=()
+		NAMES_COLLISION_MAP=()
+		NAMES_COLLISION_COUNT_MAP=()
+
+		if [[ "${#DCA_NAMES[@]}" -lt 2 ]]; then
+			NAMES_COLLISION_MAP+=("")
+		fi
+
+		for ((i_check = 0; i_check < "${#DCA_NAMES[@]}"; i_check++)); do
+			name_check="${DCA_NAMES[$i_check]}" collision='no' encode_count_string="$i_check"
+			if is-needle --needle="$name_check" -- "${already_processed[@]}"; then
+				continue # guard against multiple checks for same name.
+			fi
+			for ((y = 0; y < "${#DCA_NAMES[@]}"; y++)); do
+				if [[ "$name_check" == "${DCA_NAMES[$y]}" ]]; then
+					NAMES_COLLISION_MAP[y]=$collision_counter
+					if [[ "$i_check" == "$y" ]]; then
+						already_processed+=("$name_check")
+						continue # first match
+					else
+						collision='yes' # subsequent matches
+						encode_count_string+=":$y"
+					fi
+				fi
+			done
+			if [[ "$collision" == 'yes' ]]; then
+				NAMES_COLLISION_COUNT_MAP+=("$encode_count_string")
+				collision_counter=$((collision_counter + 1))
+			else
+				NAMES_COLLISION_MAP[i_check]=""
+			fi
+		done
+		# debug_post_check_name_collisions
+	}
+
+	# =======================================================
+	# =======================================================
+	# =======================================================
+	# FILE SYSTEM
+
+	function correct_permissions() {
+		# fs-own --permissions="+Xrw" --recursive --quiet -- "$USER_COMMAND_ALIASES_DIR"
+		if [[ $# -eq 0 ]]; then
+			local alias_paths=()
+			mapfile -t alias_paths < <(get_all_existing_dcas)
+			fs-own --x -- "${alias_paths[@]}"
+		else
+			fs-own --x --no-quiet -- "$@" # correct permissions for inpus only
+		fi
+	}
+
+	function create_dca_files() {
+		local i target_path target_dir='' target_name prev_dir='' target_new_paths=()
+
+		function apply() {
+			if [[ -z "$prev_dir" || "$target_dir" != "$prev_dir" ]]; then
+				target_dir="${DCA_DIRS[i]}"
+				__mkdirp "$target_dir" >/dev/null
+				prev_dir="$target_dir"
+			fi
+			target_name="${DCA_NAMES[$i]}"
+			target_path="$target_dir/$target_name"
+			__print_lines "${DCA_CONTENTS[$i]}" >"$target_path"
+			DO_RELOAD='yes'
+			target_new_paths+=("$target_path")
+		}
+
+		if [[ "${1-}" == "--successful" ]]; then
+			for i in "${SUCCESS_POSITIONS[@]}"; do
+				apply
+			done
+		else
+			for ((i = 0; i < "${#DCA_NAMES[@]}"; i++)); do
+				apply
+			done
+		fi
+
+		correct_permissions "${target_new_paths[@]}" # bulk correct permissions
+	}
+
+	# =======================================================
+	# =======================================================
+	# =======================================================
+	#
+
+	#
+	function make_contents() {
+		local index=$1 c=''
+		c+="$SHEBANG_BASH"
+		c+=$'\n'"# NAME: ${DCA_NAMES[$index]}"
+		c+=$'\n'"# -------------------------------------------------------"
+		c+=$'\n'"# DESCRIPTION:"
+		c+=$'\n'"# ${DCA_DESCS[$index]}"
+		c+=$'\n'"# -------------------------------------------------------"
+		if [[ "${DCA_IS_FUNC[$index]}" == 'yes' ]]; then
+			c+=$'\n'"# ARGS: ${DCA_ARGS[$index]}"
+			c+=$'\n'"${DCA_CODE[$index]}"
+		else
+			c+=$'\n'"${DCA_CODE[$index]}"
+			c+=' "$@"'
+		fi
+		DCA_CONTENTS[index]="$c"
+	}
+
+	# =======================================================
+	# =======================================================
+	# =======================================================
+	# EDIT FUNCS
+	#
+	# - ( ) Add ability to create more informative labels by passing, eg. failure reason.
+	#
+	# TODO: these functions should return status on abort, so that i can use that
+	# to break out of editing pipeline in act_migrate
+
+	local EDIT_label=''
+
+	function pre_edit__ {
+		:
+	}
+
+	function edit_name() {
+		local index=${1-$INDEX} answer failure_pos success_pos label current_value temp_fail='no'
+
+		label="======================================================="
+		label+=$'\n'"$AX_UI_PREFIX | ${#FAILING_POSITIONS[@]} / ${#DCA_NAMES[@]} FAILURES"
+
+		if [[ "$REVIEW_UI_MODE" == 'iterate' ]]; then
+			label+=$'\n'"Supply empty string to discard subsequent and proceed to post review"
+		fi
+
+		echo "name in edit: ${DCA_NAMES[$index]}"
+
+		local num_failures="$(get_number_of_collisions "$index")"
+
+		if [[ -n "$TEMP_FAILURE_REASON" ]]; then
+			temp_fail='yes'
+		else
+			failure_pos="$(get_failure_pos_from_dca_index "$index")"
+			success_pos="$(get_success_pos_from_dca_index "$index")"
+			echo "index $index | fpos $failure_pos | spos $success_pos"
+		fi
+
+		current_value="${DCA_NAMES[$index]}"
+
+		# edit_name | build label
+
+		if [[ "$temp_fail" == 'yes' ]]; then
+			# temp / review
+			label+=$'\n'"$(echo-style --error "Rectify name (currently: ${DCA_NAMES[index]} | DCA index: $index):")"
+			label+=$'\n'"REASON: $TEMP_FAILURE_REASON"
+			if [[ "$option_review_verbose" == 'yes' ]]; then
+				label+=$'\n'"$(log_single_content "$index")"
+			fi
+
+		elif [[ -n "$failure_pos" ]]; then
+			# is failure
+			label+=$'\n'"$(echo-style --error "Rectify name (currently: ${DCA_NAMES[index]} | DCA index: $index):")"
+			label+=$'\n'"REASON: ${INVALID_REASON[$failure_pos]}"
+			if [[ "$option_review_verbose" == 'yes' ]]; then
+				label+=$'\n'"$(log_single_content "$index")"
+			fi
+
+		elif [[ -n "$success_pos" ]]; then
+			# is valid
+			label+=$'\n'"$(echo-style --success "Edit name (currently: ${DCA_NAMES[index]} | DCA index: $index):")"
+			if [[ "$option_review_verbose" == 'yes' ]]; then
+				label+=$'\n'"$(log_single_content "$index")"
+			fi
+			# answer="$(ask --linger --default="$current_value" "$label")"
+		else
+			label+="$AX_UI_PREFIX Edit name (old: ${DCA_NAMES[index]}) for index ($index):"
+		fi
+		answer="$(ask --linger --default="$current_value" "$label")"
+
+		# Shouldnt -z cancel come before triggering finished since, cancelling
+		# implies not finishing??
+		# >> And then i can remove __* from the trigger_event func.
+		#
+		# Which then would discard any updates on cancel
+
+		[[ -z "$answer" ]] && return 1
+
+		__trigger_event "EDIT_NAME_FINISHED" "$answer"
+
+		# DCA_NAMES[index]="$answer"
+		# make_contents
+	}
+
+	function edit_code() {
+		local answer
+		answer="$(ask --linger "$AX_UI_PREFIX Edit command code (index: $INDEX):")"
+		[[ -z "$answer" ]] && return 1
+		DCA_CODE[INDEX]="$answer"
+		make_contents
+	}
+
+	function edit_desc() {
+		local answer
+		answer="$(ask --linger "$AX_UI_PREFIX Edit new alias description (index: $INDEX):")"
+		[[ -z "$answer" ]] && return 1
+		DCA_DESCS[INDEX]="$answer"
+		make_contents
+	}
+
+	function edit_sub_path() {
+		local sub_path
+		while :; do
+			sub_path="$(ask --linger "$AX_UI_PREFIX Redo sub path:")"
+			# path valid | validation is already done in the final validator func.
+			# maybe it can be removed from here...
+			if ! is_valid_group_dir "$sub_path"; then
+				sub_path="$(ask --linger "$AX_UI_PREFIX [$sub_path] is not valid | Input sub path again:")"
+				# This could also go into the validator?
+			elif ! is_valid_subdir_depth "$sub_path"; then
+				sub_path="$(ask --linger "$AX_UI_PREFIX [$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
+				# elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
+				# # this is handled by the redo choose menu
+				# 	sub_path="$(ask --linger "$AX_UI_PREFIX Input subpath again:")"
+			else
+				break
+			fi
+		done
+		[[ -z "$subpath" ]] && return 1
+		DCA_GROUPS[INDEX]="$sub_path"
+		make_contents
+	}
+
+	# =======================================================
+	# =======================================================
+	# =======================================================
+	# EVENTS
+	# This is more just a post_editing function rather than an event system. So,
+	# maybe I should rename this.
+
+	function __trigger_event {
+		local event=${1-}
+
+		if [[ $# -eq 0 ]]; then
+			logger "ERROR: Requires at least one event name passed."
+		fi
+		shift
+
+		case "$event" in
+		# "EDIT_PRE") ;;
+		"EDIT_NAME_FINISHED")
+			local new_name="${1-}" # this should be $1 when transitio to $INDEX is done.
+
+			# this is redundant since cancel is handled before throwing event.
+			# [[ -z "$EDIT_ANSWER" ]] && return
+
+			# Check if collision still persists.
+			if ! __parsed_name_was_unique && __new_name_is_unique "$new_name"; then
+				remove_collision "$index"
+			fi
+
+			DCA_NAMES[index]="$new_name"
+
+			# remove usage of index here later
+			update_secondary_data "$index"
+			;;
+		# "REVIEW_PRE") ;;
+		*)
+			logger "ERROR: Un recognized event name."
+			;;
+		esac
+	}
+
+	# =======================================================
+	# =======================================================
+	# =======================================================
+	# ACTIONS
+
+	# =======================================================
+	# LIST
+
+	# TODO: only show <group>/<name>
+	# TODO: type/group/all/etc...
+	function act_list() {
+		local path alias_paths=() aliases_short=()
+
+		mapfile -t alias_paths < <(get_all_existing_dcas)
+
+		# for path in "${alias_paths[@]}"; do
+		#   aliases_short+=("$(get_dca_short_path --path "$path")")
+		#   # aliases_short+=("$(basename "$path")")
+		# done
+
+		if [[ "${#alias_paths[@]}" -eq 0 ]]; then
+			echo "No aliases exists."
+			return
+		fi
+		__print_lines "${alias_paths[@]}"
+	}
+	# =======================================================
+	# BROWSE
+
+	# ( ) choose
+	# ( ) fuzzy-helper
+	# ( ) keybind create new DCA from selection.
+	# TODO: Choose which type to display:
+	# | 1. [ regular | testing | evaluate ]
+	# | 2. Which group to show?
+	# | 3. Mix groups and single DCAs in the same view?
+	# | On choose <esc> cancel go to menu where you can either close or select
+	# | another type/group to display.
+	function act_browse() {
+		local path alias_paths=() alias_names=() alias_labels=()
+		mapfile -t alias_paths < <(get_all_existing_dcas)
+		for path in "${alias_paths[@]}"; do
+			local header contents
+			# ${path#*"commands.aliases"} does not work for trimming everything before
+			# the match pattern. That is why the string looks a bit weird below.
+			header="commands${path#*"commands"}"
+			contents="$("${BAT_CMD[@]}" "$path")"
+			alias_names+=("$header")
+			alias_labels+=("$header"$'\n'"$contents")
+		done
+		if [[ "${#alias_paths[@]}" -eq 0 ]]; then
+			echo "No aliases exists."
+			return
+		fi
+		local index=0 choose_title="$AX_UI_PREFIX "
+		while :; do
+			index="$(choose "$choose_title" --default="$index" --match='$INDEX' --index -- "${alias_labels[@]}")"
+			if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
+				break
+			fi
+		done
+	}
+
+	# =======================================================
+	# CREATE
+
+	function act_create() {
+		local sub_path='' ask_prefix="ALIASES CREATE" prompt_confirm_or_edit
+		reset_all
+		# could these be replaced by the update funcs, and use some kind of default mode?
+		DCA_IS_FUNC+=('no')
+		DCA_NAMES+=("$(ask --linger "$ask_prefix | 1. What will the NAME be?")")
+		DCA_DESCS+=("$(ask --linger "$ask_prefix | 3. What will the DESC be?")")
+		DCA_CODE+=("$(ask --linger "$ask_prefix | 2. What will the VALUE be?")")
+		if confirm --ppid=$$ --negative -- "$ask_prefix | 4. Put it in sub path, eg. [commands.aliases/<my>/<dir>]?"; then
+			sub_path="$(ask --linger "$ask_prefix | What will the SUB PATH be?")"
+			while :; do
+				# path valid
+				if ! is_valid_group_dir "$sub_path"; then
+					sub_path="$(ask --linger "[$sub_path] is not valid | Input sub path again:")"
+					# path maxth depth
+				elif ! is_valid_subdir_depth "$sub_path"; then
+					sub_path="$(ask --linger "[$sub_path] exceeds max subd dir depth [$ALLOW_MAX_SUB_DIRS] | Input sub path again:")"
+					# elif ! confirm --ppid=$$ --positive -- "Are you OK with subpath: [$sub_path]"; then
+					# # this is handled by the redo choose menu
+					# 	sub_path="$(ask --linger "Input subpath again:")"
+				else
+					DCA_GROUPS+=("$sub_path")
+					break
+				fi
+			done
+		else
+			DCA_GROUPS+=("")
+		fi
+		# make_contents
+		update_secondary_data
+
+		while :; do
+			prompt_confirm_or_edit="Go ahead create alias at [${DCA_PATHS_SHORT[$INDEX]}] OR edit alias?"$'\n'"$(log_single_content)"
+			if ! confirm --ppid=$$ --positive -- "$prompt_confirm_or_edit"; then
+				# todo: move title definition into the choose command
+				local redo_func redo_options=() title="$AX_UI_PREFIX Select which part to edit:"
+				redo_options+=(edit_name "Name (${DCA_NAMES[INDEX]})")
+				redo_options+=(edit_code "Code (${DCA_CODE[INDEX]})")
+				redo_options+=(edit_sub_path "Sub group name (${DCA_GROUPS[INDEX]})")
+				redo_options+=(edit_desc "Description (${DCA_DESCS[INDEX]})")
+				redo_func="$(choose "$title" --label -- "${redo_options[@]}")"
+
+				# FIX: This handles failure after edit_* finish, but I dont quite like having
+				# to put it here and also having the validation call below..
+				eval_capture --statusvar=status -- validate_all
+
+				"$redo_func"
+			else
+				break
+			fi
+		done
+
+		local failure_redo_func status
+		while :; do
+			eval_capture --statusvar=status -- validate_all
+			if [[ "$status" -ne 0 ]]; then
+				local label
+				label="[$status] Creating alias [${DCA_PATHS_SHORT[$INDEX]}] failed with reason:"
+				label+=$'\n'"REASON: ${INVALID_REASON[0]}"
+				label+=$'\n'"Do you want to re-edit failing part?"
+				if confirm --ppid=$$ --positive -- "$label"; then
+					# failure_redo_func="${INVALID_CORRECTION_FUNC[0]}"
+					# if [[ -n "$failure_redo_func" && "$failure_redo_func" == "none" ]]; then
+					# 	echo-style --error "CREATE | Could not create alias [$(get_dca_short_path)]. No re-edit func exists for failure. (todo: ignore/discard?)"
+					# fi
+					# "$failure_redo_func"
+					"${INVALID_CORRECTION_FUNC[0]}"
+					reset_status_arrays
+
+					# TODO: move this into EDIT_NAME_FINISHED
+					update_secondary_data
+
+				fi
+			else
+				create_dca_files
+				break
+			fi
+		done
+
+		if confirm --ppid=$$ --positive -- "Add nother alias?"; then
+			act_create
+		fi
+	}
+
+	# =======================================================
+	# CLEAN
+
+	# TODO: same as with browse. select which type/group/single to remove.
+	function act_clean() {
+		local alias_paths=() alias_names=() alias_labels=()
+
+		clean_labels=(
+			test "test dir"
+			evaluate "evaluate dir"
+			all "all"
+			groups "group"
+			single "select single"
+		)
+
+		# __print_lines "${alias_labels[@]}"
+		local index=0 clean_title="$AX_UI_PREFIX Select which category you want to purge:"
+		clean_selection="$(choose "$clean_title" --labels -- "${clean_labels[@]}")"
+		# if ! confirm --ppid=$$ --positive -- "You selected alias:"$'\n'"${alias_labels[index]}"$'\n'"Prompt again?"; then
+		# 	break
+		# fi
+
+		local opts=("-Rf")
+		case "$clean_selection" in
+		test)
+			if confirm --ppid=$$ --negative -- "Are you sure you want to purge all [TESTING] aliases?"; then
+				echo "Purging all TESTING aliases..."
+				rm "${opts[@]}" "$USER_COMMAND_ALIASES_DIR/$DCA_TEST_DIR_NAME"/*
+			fi
+			;;
+		evaluate)
+			if confirm --ppid=$$ --negative -- "Are you sure you want to purge all [EVALUATE] aliases?"; then
+				echo "Purging all TESTING aliases..."
+				rm "${opts[@]}" "$USER_COMMAND_ALIASES_DIR/$DCA_EVALUATE_DIR_NAME"/*
+			fi
+			;;
+		all)
+			if confirm --ppid=$$ --negative -- "Are you sure you want to purge [ALL] aliases?"; then
+				if confirm --ppid=$$ --negative -- "Again, are you really, really sure to remove [ALL] aliases?"; then
+					echo "Purging all ALL aliases..."
+					rm "${opts[@]}" "$USER_COMMAND_ALIASES_DIR"/*
+				fi
+			fi
+			;;
+		groups) echo "purge group todo.." ;;
+		single) echo "purge single todo.." ;;
+		esac
+	}
+
+	# =======================================================
+	# MIGRATE
+
+	function do_review_pre {
+		# nothing was picked up. review doesnt make sense
+		if [[ "${#DCA_NAMES[@]}" -eq 0 ]]; then
+			do_review_post
+			return
+		fi
+
+		reset_status_arrays
+
+		# validate parsed aliases and funcs
+		eval_capture --statusvar=validate_status -- validate_all
+	}
+
+	# call this after the parser loop has run it's course.
+	function do_review_post() {
+		echo-style --header "$migrate_prefix POST REVIEW"
+
+		function go_back_to_review() {
+			local go_back_sel go_back_to_review_choices=(
+				iterate_all "iterate all"
+				iterate_failures "iterate only failures"
+				iterate_successful "iterate (already) successful"
+				menu_all "overview: all"
+				menu_failures "overview: only failures"
+				menu_successful "overview: only (already) successful"
+			)
+			go_back_sel="$(choose "Go back | Select review mode" --label -- "${go_back_to_review_choices[@]}")"
+			case "$go_back_sel" in
+			iterate_*)
+				REVIEW_UI_MODE='iterate'
+				case "$go_back_sel" in
+				*_all) REVIEW_TYPE='all' ;;
+				*_failures) REVIEW_TYPE='failures' ;;
+				*_successful) REVIEW_TYPE='successful' ;;
+				esac
+				;;
+			menu_*)
+				REVIEW_UI_MODE='choose'
+				case "$go_back_sel" in
+				*_all) REVIEW_TYPE='all' ;;
+				*_failures) REVIEW_TYPE='failures' ;;
+				*_successful) REVIEW_TYPE='successful' ;;
+				esac
+				;;
+			*)
+				__print_lines "User cancelled [go back to review] menu"
+				return
+				;;
+			esac
+
+			if [[ -z "$go_back_sel" ]]; then
+				return
+			else
+				do_review_main
+			fi
+		}
+
+		local num_failures="${#FAILING_POSITIONS[@]}"
+		local num_successful="${#SUCCESS_POSITIONS[@]}"
+
+    local review_question="Do you want to go back to reviewing?"
+
+		if [[ "${#DCA_NAMES[@]}" -eq 0 ]]; then
+			echo-style --bold "Parser did not pick anything. Exiting..."
+			exit 0
+		fi
+
+		if [[ "$num_successful" -gt 0 && "$num_failures" -gt 0 ]]; then
+			if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
+				go_back_to_review
+			else
+				# confirm create or exit
+				if ! confirm --ppid=$$ --positive -- "There are successful DCAs parsed. Do you want to go ahead and create them?"; then
+					echo-style --bold "[User cancelled]: Exiting..."
+					exit
+				fi
+
+				# TODO: Default to creating aliases under [aliases/testing]
+				# if ! confirm --ppid=$$ --positive -- "Put NEW DCAs in /testing dir?"; then
+				# 	# echo-style --bold "[User cancelled]: Exiting..."
+				# 	# exit
+				# fi
+
+				# this is just because user can cancel review, with existing failures,
+				# then we only want to create successful ones and exit
+				local create_opts=()
+				if [[ "$proceed_with_successful" == 'yes' ]]; then
+					echo-style --bold "Proceeding to create only valid DCAs.."
+					create_opts+=(--successful)
+				fi
+
+				# TODO: Choose "Add to TEST dir or REAL positions"
+
+				create_dca_files "${create_opts[@]}"
+			fi
+
+		elif [[ "$num_failures" -gt 0 && "$num_failures" -eq 0 ]] ; then
+			echo-style --bold "$migrate_prefix POST REVIEW | Only successful but TODO..."
+
+		elif [[ "$num_failures" -gt 0 ]] ; then
+			echo-style --bold "$num_failures invalid left."
+
+			if [[ "$REVIEW_TYPE" == 'all' ]]; then
+				if confirm --ppid=$$ --positive -- "Option review BOTH but no successful parses. $review_question"; then
+					go_back_to_review
+				fi
+				echo-style --bold "Exiting..."
+
+			elif [[ "$REVIEW_TYPE" == 'successful' ]]; then
+				if confirm --ppid=$$ --positive -- "Option review ONLY SUCCESSFUL but no successful parses. $review_question"; then
+					go_back_to_review
+				fi
+				echo-style --bold "Exiting..."
+
+			else
+				echo-style --bold "Option review ONLY FAILURES (default)"
+				if [[ "$num_failures" -gt 0 ]]; then
+					if confirm --ppid=$$ --positive -- "$num_failures invalid parses are left. Do you want to go back to reviewing?"; then
+						go_back_to_review
+					fi
+				fi
+				echo-style --bold "Exiting..."
+			fi
+		fi
+	}
+
+	function do_review_main {
+		do_review_pre
+
+		# setup variables for review
+		local -n REVIEW_ARRAY
+		local current_was_failure_initially='no'
+		local _selected_review_index
+
+		local REVIEW_SELECTED_FAILURE_INDEX
+
+		local proceed_with_successful='no'
+
+		if [[ "$REVIEW_TYPE" == 'all' ]]; then
+			REVIEW_ARRAY="DCA_NAMES"
+		elif [[ "$REVIEW_TYPE" == 'successful' ]]; then
+			REVIEW_ARRAY="SUCCESS_POSITIONS"
+		else
+			REVIEW_ARRAY="FAILING_POSITIONS"
+		fi
+
+		function __review__handle_edit() {
+			local update_validated='no'
+
+			while [[ "$update_validated" == "no" ]]; do
+				# on cancel return and exit choose/ask loops below
+
+				if ! edit_name; then
+					proceed_with_successful='yes'
+					return # discard edit and go back/continue review.
+				fi
+
+				# TODO: below could go into [__trigger_event "edit_finished" ]
+
+				if validate_single_simple "$INDEX"; then
+					update_validated='yes'
+
+					# updating the name, it will only pass the collision system
+					#
+					# edit -> check if us unique within -> validate
+					#
+					# edit -> trigger
+
+					if [[ "$current_was_failure_initially" == 'yes' ]]; then
+						# Only if a failure was rectified,
+						trim_failure_arrays "$REVIEW_SELECTED_FAILURE_INDEX"
+						success_pos_add "$INDEX"
+					fi
+				fi
+			done
+		}
+
+		# Ensure correct mapping of indices after selection or iteration if fix iterate
+		function review__apply_correct_indices() {
+			if [[ "$REVIEW_TYPE" == 'failures' ]]; then
+				# echo "apply:failures"
+				current_was_failure_initially='yes'
+				INDEX="${REVIEW_ARRAY[$_selected_review_index]}"
+				REVIEW_SELECTED_FAILURE_INDEX="$_selected_review_index" # "$(get_failure_pos_from_dca_index "$_selected_review_index")"
+
+			elif [[ "$REVIEW_TYPE" == 'all' ]] && is_failure "$_selected_review_index"; then
+				# echo "apply:both"
+				current_was_failure_initially='yes'
+				INDEX="$_selected_review_index"
+				REVIEW_SELECTED_FAILURE_INDEX="$(get_failure_pos_from_dca_index "$_selected_review_index")"
+
+			else
+				# echo "apply:else"
+				current_was_failure_initially='no'
+				if [[ "$REVIEW_TYPE" == 'successful' ]]; then
+					INDEX="$(get_dca_index_from_success_pos "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
+				else
+					INDEX="$_selected_review_index" #"$(get_success_pos_from_dca_index "$_selected_review_index")" # "${REVIEW_ARRAY[$_selected_review_index]}" # selected successful value
+				fi
+			fi
+			# echo "dcai $INDEX | sfix $REVIEW_SELECTED_FAILURE_INDEX"
+		}
+
+		#
+		# REVIEW: UI ASK (ITERATE)
+		#
+
+		# handle parsed aliases
+		if [[ "$REVIEW_UI_MODE" == 'iterate' ]]; then
+			# w/ASK --------------------------------------------
+			#
+			# TEST: Does it handle updated statuses correctly?
+			# TEST: Does it handle causing new errors??
+			#
+			# FAILURES ONLY:
+			# with fails only each will be stomped out one by one.
+
+			# TODO: func [run_review_iterate]
+
+			# debug_status_arrays
+			local ordinal iterations="${#REVIEW_ARRAY[@]}"
+			for ((ordinal = 0; ordinal < "$iterations"; ordinal++)); do
+				_selected_review_index='' REVIEW_SELECTED_FAILURE_INDEX=''
+				_selected_review_index="$ordinal" # "${REVIEW_ARRAY[i]}"
+				if [[ "$REVIEW_TYPE" == 'failures' ]]; then
+					_selected_review_index=0
+				fi
+				review__apply_correct_indices
+
+				# TODO: if false then [do_review_post]
+				! __review__handle_edit && break
+			done
+		elif [[ "$REVIEW_UI_MODE" == "choose" ]]; then
+
+			#
+			# REVIEW: UI CHOOSE (MENU)
+			#
+
+			# TODO: func [run_review_choose]
+
+			while [[ "${#REVIEW_ARRAY[@]}" -gt 0 ]]; do
+				_selected_review_index='' REVIEW_SELECTED_FAILURE_INDEX=''
+
+				# echo "-------------------------------------------------------"
+				# echo "::::::::: DEBUG BEFORE :::::::::"
+				# debug_status_arrays
+
+				local ordinal choose_start_index=0 choose_title="$AX_UI_PREFIX " choose_review_labels=() short_path_formatted
+
+				choose_title+="| REVIEWING: [$REVIEW_TYPE] | "
+				choose_title+="${#FAILING_POSITIONS[@]} BAD | ${#SUCCESS_POSITIONS[@]} GOOD / ${#DCA_NAMES[@]} total | Select below to fix failing issue."
+				choose_title+=$'\n'"ENTER: edit/fix selection | ESC/CANCEL: create validate only | Ctrl-C: Abort"
+
+				for ((ordinal = 0; ordinal < "${#REVIEW_ARRAY[@]}"; ordinal++)); do
+					local review_label='' dca_review_index status_pos
+					if [[ "$REVIEW_TYPE" == 'all' ]]; then
+						dca_review_index=$ordinal
+					else
+						dca_review_index="${REVIEW_ARRAY[$ordinal]}"
+					fi
+
+					local short_path_formatted="$(str_ensure_length 40 "[${DCA_PATHS_SHORT[$dca_review_index]}]")"
+
+					function make_failure_label() {
+						review_label+="$(echo-style --error+bold "#$ordinal: $short_path_formatted REASON: ${INVALID_REASON[$status_pos]}")"
+					}
+					function make_successful_label() {
+						review_label+="$(echo-style --success+bold "#$ordinal: $short_path_formatted")"
+					}
+					status_pos="$(get_status_pos_from_dca_index "$dca_review_index")"
+					if [[ "$REVIEW_TYPE" == 'all' ]]; then
+						if is_failure "$dca_review_index"; then
+							make_failure_label
+						else
+							make_successful_label
+						fi
+					elif [[ "$REVIEW_TYPE" == 'failures' ]]; then
+						make_failure_label
+					elif [[ "$REVIEW_TYPE" == 'successful' ]]; then
+						make_successful_label
+					fi
+					if [[ "$option_review_verbose" == 'yes' ]]; then
+						review_label+=$'\n'"$(log_single_content "$dca_review_index")"
+					fi
+					choose_review_labels+=("$review_label")
+				done
+
+				# --default="$choose_start_index" --match='$INDEX'
+				_selected_review_index="$(choose "$choose_title" --index -- "${choose_review_labels[@]}")"
+
+				review__apply_correct_indices
+
+				if [[ -z "$_selected_review_index" ]]; then # choose sets output to empty string on cancel
+					logger "chooce cancel"
+					proceed_with_successful='yes'
+					break
+				fi
+				# ^ this only pertains to review_choose
+
+				# echo "::::::::: DEBUG AFTER :::::::::"
+				# debug_status_arrays
+				# echo
+				# echo "sel failure pos = $REVIEW_SELECTED_FAILURE_INDEX"
+				# echo "sel val = $INDEX"
+
+				# TODO: if false then [do_review_post]
+				! __review__handle_edit && break
+			done
+		fi
+
+		do_review_post
+	}
+
+	function act_migrate() {
+		local interpreter='' input_file migrate_prefix="ALIASES MIGRATE |"
+		if [[ -n "$option_migrate_to_subdir" ]] && ! is_valid_group_dir "$option_migrate_to_subdir"; then
+			echo-style --error "Supplied invalid sub path: [$option_migrate_to_subdir]"
+			exit 1
+		fi
+
+		function parse_posix__collect_aliases {
+			local aliases=()
+			local alias_regex='^[[:space:]]*alias[[:space:]]+[a-zA-Z0-9_-]+='
+			mapfile -t aliases < <(grep -E "$alias_regex" "$input_file" | echo-trim-each-line)
+			for line_alias in "${aliases[@]}"; do
+				local new_alias_name='' new_alias_desc='' value=''
+				# handle trim trailing comment
+				if [[ "$line_alias" =~ ^([^\#]*)\s*#\s*(.*) ]]; then
+					line_alias="${BASH_REMATCH[1]}"
+					new_alias_desc="${BASH_REMATCH[2]}"
+				fi
+
+				# handle split alias
+				# TODO: handle case where code `value` is not quoted.
+				if [[ "$line_alias" =~ alias\ ([^=]+)=\"(.*)\" ]]; then
+					new_alias_name="${BASH_REMATCH[1]}"
+					value="${BASH_REMATCH[2]}"
+				elif [[ "$line_alias" =~ alias\ ([^=]+)=\'(.*)\' ]]; then
+					new_alias_name="${BASH_REMATCH[1]}"
+					value="${BASH_REMATCH[2]}"
+				elif [[ "$line_alias" =~ alias\ ([^=]+)=(.*) ]]; then
+					new_alias_name="${BASH_REMATCH[1]}"
+					value="${BASH_REMATCH[2]}"
+				fi
+
+				DCA_IS_FUNC+=('no')
+				DCA_NAMES+=("$new_alias_name")
+				DCA_GROUPS+=("$option_migrate_to_subdir")
+				DCA_CODE+=("$value")
+				DCA_DESCS+=("$new_alias_desc")
+				DCA_ARGS+=("")
+
+				local last=$(("${#DCA_NAMES[@]}" - 1))
+				update_secondary_data "$last"
+
+				if [[ "$option_parsing_verbose" == 'yes' ]]; then
+					log_during_parsing
+				fi
+			done
+		}
+
+		function parse_posix__collect_functions {
+			local new_alias_name function_names=()
+			mapfile -t function_names < <(bash -c 'source '"$input_file"'; declare -F | awk "{print \$3}"')
+
+			# PERF: Shouldnt I be able to parse all func bodies in one go??
+			#
+			# >> In _doc_helper we wanted the correct order that functions are
+			# defined in but here that does not matter so we could just bulk parse.
+
+			for new_alias_name in "${function_names[@]}"; do
+				local body body_trimmed #new_alias_name
+				body="$(bash -c 'source '"$input_file"'; declare -f '"$new_alias_name")"
+				body_trimmed="$(__print_lines "$body" | sed '1,2d; $d' | sed 's/^    //')"
+				# Capture how many arguments each func snippets takes. This is not perfect but at least it gives some indication.
+				local arguments=() count=0
+				while read -r line; do
+					local line="$line"
+					while [[ "$line" =~ (\$[0-9]+) ]]; do
+						local match="${BASH_REMATCH[0]}"
+						if ! is-needle "$match" -- "${arguments[@]}"; then
+							arguments+=("$match")
+						fi
+						line="${line/"$match"/}" # Remove the matched part from the line
+						# echo "trim: [$line]"
+						if [[ "$count" == 10 ]]; then
+							break
+						fi
+					done
+				done <<<"$body_trimmed"
+				DCA_IS_FUNC+=('yes')
+
+				if [[ "$option_replace_underscores" == 'yes' ]]; then
+					new_alias_name=${new_alias_name//_/-}
+				fi
+
+				DCA_NAMES+=("$new_alias_name")
+				DCA_GROUPS+=("$option_migrate_to_subdir")
+				DCA_CODE+=("$body_trimmed")
+
+				# DCA_DESCS+=("")
+				DCA_DESCS+=("$(echo-comment-blocks --function="$new_alias_name" -- "$input_file")")
+
+				DCA_ARGS+=("'${arguments[@]}'")
+
+				local last=$(("${#DCA_NAMES[@]}" - 1))
+				update_secondary_data "$last"
+
+				if [[ "$option_parsing_verbose" == 'yes' ]]; then
+					log_during_parsing
+				fi
+			done
+		}
+
+		function migrate_single_file() {
+			input_file=$1
+			interpreter="$(get-interpreter --name -- "$input_file")"
+			if is-needle --needle="$interpreter" -- "${supported[@]}"; then
+				# TODO:: check if contents are posix. test source file and see if it returns success
+				if is-needle "$interpreter" -- "${SUPPORTED_POSIX[@]}"; then
+					parse_posix__collect_aliases
+					parse_posix__collect_functions
+					#	log_all_contents
+				elif is-needle "$interpreter" -- "${SUPPORTED_NON_POSIX[@]}"; then
+					if [[ "$interpreter" == "nu" ]]; then
+						:
+					elif [[ "$interpreter" == "elvish" ]]; then
+						:
+					elif [[ "$interpreter" == "xonsh" ]]; then
+						:
+					fi
+				else
+					help "Interpreter [$interpreter] not supported"
+				fi
+			fi
+		}
+
+		# try parse
+		for migrate_file in "${option_args[@]}"; do
+			migrate_single_file "$migrate_file"
+		done
+
+		do_review_main
+	}
+
+	# =======================================================
+	# =======================================================
+	# PREPARE
+
+	if [[ ! -d "$USER_COMMAND_ALIASES_DIR" ]]; then
+		__mkdirp "$USER_COMMAND_ALIASES_DIR"
+		# fs-own --permissions="+Xrw" --recursive --quiet -- "$USER_COMMAND_ALIASES_DIR"
+	fi
+
+	if [[ -z "$option_action" ]]; then
+		# help "No action provided"
+		option_action="browse"
+	fi
+
+	# Check before running migration..
+	if [[ -n "$option_migrate_to_subdir" ]]; then
+		if ! is_valid_subdir_depth "$option_migrate_to_subdir"; then
+			echo-style --error "Maximum sub dir depth allowed is [$ALLOW_MAX_SUB_DIRS]"
+			exit
+		fi
+	fi
+
+	if [[ "$option_fix_iterate" == 'yes' ]]; then
+		REVIEW_UI_MODE="iterate"
+	fi
+
+	if [[ "$option_review_both" == 'yes' ]]; then
+		REVIEW_TYPE='all'
+	elif [[ "$option_review_successful" == 'yes' ]]; then
+		REVIEW_TYPE='successful'
+	else
+		REVIEW_TYPE='failures'
+	fi
+
+	# =======================================================
+	# Act
+
+	# This is a better one liner but my linter complains too much about
+	# funcs being unreachable so for now i go with the switch case.
+	# "act_$option_action"
+
+	case "$option_action" in
+	browse) act_browse ;;
+	create) act_create ;;
+	migrate) act_migrate ;;
+	clean) act_clean ;;
+	list) act_list ;;
+	esac
+
+  # Hacky temporary handle reload env.
+	if [[ "$DO_RELOAD" == 'yes' ]]; then
+		return 1
+	fi
 )
 
 # fire if invoked standalone
 if [[ $0 == "${BASH_SOURCE[0]}" ]]; then
-  if [[ $* == '--test' ]]; then
-    command_aliases_test
-  else
-    command_aliases "$@"
-  fi
+	if [[ $* == '--test' ]]; then
+		command_aliases_test
+	else
+		command_aliases "$@"
+	fi
 fi
