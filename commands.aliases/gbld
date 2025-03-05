@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# NAME: gbld
+# -------------------------------------------------------
+# DESCRIPTION:
+# 
+# -------------------------------------------------------
+git for-each-ref --sort=committerdate refs/heads/ --format='%(color: red)%(committerdate:short) %(color: cyan)%(refname:short)' "$@"

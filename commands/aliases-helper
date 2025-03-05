@@ -21,10 +21,6 @@
 # https://github.com/cykerway/complete-alias
 #
 
-# TODO: fix: proceed_with_successful is local to [do_review_main]
-#
-# TODO: ( ) review_post -> if failures -> ASK: Include failures??
-#
 # TODO: prevent edit_code if function?
 # >>> Im not sure this is necessary since you can only enter edit_code from [act_create]
 #
@@ -45,6 +41,8 @@
 # TODO: try using [echo-lines] for column formatting.
 #
 # PERF: obtain all fn bodies in bulk - works bc we dont care about order.
+#
+# TODO: toggle review verbose -> so that you can see the code.
 
 # -----------------------------------------------------------------------------
 # FABRIC

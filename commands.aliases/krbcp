@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# NAME: krbcp
+# -------------------------------------------------------
+# DESCRIPTION:
+# 
+# -------------------------------------------------------
+# ARGS: '$1'
+make;
+cp public/json/molleweide.json ~/.config/karabiner/assets/complex_modifications

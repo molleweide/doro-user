@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# NAME: fco
+# -------------------------------------------------------
+# DESCRIPTION:
+# 
+# -------------------------------------------------------
+# ARGS: ''
+git checkout $(git branch -a --sort=-committerdate | cut -c 3- | sed 's/^remotes\/[^/]*\///' | sort | uniq | grep -v HEAD | fzf-tmux -d 20)

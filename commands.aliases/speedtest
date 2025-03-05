@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# NAME: speedtest
+# -------------------------------------------------------
+# DESCRIPTION:
+# 
+# -------------------------------------------------------
+wget -O /dev/null http://speed.transip.nl/10mb.bin "$@"

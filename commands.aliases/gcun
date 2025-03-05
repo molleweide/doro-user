@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# NAME: gcun
+# -------------------------------------------------------
+# DESCRIPTION:
+# 
+# -------------------------------------------------------
+git add notes/ && git commit -m 'user(molleweide): notes' "$@"

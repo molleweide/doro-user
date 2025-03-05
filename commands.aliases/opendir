@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# NAME: opendir
+# -------------------------------------------------------
+# DESCRIPTION:
+# 
+# -------------------------------------------------------
+# ARGS: ''
+local file="$1";
+local dir=$(dirname "$file");
+open "$dir"

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# NAME: fgr
+# -------------------------------------------------------
+# DESCRIPTION:
+# # fuzzy grep via rg and open in vim with line numbe
+# -------------------------------------------------------
+# ARGS: '$1
+local file;
+local line;
+read -r file line <<< "$(rg --no-heading --line-number $@ | fzf -0 -1 | awk -F: '{print $1, $2}')";
+if [[ -n $file ]]; then
+    vim $file +$line;
+fi

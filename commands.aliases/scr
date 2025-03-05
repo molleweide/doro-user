@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# NAME: scr
+# -------------------------------------------------------
+# DESCRIPTION:
+#  this does not capture applications ?! only background image?!
+# -------------------------------------------------------
+screenshot "$@"

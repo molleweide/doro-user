@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# NAME: pgrefresh
+# -------------------------------------------------------
+# DESCRIPTION:
+# 
+# -------------------------------------------------------
+# ARGS: '$1'
+rm -fr /usr/local/var/postgres/postmaster.pid;
+brew services restart postgresql

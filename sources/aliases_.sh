@@ -402,12 +402,6 @@ alias krb="open -a /Applications/Karabiner-Elements.app"
 # kmoairT() { sudo $kmonad $layouts/macbook_air_2021_m1.kbd -l debug; }
 # kmoezT() { sudo $kmonad $layouts/ergodox_ez.kbd -l debug; }
 
-#-------------------------
-#---       MEDIA       ---
-#-------------------------
-
-alias yt="mpsyt"
-
 #-----------------------
 #---       GPG       ---
 #-----------------------
@@ -435,8 +429,7 @@ alias rh="runhaskell"
 # https://itectec.com/askdifferent/macos-how-to-change-mission-control-shortcuts-from-the-command-line/
 # https://apple.stackexchange.com/questions/398561/how-to-set-system-keyboard-shortcuts-via-command-line
 
-alias g="screenshot" # this does not capture applications ?! only background image?!
-alias sl="computer-sleep"
+alias scr="screenshot" # this does not capture applications ?! only background image?!
 
 alias defd="defaults domains | tr ',' '\n'"
 
@@ -564,7 +557,7 @@ function opendir() {
 # 	ffmpeg="ffmpeg -hide_banner"
 
 # single character shortcuts - be sparing!
-alias dr='dirs -v | head -10'
+# alias dr='dirs -v | head -10'
 # alias v='vim'
 alias h='history'
 

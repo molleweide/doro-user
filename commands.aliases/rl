@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# NAME: rl
+# -------------------------------------------------------
+# DESCRIPTION:
+# # reload shel
+# -------------------------------------------------------
+# ARGS: ''
+source "$DOROTHY/sources/environment.sh";
+source "$DOROTHY/sources/interactive.sh"

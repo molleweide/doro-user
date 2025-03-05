@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# NAME: qmkflash
+# -------------------------------------------------------
+# DESCRIPTION:
+# 
+# -------------------------------------------------------
+cd $HOME/code/firmware/qmk-firmware/ && tfl "$@"

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# NAME: ranger2
+# -------------------------------------------------------
+# DESCRIPTION:
+# # ranger with some extras
+# - Q to exit to current dir in CLI
+# -------------------------------------------------------
+# ARGS: ''
+local IFS='	
+' tempfile ranger_cmd;
+tempfile="$(mktemp -t tmp.XXXXXX)";
+ranger_cmd=(command ranger --cmd='map Q chain shell echo %d > '"$tempfile"'; quitall');
+"${ranger_cmd[@]}" "$@";
+if [[ -f "$tempfile" ]] && [[ "$(cat -- "$tempfile")" != "$(echo -n "$(pwd)")" ]]; then
+    cd -- "$(cat "$tempfile")" || return;
+fi;
+command rm -f -- "$tempfile" 2> /dev/null

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# NAME: netws
+# -------------------------------------------------------
+# DESCRIPTION:
+#  <SSID_OF_NETWORK> <PASSWORD>
+# -------------------------------------------------------
+networksetup -setairportnetwork en0 "$@"

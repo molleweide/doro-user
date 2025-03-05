@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# NAME: karb
+# -------------------------------------------------------
+# DESCRIPTION:
+# 
+# -------------------------------------------------------
+/Library/Application\ Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli "$@"

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# NAME: reload-tiling
+# -------------------------------------------------------
+# DESCRIPTION:
+# 
+# -------------------------------------------------------
+# ARGS: ''
+brew services restart yabai;
+brew services restart skhd;
+limelight

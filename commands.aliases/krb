@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# NAME: krb
+# -------------------------------------------------------
+# DESCRIPTION:
+# 
+# -------------------------------------------------------
+open -a /Applications/Karabiner-Elements.app "$@"

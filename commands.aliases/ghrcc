@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# NAME: ghrcc
+# -------------------------------------------------------
+# DESCRIPTION:
+# # create puflic git rep
+# -------------------------------------------------------
+# ARGS: '$1'
+gh repo create $1 --public -c

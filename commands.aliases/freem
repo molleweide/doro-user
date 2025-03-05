@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# NAME: freem
+# -------------------------------------------------------
+# DESCRIPTION:
+# # CHECK SYSTEM INFORMATION
+# display free memory / linux `free` equiv https://superuser.com/questions/521681/what-is-the-mac-osx-equivalent-of-free-m
+# make equivalents for linux: dmidecode # lshw # hwinfo # lscpu # lspci # /proc/cpuinf
+# -------------------------------------------------------
+# ARGS: '$1'
+if is-mac; then
+    echo $(($(sysctl -a | awk '/memsize/{print $2}') / 2 ** 30));
+else
+    echo "freem only supported on macos..";
+fi
