@@ -21,9 +21,6 @@
 # https://github.com/cykerway/complete-alias
 #
 
-# TODO: prevent edit_code if function?
-# >>> Im not sure this is necessary since you can only enter edit_code from [act_create]
-#
 # TODO: ( ) support zsh
 # - modified parser ??
 # - add zsh shebang?
@@ -454,7 +451,7 @@ function command_aliases() (
 						    name, description, and contents, which you can then affirm or
 						    manually edit, and then continue with the next iteration.
 
-						--llm-contents
+						--llm
 						    Here, in the create loop, you're first asked for the name and the
 						    description, and LLM generates the contents of the DCA.
 

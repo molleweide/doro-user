@@ -5,4 +5,34 @@
 # # fh [FUZZY PATTERN] - Search in command histor
 # -------------------------------------------------------
 # ARGS: '$2'
-print -z $( ( [ -n "$ZSH_NAME" ] && fc -l 1 || history ) | fzf +s --tac | sed 's/ *[0-9]* *//')
+# select_cmd=$( ( [ -n "$ZSH_NAME" ] && fc -l 1 || history ) | fzf +s --tac | sed 's/ *[0-9]* *//')
+# print -z $select_cmd
+# ow
+
+# FIX: handle history correctly
+# 1. research where history is stored.
+#
+# TODO: custom solution that triggers the current prompt and inserts the
+# output text.
+# ^ The issue is that with aliases that arent cross compat then you can modify
+# the prompt but we need a custom solution that can handle the prompt from
+# outside. -> We'd need a helper that can modify and update the prompt from
+# our custom aliases.
+#
+# NOTE: Old zsh variant
+# -print -z $( ( [ -n "$ZSH_NAME" ] && fc -l 1 || history ) | fzf +s --tac | sed 's/ *[0-9]* *//')
+
+ran_from_shell='bash'
+
+# get which shell the command was called from
+if ps -o comm= -p $PPID | grep -q "zsh"; then
+  ran_from_shell='zsh'
+fi
+
+if [[ "$ran_from_shell" == 'zsh' ]]; then
+  cmd=$(awk '{print $0}' "$ZDOTDIR/.zsh_history" | fzf --tac | sed 's/ *[0-9]* *//')
+  echo "$cmd" # \033[K clears the line after the cursor
+else
+  cmd=$(awk '{print $0}' "$HOME/.bash_history" | fzf --tac | sed 's/ *[0-9]* *//')
+  echo "$cmd"
+fi
