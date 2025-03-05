@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# NAME: xy
+# NAME: vv
 # -------------------------------------------------------
 # DESCRIPTION:
-#  nsetest
+#  forked build
 # -------------------------------------------------------
-echo "$@"
+~/code/repos/github.com/neovim/neovim/build/bin/nvim "$@"

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# NAME: vc
+# -------------------------------------------------------
+# DESCRIPTION:
+# 
+# -------------------------------------------------------
+CC=/usr/local/Cellar/gcc/12.2.0/bin/gcc-12 ~/.local/share/neovim/bin/nvim "$@"

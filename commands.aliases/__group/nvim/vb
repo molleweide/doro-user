@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# NAME: ars
+# NAME: vb
 # -------------------------------------------------------
 # DESCRIPTION:
-# # above ar
+# 
 # -------------------------------------------------------
-# ARGS: ''
-echo "$@"
+CC=gcc-12 ~/.local/share/bob/nvim-bin/nvim "$@"

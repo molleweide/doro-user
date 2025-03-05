@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# NAME: fn-name-with-underscores
+# NAME: vNC
 # -------------------------------------------------------
 # DESCRIPTION:
 # 
 # -------------------------------------------------------
-# ARGS: ''
-echo "$@"
+nvim -u NORC "$@"
